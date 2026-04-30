@@ -9,6 +9,12 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+  if (req.method !== 'POST') {
+    return new Response(
+      JSON.stringify({ error: 'Method not allowed' }),
+      { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
 
   try {
     // --- Bootstrap guard ---
@@ -40,7 +46,24 @@ Deno.serve(async (req) => {
     }
 
     // --- Validate ADMIN_CREATION_KEY ---
-    const { adminKey } = await req.json();
+    let body: Record<string, unknown> = {};
+    try {
+      const parsed = await req.json();
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid payload' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      body = parsed as Record<string, unknown>;
+    } catch (_error) {
+      return new Response(
+        JSON.stringify({ error: 'Malformed JSON body' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const adminKey = typeof body.adminKey === 'string' ? body.adminKey : '';
     const expectedKey = Deno.env.get('ADMIN_CREATION_KEY');
     if (!expectedKey || adminKey !== expectedKey) {
       return new Response(
