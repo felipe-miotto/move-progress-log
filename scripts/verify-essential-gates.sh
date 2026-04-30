@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "==> [1/4] Lint"
+echo "==> [1/5] Lint"
 npm run lint
 
-echo "==> [2/4] Tests"
+echo "==> [2/5] Tests"
 npm run test
 
-echo "==> [3/4] Build"
+echo "==> [3/5] Build"
 npm run build
 
 echo "==> [4/5] Edge auth guard audit"
