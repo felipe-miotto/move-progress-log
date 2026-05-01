@@ -1,12 +1,13 @@
-import { useState, useRef } from "react";
+import { useMemo, useState, useRef } from "react";
 import { useStudents } from "@/hooks/useStudents";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageLoadingSkeleton } from "@/components/PageLoadingSkeleton";
 import { OuraApiDiagnosticsCard } from "@/components/OuraApiDiagnosticsCard";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ExerciseDistributionDiagnostic } from "@/components/ExerciseDistributionDiagnostic";
-import { ArrowLeft, Shield, Upload, Loader2, FileSpreadsheet } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Shield, Upload, Loader2, FileSpreadsheet, UserRoundSearch } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { PageLayout } from "@/components/PageLayout";
 import { PageHeader } from "@/components/PageHeader";
@@ -22,6 +23,7 @@ import { toast } from "sonner";
 import exercisesJSON from "@/data/exercicios_fabrik_categorizado.json";
 import { logger } from "@/utils/logger";
 import { buildErrorDescription } from "@/utils/errorParsing";
+import { findDuplicateStudentCandidates, type DuplicateStudentConfidence } from "@/utils/studentDuplicateDetection";
 
 const extractExcelCellValue = (value: unknown): unknown => {
   if (value instanceof Date) return value;
@@ -53,6 +55,20 @@ const toNumber = (value: unknown): number | undefined => {
   return undefined;
 };
 
+const duplicateConfidenceLabel: Record<DuplicateStudentConfidence, string> = {
+  alta: "Alta confiança",
+  media: "Revisar",
+  baixa: "Baixa confiança",
+  conflito: "Conflito",
+};
+
+const duplicateConfidenceVariant: Record<DuplicateStudentConfidence, "default" | "secondary" | "destructive" | "outline"> = {
+  alta: "default",
+  media: "secondary",
+  baixa: "outline",
+  conflito: "destructive",
+};
+
 const AdminDiagnosticsPage = () => {
   usePageTitle(NAV_LABELS.adminDiagnostics);
   useSEOHead(SEO_PRESETS.private);
@@ -66,6 +82,10 @@ const AdminDiagnosticsPage = () => {
   
   const navigate = useNavigate();
   const { data: students, isLoading } = useStudents();
+  const duplicateStudentCandidates = useMemo(
+    () => findDuplicateStudentCandidates(students ?? [], 12),
+    [students]
+  );
   const { isAdmin, isLoading: isLoadingRole } = useIsAdmin();
   const [importing, setImporting] = useState(false);
   const [importingXlsx, setImportingXlsx] = useState(false);
@@ -412,6 +432,97 @@ const AdminDiagnosticsPage = () => {
 
         {/* Exercise Distribution Diagnostic */}
         <ExerciseDistributionDiagnostic />
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <UserRoundSearch className="h-5 w-5" />
+              Possíveis alunos duplicados
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                Este diagnóstico não consolida alunos automaticamente. Ele só aponta candidatos para revisão manual,
+                porque nomes parecidos podem representar pessoas diferentes.
+              </AlertDescription>
+            </Alert>
+
+            {isLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((item) => (
+                  <Skeleton key={item} className="h-20 w-full" />
+                ))}
+              </div>
+            ) : duplicateStudentCandidates.length === 0 ? (
+              <div className="rounded-md border border-border bg-muted/20 p-4 text-sm text-muted-foreground">
+                Nenhum candidato encontrado pelos critérios seguros atuais.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {duplicateStudentCandidates.map((candidate) => (
+                  <div
+                    key={`${candidate.studentA.id}-${candidate.studentB.id}`}
+                    className="rounded-lg border bg-muted/20 p-4"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold">
+                            {candidate.studentA.name} ↔ {candidate.studentB.name}
+                          </p>
+                          <Badge variant={duplicateConfidenceVariant[candidate.confidence]}>
+                            {duplicateConfidenceLabel[candidate.confidence]}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            Score {(candidate.score * 100).toFixed(0)}%
+                          </span>
+                        </div>
+
+                        <div className="text-sm text-muted-foreground">
+                          <p>ID A: {candidate.studentA.id}</p>
+                          <p>ID B: {candidate.studentB.id}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(ROUTES.studentDetail(candidate.studentA.id))}
+                        >
+                          Abrir A
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(ROUTES.studentDetail(candidate.studentB.id))}
+                        >
+                          Abrir B
+                        </Button>
+                      </div>
+                    </div>
+
+                    {candidate.blockingReasons.length > 0 && (
+                      <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                        {candidate.blockingReasons.join(" ")} Não consolidar sem validação humana.
+                      </div>
+                    )}
+
+                    {candidate.reasons.length > 0 && (
+                      <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                        {candidate.reasons.map((reason) => (
+                          <li key={reason}>{reason}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {isLoading ? (
           <div className="space-y-6">
