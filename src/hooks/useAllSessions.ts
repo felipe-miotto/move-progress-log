@@ -11,6 +11,7 @@ interface SessionFilters {
   startTime?: string;
   endTime?: string;
   sessionType?: "individual" | "group" | "all";
+  finalized?: boolean;
 }
 
 export interface SessionWithDetails {
@@ -80,6 +81,9 @@ function buildSessionQuery(filters?: SessionFilters) {
   if (filters?.sessionType && filters.sessionType !== "all") {
     query = query.eq("session_type", filters.sessionType);
   }
+  if (typeof filters?.finalized === "boolean") {
+    query = query.eq("is_finalized", filters.finalized);
+  }
   return query;
 }
 
@@ -99,6 +103,7 @@ function buildStableQueryKey(prefix: string, filters?: SessionFilters) {
     filters?.startTime ?? "",
     filters?.endTime ?? "",
     filters?.sessionType ?? "all",
+    typeof filters?.finalized === "boolean" ? String(filters.finalized) : "all",
   ];
 }
 
