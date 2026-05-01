@@ -214,6 +214,7 @@ switch (movementPatternFilter) {
 ```
 - **User impact:** operação / manutenção do banco de exercícios / severity 4
 - **Recommendation:** Criar modo `Cadastro rápido` com nome, categoria, padrão, risco e equipamento; mover scores biomecânicos para seção avançada colapsada com checklist de completude. Mostrar “qualidade do cadastro: básico/completo”.
+- **Status 2026-05-01:** parcialmente tratado. O cadastro agora mantém nome, padrão, categoria, nível Boyle e risco no fluxo principal, e move classificação biomecânica, scores, prescrição padrão, mídia e equipamentos para uma seção `Campos avançados` colapsável com contador de campos preenchidos. Ainda fica pendente transformar equipamentos em parte do modo rápido se o uso prático mostrar necessidade.
 - **Effort:** M
 
 ## Médio

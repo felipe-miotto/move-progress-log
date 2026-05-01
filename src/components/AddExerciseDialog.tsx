@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Plus, AlertTriangle } from "lucide-react";
+import { Plus, AlertTriangle, ChevronDown } from "lucide-react";
 import {
   useCreateExercise,
   MOVEMENT_PATTERNS,
@@ -36,6 +36,7 @@ import {
 import { useDuplicateExerciseCheck } from "@/hooks/useDuplicateExerciseCheck";
 import { EQUIPMENT_CATEGORIES } from "@/constants/equipment";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { notify } from "@/lib/notify";
 
 // Flatten equipment for selection
@@ -87,11 +88,13 @@ export const AddExerciseDialog = ({
   const dialogOpen = isControlled ? externalOpen : internalOpen;
   const setDialogOpen = isControlled ? (onExternalOpenChange || (() => {})) : setInternalOpen;
   const [name, setName] = useState(defaultName || "");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   // Sync defaults when dialog opens externally
   useEffect(() => {
     if (isControlled && externalOpen) {
       if (defaultName) setName(defaultName);
+      setAdvancedOpen(Boolean(defaultValues));
       if (defaultValues) {
         setMovementPattern(defaultValues.movementPattern || "");
         setLaterality(defaultValues.laterality || "");
@@ -145,6 +148,28 @@ export const AddExerciseDialog = ({
   const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
   const [stabilityPosition, setStabilityPosition] = useState("");
   const [surfaceModifier, setSurfaceModifier] = useState("");
+
+  const advancedFieldsFilledCount = [
+    laterality,
+    movementPlane,
+    contractionType,
+    axialLoad,
+    lumbarDemand,
+    technicalComplexity,
+    metabolicPotential,
+    kneeDominance,
+    hipDominance,
+    emphasis,
+    description,
+    videoUrl,
+    subcategory,
+    plyometricPhase,
+    defaultSets,
+    defaultReps,
+    stabilityPosition,
+    surfaceModifier && surfaceModifier !== "nenhum" ? surfaceModifier : "",
+    selectedEquipment.length > 0 ? "equipment" : "",
+  ].filter(Boolean).length;
 
   const createExercise = useCreateExercise();
   const { data: duplicates } = useDuplicateExerciseCheck(name);
@@ -235,6 +260,7 @@ export const AddExerciseDialog = ({
     setSelectedEquipment([]);
     setStabilityPosition("");
     setSurfaceModifier("");
+    setAdvancedOpen(false);
 
     if (!onCreated) {
       setDialogOpen(false);
@@ -360,9 +386,39 @@ export const AddExerciseDialog = ({
               </div>
             </div>
 
-            {/* Classification Section */}
-            <div className="space-y-4 pt-4 border-t border-border">
-              <h3 className="text-sm font-medium text-muted-foreground">Classificação Biomecânica</h3>
+            <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+              <div className="pt-2">
+                <CollapsibleTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-between"
+                    aria-label={
+                      advancedOpen
+                        ? "Ocultar campos avançados do exercício"
+                        : "Mostrar campos avançados do exercício"
+                    }
+                  >
+                    <span className="text-left">
+                      Campos avançados
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">
+                        {advancedFieldsFilledCount > 0
+                          ? `${advancedFieldsFilledCount} preenchido(s)`
+                          : "opcional"}
+                      </span>
+                    </span>
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform ${advancedOpen ? "rotate-180" : ""}`}
+                      aria-hidden="true"
+                    />
+                  </Button>
+                </CollapsibleTrigger>
+              </div>
+
+              <CollapsibleContent className="space-y-4">
+                {/* Classification Section */}
+                <div className="space-y-4 pt-4 border-t border-border">
+                  <h3 className="text-sm font-medium text-muted-foreground">Classificação Biomecânica</h3>
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -461,11 +517,11 @@ export const AddExerciseDialog = ({
                   />
                 </div>
               </div>
-            </div>
+                </div>
 
-            {/* Dimension Scores Section */}
-            <div className="space-y-4 pt-4 border-t border-border">
-              <h3 className="text-sm font-medium text-muted-foreground">Scores de Classificação (0-5)</h3>
+                {/* Dimension Scores Section */}
+                <div className="space-y-4 pt-4 border-t border-border">
+                  <h3 className="text-sm font-medium text-muted-foreground">Scores de Classificação (0-5)</h3>
               
               <div className="grid grid-cols-3 gap-4">
                 {Object.entries(EXERCISE_DIMENSIONS).map(([key, dim]) => {
@@ -503,11 +559,11 @@ export const AddExerciseDialog = ({
                   placeholder="Ex: Joelho, Quadril, Ombro"
                 />
               </div>
-            </div>
+                </div>
 
-            {/* Defaults Section */}
-            <div className="space-y-4 pt-4 border-t border-border">
-              <h3 className="text-sm font-medium text-muted-foreground">Prescrição Padrão</h3>
+                {/* Defaults Section */}
+                <div className="space-y-4 pt-4 border-t border-border">
+                  <h3 className="text-sm font-medium text-muted-foreground">Prescrição Padrão</h3>
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -540,11 +596,11 @@ export const AddExerciseDialog = ({
                   />
                 </div>
               </div>
-            </div>
+                </div>
 
-            {/* Video and Description */}
-            <div className="space-y-4 pt-4 border-t border-border">
-              <h3 className="text-sm font-medium text-muted-foreground">Mídia e Descrição</h3>
+                {/* Video and Description */}
+                <div className="space-y-4 pt-4 border-t border-border">
+                  <h3 className="text-sm font-medium text-muted-foreground">Mídia e Descrição</h3>
               
               <div className="space-y-2">
                 <Label htmlFor="video-url">URL do Vídeo</Label>
@@ -567,11 +623,11 @@ export const AddExerciseDialog = ({
                   rows={3}
                 />
               </div>
-            </div>
+                </div>
 
-            {/* Equipment Section */}
-            <div className="space-y-4 pt-4 border-t border-border">
-              <h3 className="text-sm font-medium text-muted-foreground">Equipamentos Necessários</h3>
+                {/* Equipment Section */}
+                <div className="space-y-4 pt-4 border-t border-border">
+                  <h3 className="text-sm font-medium text-muted-foreground">Equipamentos Necessários</h3>
               
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-2 border rounded-md">
                 {ALL_EQUIPMENT.map((equipment) => (
@@ -595,7 +651,9 @@ export const AddExerciseDialog = ({
                   {selectedEquipment.length} equipamento(s) selecionado(s)
                 </p>
               )}
-            </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           </form>
         </div>
 
