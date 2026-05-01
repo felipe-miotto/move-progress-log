@@ -9,7 +9,7 @@ import TrainingZonesCard from "./TrainingZonesCard";
 import { StudentObservationsCard } from "./StudentObservationsCard";
 import ProtocolRecommendationsCard from "./ProtocolRecommendationsCard";
 import { useMemo, useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 
 interface SessionWithExercises {
   id: string;
@@ -75,6 +75,16 @@ const cardVariants = {
   }
 };
 
+const reducedContainerVariants = {
+  hidden: { opacity: 1 },
+  visible: { opacity: 1, transition: { duration: 0 } },
+};
+
+const reducedCardVariants = {
+  hidden: { y: 0, opacity: 1 },
+  visible: { y: 0, opacity: 1, transition: { duration: 0 } },
+};
+
 export const StudentOverviewDashboard = ({
   student,
   sessions,
@@ -83,6 +93,9 @@ export const StudentOverviewDashboard = ({
   ouraConnection,
   onNavigateToOura,
 }: StudentOverviewDashboardProps) => {
+  const shouldReduceMotion = useReducedMotion();
+  const activeContainerVariants = shouldReduceMotion ? reducedContainerVariants : containerVariants;
+  const activeCardVariants = shouldReduceMotion ? reducedCardVariants : cardVariants;
   // Medical alert dismiss state
   const [medicalAlertDismissed, setMedicalAlertDismissed] = useState(false);
 
@@ -143,13 +156,13 @@ export const StudentOverviewDashboard = ({
 
   return (
     <motion.div 
-      variants={containerVariants}
+      variants={activeContainerVariants}
       initial="hidden"
       animate="visible"
       className="space-y-lg"
     >
       {/* Oura Ring summary (compact to avoid duplicated dashboards) */}
-      <motion.div variants={cardVariants}>
+      <motion.div variants={activeCardVariants}>
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-sm">
@@ -225,7 +238,7 @@ export const StudentOverviewDashboard = ({
 
       {/* Training Statistics - Rich Context */}
       <motion.div 
-        variants={cardVariants}
+        variants={activeCardVariants}
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-md"
       >
         <StatCard
@@ -265,13 +278,13 @@ export const StudentOverviewDashboard = ({
       </motion.div>
 
       {/* Important Observations */}
-      <motion.div variants={cardVariants}>
+      <motion.div variants={activeCardVariants}>
         <StudentObservationsCard studentId={student.id} />
       </motion.div>
 
       {/* Training Zones and Protocol Recommendations */}
       <motion.div 
-        variants={cardVariants}
+        variants={activeCardVariants}
         className="grid grid-cols-1 lg:grid-cols-2 gap-md"
       >
         <TrainingZonesCard maxHeartRate={student.max_heart_rate} />
@@ -280,17 +293,17 @@ export const StudentOverviewDashboard = ({
 
       {/* Medical Considerations - Premium Alert */}
       {(student.limitations || student.injury_history) && !medicalAlertDismissed && (
-        <motion.div variants={cardVariants}>
+        <motion.div variants={activeCardVariants}>
           <Card className="relative overflow-hidden border-2 border-warning/50 bg-gradient-to-br from-warning/5 via-background to-warning/5">
             {/* Subtle Corner Shimmer */}
-            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-warning/20 via-transparent to-transparent animate-shimmer pointer-events-none" />
-            <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-warning/20 via-transparent to-transparent animate-shimmer pointer-events-none" />
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-warning/20 via-transparent to-transparent motion-safe:animate-shimmer motion-reduce:hidden pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-warning/20 via-transparent to-transparent motion-safe:animate-shimmer motion-reduce:hidden pointer-events-none" />
             
             <CardHeader className="relative z-10">
               <div className="flex items-start justify-between gap-md">
                 <CardTitle className="flex items-center gap-sm text-warning-foreground">
                   <div className="p-2 bg-warning/20 rounded-full">
-                    <AlertCircle className="h-5 w-5 text-warning animate-pulse-slow" />
+                    <AlertCircle className="h-5 w-5 text-warning motion-safe:animate-pulse-slow" />
                   </div>
                   ⚠️ Considerações Médicas Importantes
                 </CardTitle>
