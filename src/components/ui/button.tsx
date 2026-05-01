@@ -51,6 +51,9 @@ const buttonVariants = cva(
         
         // Large - ações primárias destacadas
         lg: "h-12 px-6 text-base rounded-lg",
+
+        // Touch - ações usadas em tablet/mobile durante atendimento
+        touch: "min-h-11 px-4 py-2 text-sm rounded-lg",
         
         // Icon - botões de ícone apenas
         icon: "h-10 w-10 rounded-md",
@@ -60,6 +63,9 @@ const buttonVariants = cva(
         
         // Icon large
         "icon-lg": "h-12 w-12 rounded-lg",
+
+        // Icon touch - alvo mínimo de toque recomendado
+        "icon-touch": "h-11 w-11 rounded-lg",
       },
     },
     defaultVariants: {

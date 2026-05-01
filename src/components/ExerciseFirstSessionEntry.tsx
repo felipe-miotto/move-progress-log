@@ -358,6 +358,135 @@ export function ExerciseFirstSessionEntry({
     })
   );
 
+  const renderTouchStudentCard = (student: StudentInfo) => {
+    const entry = data[student.id]?.[exerciseIndex];
+    if (!entry) return null;
+
+    const last = getLastSession(student.id, entry.exercise_name);
+    const deviation = hasLoadDeviation(student.id, exerciseIndex);
+    const isSubstituted = entry.exercise_name !== currentPrescribed.exercise_name;
+
+    return (
+      <div key={student.id} className="rounded-xl border border-border bg-card p-3 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold leading-tight">{student.name}</p>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted-foreground">{entry.exercise_name}</span>
+              {isSubstituted && (
+                <Badge variant="outline" className="text-[10px]">
+                  substituído
+                </Badge>
+              )}
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="touch"
+            className="shrink-0 gap-2"
+            onClick={() => openSubstitution(student.id)}
+          >
+            <BookOpen className="h-4 w-4" />
+            Trocar
+          </Button>
+        </div>
+
+        {last && (
+          <div className="mt-3 rounded-lg bg-muted/60 p-3 text-xs">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-medium text-foreground">
+                  Última: {last.load_breakdown ? compressLoadShorthand(last.load_breakdown) : "—"} = {last.load_kg ?? "—"}kg ×{last.reps ?? "—"}
+                </p>
+                {last.date && (
+                  <p className="mt-0.5 text-muted-foreground">
+                    há {formatDistanceToNow(new Date(last.date), { addSuffix: false, locale: ptBR })}
+                  </p>
+                )}
+                {last.observations && (
+                  <p className="mt-1 line-clamp-2 text-muted-foreground/80">{last.observations}</p>
+                )}
+              </div>
+              <Button
+                variant="ghost"
+                size="touch"
+                className="shrink-0"
+                onClick={() => handleRepeatLastLoad(student.id)}
+              >
+                <RefreshCw className="h-4 w-4" />
+                Repetir
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <div className="col-span-2">
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              Carga parcial
+            </label>
+            <Input
+              value={entry.load_breakdown}
+              onChange={(e) => updateField(student.id, exerciseIndex, "load_breakdown", e.target.value)}
+              onBlur={() => handleLoadBlur(student.id, exerciseIndex)}
+              placeholder="2x24, KB32, 10cl b15"
+              className={`min-h-11 text-base ${
+                deviation
+                  ? "border-amber-500 focus-visible:ring-amber-500"
+                  : !isLoadExemptCategory(entry.exercise_name) && !entry.load_breakdown
+                  ? "border-destructive/50"
+                  : ""
+              }`}
+            />
+            {deviation && (
+              <p className="mt-1 flex items-center gap-1 text-xs text-amber-600">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                Desvio maior que 30% da última carga.
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              Reps
+            </label>
+            <Input
+              type="number"
+              value={entry.reps || ""}
+              onChange={(e) =>
+                updateField(student.id, exerciseIndex, "reps", parseInt(e.target.value) || 0)
+              }
+              min={1}
+              inputMode="numeric"
+              className={`min-h-11 text-base ${entry.reps <= 0 ? "border-destructive/50" : ""}`}
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              Total
+            </label>
+            <div className="flex min-h-11 items-center rounded-md border bg-muted/40 px-3 font-mono text-base">
+              {entry.load_kg !== null ? `${entry.load_kg} kg` : "—"}
+            </div>
+          </div>
+
+          <div className="col-span-2">
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              Observações
+            </label>
+            <Input
+              value={entry.observations}
+              onChange={(e) => updateField(student.id, exerciseIndex, "observations", e.target.value)}
+              placeholder="dor, técnica, ajuste..."
+              className="min-h-11 text-base"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (!currentPrescribed || totalExercises === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
@@ -419,8 +548,12 @@ export function ExerciseFirstSessionEntry({
             </Button>
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
+        <CardContent className="p-3 sm:p-4 lg:p-0">
+          <div className="space-y-3 lg:hidden">
+            {selectedStudents.map(renderTouchStudentCard)}
+          </div>
+
+          <div className="hidden overflow-x-auto lg:block">
             <Table>
               <TableHeader>
                 <TableRow>

@@ -448,7 +448,15 @@ export default function StudentOnboardingPage() {
                                 </ul>
                                 <div className="mt-3 pt-2 border-t border-border">
                                   <p className="text-xs">
-                                    🔒 <strong>Privacidade garantida:</strong> Seus dados serão usados <strong>exclusivamente</strong> por {validationData?.trainer_name || "seu treinador"} para personalizar seus treinos. Não compartilharemos com terceiros.
+                                    🔒 <strong>Privacidade garantida:</strong> Seus dados serão usados <strong>exclusivamente</strong> por {validationData?.trainer_name || "seu treinador"} para personalizar seus treinos. Não compartilharemos com terceiros.{" "}
+                                    <a
+                                      href={ROUTES.ouraConsent}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="text-primary hover:underline"
+                                    >
+                                      Ver escopo Oura.
+                                    </a>
                                   </p>
                                 </div>
                               </div>
@@ -464,27 +472,19 @@ export default function StudentOnboardingPage() {
                   <p>
                     Ao finalizar o cadastro, você concorda com nossos{" "}
                     <a 
-                      href="#" 
+                      href={ROUTES.terms}
+                      target="_blank"
+                      rel="noreferrer"
                       className="text-primary hover:underline"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        toast.info("Em breve", {
-                          description: "Página de Termos de Uso em desenvolvimento"
-                        });
-                      }}
                     >
                       Termos de Uso
                     </a>
                     {" "}e{" "}
                     <a 
-                      href="#" 
+                      href={ROUTES.privacy}
+                      target="_blank"
+                      rel="noreferrer"
                       className="text-primary hover:underline"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        toast.info("Em breve", {
-                          description: "Página de Política de Privacidade em desenvolvimento"
-                        });
-                      }}
                     >
                       Política de Privacidade
                     </a>

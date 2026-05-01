@@ -227,6 +227,85 @@ interface ProcessingStatus {
   success: boolean;
 }
 
+interface ImportErrorGroup {
+  key: string;
+  title: string;
+  action: string;
+  errors: string[];
+}
+
+const categorizeImportErrors = (errors: string[]): ImportErrorGroup[] => {
+  const groups: Record<string, ImportErrorGroup> = {
+    databaseFunction: {
+      key: "databaseFunction",
+      title: "Função do banco indisponível",
+      action: "Republique a função RPC/migration antes de tentar importar novamente.",
+      errors: [],
+    },
+    spreadsheetFormat: {
+      key: "spreadsheetFormat",
+      title: "Formato da planilha",
+      action: "Revise colunas obrigatórias, datas, horários e linhas vazias.",
+      errors: [],
+    },
+    studentOrSession: {
+      key: "studentOrSession",
+      title: "Aluno ou sessão",
+      action: "Confirme nome do aluno, data, horário e se a sessão já existe.",
+      errors: [],
+    },
+    other: {
+      key: "other",
+      title: "Outros erros",
+      action: "Abra os detalhes técnicos e use o primeiro exemplo para diagnóstico.",
+      errors: [],
+    },
+  };
+
+  errors.forEach((error) => {
+    const normalized = error.toLowerCase();
+
+    if (
+      normalized.includes("could not find the function") ||
+      normalized.includes("schema cache") ||
+      normalized.includes("public.create_workout_session")
+    ) {
+      groups.databaseFunction.errors.push(error);
+      return;
+    }
+
+    if (
+      normalized.includes("coluna") ||
+      normalized.includes("column") ||
+      normalized.includes("linha") ||
+      normalized.includes("row") ||
+      normalized.includes("data") ||
+      normalized.includes("hora") ||
+      normalized.includes("formato") ||
+      normalized.includes("required") ||
+      normalized.includes("obrigat")
+    ) {
+      groups.spreadsheetFormat.errors.push(error);
+      return;
+    }
+
+    if (
+      normalized.includes("aluno") ||
+      normalized.includes("student") ||
+      normalized.includes("sess") ||
+      normalized.includes("duplicate") ||
+      normalized.includes("duplicad")
+    ) {
+      groups.studentOrSession.errors.push(error);
+      return;
+    }
+
+    groups.other.errors.push(error);
+  });
+
+  return Object.values(groups).filter((group) => group.errors.length > 0);
+};
+
 const formatExcelSerialDate = (serial: number): string | null => {
   if (!Number.isFinite(serial)) return null;
   const wholeDays = Math.floor(serial);
@@ -906,13 +985,54 @@ export const ImportSessionsDialog = ({ open, onOpenChange }: ImportSessionsDialo
                     <strong>Importação concluída com erros</strong>
                     <br />
                     {status.processed} importada(s), {status.skippedDuplicates} duplicada(s) ignorada(s), {status.mergedDuplicates} exercício(s) atualizado(s), {status.errors.length} erro(s).
-                    <div className="mt-2 max-h-32 overflow-y-auto text-xs">
-                      {status.errors.map((error, i) => (
-                        <div key={i} className="mt-1">
-                          • {error}
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                      <div className="rounded-md border border-destructive/20 bg-background/60 p-2">
+                        <p className="text-muted-foreground">Importadas</p>
+                        <p className="text-base font-semibold">{status.processed}</p>
+                      </div>
+                      <div className="rounded-md border border-destructive/20 bg-background/60 p-2">
+                        <p className="text-muted-foreground">Duplicadas</p>
+                        <p className="text-base font-semibold">{status.skippedDuplicates}</p>
+                      </div>
+                      <div className="rounded-md border border-destructive/20 bg-background/60 p-2">
+                        <p className="text-muted-foreground">Atualizadas</p>
+                        <p className="text-base font-semibold">{status.mergedDuplicates}</p>
+                      </div>
+                      <div className="rounded-md border border-destructive/20 bg-background/60 p-2">
+                        <p className="text-muted-foreground">Erros</p>
+                        <p className="text-base font-semibold">{status.errors.length}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {categorizeImportErrors(status.errors).map((group) => (
+                        <div key={group.key} className="rounded-md border border-destructive/30 bg-background/70 p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-medium">{group.title}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">{group.action}</p>
+                            </div>
+                            <span className="shrink-0 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-semibold">
+                              {group.errors.length}
+                            </span>
+                          </div>
+                          <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">
+                            Exemplo: {group.errors[0]}
+                          </p>
                         </div>
                       ))}
                     </div>
+                    <details className="mt-3 rounded-md border border-destructive/20 bg-background/60 p-3">
+                      <summary className="cursor-pointer text-xs font-medium">
+                        Ver detalhes técnicos
+                      </summary>
+                      <div className="mt-2 max-h-40 overflow-y-auto text-xs">
+                        {status.errors.map((error, i) => (
+                          <div key={i} className="mt-1 break-words">
+                            • {error}
+                          </div>
+                        ))}
+                      </div>
+                    </details>
                   </AlertDescription>
                 </Alert>
               )}
