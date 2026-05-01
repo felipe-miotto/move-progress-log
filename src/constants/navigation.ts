@@ -55,6 +55,8 @@ export interface RouteDefinition {
   label: string;
   icon?: LucideIcon;
   requiresAdmin?: boolean;
+  navGroup: "operations" | "library" | "admin" | "experimental";
+  experimentalNav?: boolean;
 }
 
 /**
@@ -62,17 +64,17 @@ export interface RouteDefinition {
  * Sincroniza automaticamente com sidebar e breadcrumbs
  */
 export const ROUTE_CONFIG: RouteDefinition[] = [
-  { path: ROUTES.dashboard, label: "Dashboard", icon: Home },
-  { path: ROUTES.students, label: "Alunos", icon: Users },
-  { path: ROUTES.sessions, label: "Sessões", icon: ClipboardList },
-  { path: ROUTES.exercises, label: "Exercícios", icon: Library },
-  { path: ROUTES.prescriptions, label: "Prescrições", icon: FileText },
-  { path: ROUTES.protocols, label: "Protocolos", icon: Heart },
-  { path: ROUTES.adminUsers, label: "Usuários", icon: UserCog, requiresAdmin: true },
-  { path: ROUTES.adminDiagnostics, label: "Admin - Diagnóstico Oura", icon: Shield, requiresAdmin: true },
-  { path: ROUTES.aiBuilder, label: "AI Builder", icon: Bot, requiresAdmin: true },
-  { path: ROUTES.athleteInsights, label: "Insights do Atleta", icon: BarChart2, requiresAdmin: true },
-  { path: ROUTES.coachConsole, label: "Coach Console", icon: Brain, requiresAdmin: true },
+  { path: ROUTES.dashboard, label: "Dashboard", icon: Home, navGroup: "operations" },
+  { path: ROUTES.students, label: "Alunos", icon: Users, navGroup: "operations" },
+  { path: ROUTES.sessions, label: "Sessões", icon: ClipboardList, navGroup: "operations" },
+  { path: ROUTES.prescriptions, label: "Prescrições", icon: FileText, navGroup: "operations" },
+  { path: ROUTES.exercises, label: "Exercícios", icon: Library, navGroup: "library" },
+  { path: ROUTES.protocols, label: "Protocolos", icon: Heart, navGroup: "library" },
+  { path: ROUTES.adminUsers, label: "Usuários", icon: UserCog, requiresAdmin: true, navGroup: "admin" },
+  { path: ROUTES.adminDiagnostics, label: "Diagnóstico Oura", icon: Shield, requiresAdmin: true, navGroup: "admin" },
+  { path: ROUTES.aiBuilder, label: "AI Builder", icon: Bot, requiresAdmin: true, navGroup: "experimental", experimentalNav: true },
+  { path: ROUTES.athleteInsights, label: "Insights do Atleta", icon: BarChart2, requiresAdmin: true, navGroup: "experimental", experimentalNav: true },
+  { path: ROUTES.coachConsole, label: "Coach Console", icon: Brain, requiresAdmin: true, navGroup: "experimental", experimentalNav: true },
 ];
 
 export const NAV_LABELS = {

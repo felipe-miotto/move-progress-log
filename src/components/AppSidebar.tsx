@@ -10,6 +10,7 @@ import { isRouteActive } from "@/lib/navigationUtils";
 import { useEffect } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { buildErrorDescription } from "@/utils/errorParsing";
+import { isExperimentalNavigationEnabled } from "@/utils/featureFlags";
 
 import {
   Sidebar,
@@ -30,6 +31,7 @@ export function AppSidebar() {
   const location = useLocation();
   const { toast } = useToast();
   const { isAdmin } = useIsAdmin();
+  const showExperimentalNav = isExperimentalNavigationEnabled();
 
   // Fechar sidebar automaticamente no mobile após navegação
   useEffect(() => {
@@ -38,10 +40,16 @@ export function AppSidebar() {
     }
   }, [location.pathname, isMobile, setOpen]);
 
-  // Filtrar rotas baseado em permissões
-  const items = ROUTE_CONFIG.filter(item => 
-    !item.requiresAdmin || isAdmin
+  // Filtrar rotas baseado em permissões e manter módulos piloto fora do menu padrão.
+  const items = ROUTE_CONFIG.filter(item =>
+    (!item.requiresAdmin || isAdmin) && (!item.experimentalNav || showExperimentalNav)
   );
+  const menuGroups = [
+    { id: "operations", label: "Operação" },
+    { id: "library", label: "Biblioteca" },
+    { id: "admin", label: "Administração" },
+    { id: "experimental", label: "Experimental" },
+  ] as const;
 
   const handleSignOut = async () => {
     const { error } = await supabase.auth.signOut();
@@ -118,18 +126,28 @@ export function AppSidebar() {
         </div>
 
         {/* Navegação centralizada via ROUTE_CONFIG */}
-        <SidebarGroup>
-          <SidebarGroupLabel>Navegação</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {items.map((item) => (
-                <SidebarMenuItem key={item.path}>
-                  <MenuItemComponent item={item} />
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {menuGroups.map((group) => {
+          const groupItems = items.filter((item) => item.navGroup === group.id);
+
+          if (groupItems.length === 0) {
+            return null;
+          }
+
+          return (
+            <SidebarGroup key={group.id} className="py-xs">
+              {open && <SidebarGroupLabel>{group.label}</SidebarGroupLabel>}
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {groupItems.map((item) => (
+                    <SidebarMenuItem key={item.path}>
+                      <MenuItemComponent item={item} />
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          );
+        })}
       </SidebarContent>
 
       {/* Footer with Logout */}
