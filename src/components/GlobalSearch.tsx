@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Search, Users, FileText, Dumbbell, Loader2 } from "lucide-react";
+import { Search, Users, FileText, Dumbbell, Loader2, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ROUTES } from "@/constants/navigation";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -19,6 +19,7 @@ export const GlobalSearch = () => {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const navigate = useNavigate();
   const debouncedQuery = useDebounce(query, 300);
 
@@ -37,10 +38,12 @@ export const GlobalSearch = () => {
   const performSearch = useCallback(async (searchQuery: string) => {
     if (!searchQuery || searchQuery.length < 2) {
       setResults([]);
+      setSearchError(null);
       return;
     }
 
     setIsSearching(true);
+    setSearchError(null);
     const searchResults: SearchResult[] = [];
 
     try {
@@ -61,6 +64,16 @@ export const GlobalSearch = () => {
           .ilike("name", `%${searchQuery}%`)
           .limit(5),
       ]);
+
+      const searchErrors = [
+        studentsData.error,
+        prescriptionsData.error,
+        exercisesData.error,
+      ].filter(Boolean);
+
+      if (searchErrors.length > 0) {
+        throw new Error(searchErrors.map((error) => error?.message).join(" | "));
+      }
 
       if (studentsData.data) {
         studentsData.data.forEach((student) => {
@@ -98,6 +111,7 @@ export const GlobalSearch = () => {
     } catch (error) {
       logger.error("Erro ao buscar:", error);
       setResults([]);
+      setSearchError("Não foi possível carregar a busca agora. Tente novamente.");
     } finally {
       setIsSearching(false);
     }
@@ -160,7 +174,24 @@ export const GlobalSearch = () => {
             </div>
           )}
           
-          {!isSearching && query.length >= 2 && results.length === 0 && (
+          {!isSearching && query.length >= 2 && searchError && (
+            <CommandEmpty>
+              <div className="px-6 py-6 text-center" role="alert">
+                <AlertCircle className="h-8 w-8 mx-auto mb-2 text-destructive" />
+                <p className="text-sm font-medium">Erro ao buscar</p>
+                <p className="text-sm text-muted-foreground mt-1">{searchError}</p>
+                <button
+                  type="button"
+                  className="mt-4 rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  onClick={() => performSearch(query)}
+                >
+                  Tentar novamente
+                </button>
+              </div>
+            </CommandEmpty>
+          )}
+
+          {!isSearching && query.length >= 2 && !searchError && results.length === 0 && (
             <CommandEmpty>
               <div className="text-center py-6">
                 <Search className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
