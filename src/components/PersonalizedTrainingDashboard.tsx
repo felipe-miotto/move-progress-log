@@ -229,6 +229,17 @@ const PersonalizedTrainingDashboard = ({
     return `${value.toFixed(1)} kg`;
   };
 
+  const formatAdjustmentPercent = (value: number | null) => {
+    if (value === null) return "--";
+    return `${value > 0 ? "+" : ""}${value}%`;
+  };
+
+  const getSuggestionStatusLabel = (status: string) => {
+    if (status === "automatic") return "Sugestão automática";
+    if (status === "assisted") return "Sugestão assistida";
+    return "Dados insuficientes";
+  };
+
   return (
     <div className="space-y-6">
       {/* Status de Recuperação Principal */}
@@ -427,7 +438,7 @@ const PersonalizedTrainingDashboard = ({
           <div className="space-y-3">
             {loadSuggestions.map((item) => (
               <div key={item.exerciseName} className="rounded-lg border p-4 bg-muted/20">
-                <div className="flex items-start justify-between gap-4 mb-2">
+                <div className="flex items-start justify-between gap-4 mb-3">
                   <div>
                     <h4 className="font-semibold">{item.exerciseName}</h4>
                     <p className="text-xs text-muted-foreground">
@@ -435,15 +446,56 @@ const PersonalizedTrainingDashboard = ({
                     </p>
                   </div>
                   <Badge variant={item.status === "insufficient" ? "destructive" : "secondary"}>
-                    {item.status === "automatic"
-                      ? "Sugestão automática"
-                      : item.status === "assisted"
-                        ? "Sugestão assistida"
-                        : "Dados insuficientes"}
+                    {getSuggestionStatusLabel(item.status)}
                   </Badge>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-2 text-sm">
+                <div className="md:hidden space-y-3">
+                  <div className="rounded-md bg-background/70 border p-3">
+                    <p className="text-xs text-muted-foreground">Carga sugerida</p>
+                    <p className="text-2xl font-bold">{formatLoad(item.suggestedLoadKg)}</p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    <span>Última: {formatLoad(item.lastLoadKg)}</span>
+                    <span>Reps: {item.referenceReps ?? "--"}</span>
+                    <span>Zona: {zoneLabelMap[recommendation.zone] ?? recommendation.zone}</span>
+                  </div>
+
+                  <details className="rounded-md border bg-background/50 px-3 py-2">
+                    <summary className="cursor-pointer text-sm font-medium text-primary">
+                      Ver detalhes da regra
+                    </summary>
+                    <div className="mt-3 grid grid-cols-1 gap-2 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">Regra aplicada</p>
+                        <p className="font-semibold">{item.ruleApplied}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Ajuste</p>
+                        <p className="font-semibold">{formatAdjustmentPercent(item.adjustmentPercent)}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Incremento</p>
+                        <p className="font-semibold">{item.incrementKg} kg</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Fonte</p>
+                        <p className="font-semibold">{sourceLabelMap[item.source] ?? item.source}</p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        {item.guardrails.includes("pain_recent") && (
+                          <Badge variant="destructive">Guardrail: dor recente</Badge>
+                        )}
+                        {item.guardrails.includes("technique_inconsistent") && (
+                          <Badge variant="outline">Guardrail: técnica inconsistente</Badge>
+                        )}
+                      </div>
+                    </div>
+                  </details>
+                </div>
+
+                <div className="hidden md:grid md:grid-cols-5 gap-2 text-sm">
                   <div>
                     <p className="text-muted-foreground">Última carga válida</p>
                     <p className="font-semibold">{formatLoad(item.lastLoadKg)}</p>
@@ -454,11 +506,7 @@ const PersonalizedTrainingDashboard = ({
                   </div>
                   <div>
                     <p className="text-muted-foreground">Ajuste</p>
-                    <p className="font-semibold">
-                      {item.adjustmentPercent === null
-                        ? "--"
-                        : `${item.adjustmentPercent > 0 ? "+" : ""}${item.adjustmentPercent}%`}
-                    </p>
+                    <p className="font-semibold">{formatAdjustmentPercent(item.adjustmentPercent)}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Carga sugerida</p>
@@ -469,7 +517,7 @@ const PersonalizedTrainingDashboard = ({
                     <p className="font-semibold">{item.incrementKg} kg</p>
                   </div>
                 </div>
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <div className="mt-2 hidden md:flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span>Fonte: {sourceLabelMap[item.source] ?? item.source}</span>
                   {item.guardrails.includes("pain_recent") && (
                     <Badge variant="destructive">Guardrail: dor recente</Badge>
