@@ -8,6 +8,7 @@ import { ptBR } from "date-fns/locale";
 
 interface ExerciseLoadHistoryPopoverProps {
   exerciseName: string;
+  exerciseLibraryId?: string | null;
   prescriptionId: string;
   children: React.ReactNode;
   /** For TV mode dark theme */
@@ -16,17 +17,19 @@ interface ExerciseLoadHistoryPopoverProps {
 
 export const ExerciseLoadHistoryPopover = ({
   exerciseName,
+  exerciseLibraryId,
   prescriptionId,
   children,
   darkMode = false,
 }: ExerciseLoadHistoryPopoverProps) => {
   const [open, setOpen] = useState(false);
 
-  const { data: history, isLoading } = useExerciseLoadHistory(
+  const { data: history, isLoading } = useExerciseLoadHistory({
     exerciseName,
+    exerciseLibraryId,
     prescriptionId,
-    open
-  );
+    enabled: open,
+  });
 
   const hasStudents = history && history.length > 0;
 

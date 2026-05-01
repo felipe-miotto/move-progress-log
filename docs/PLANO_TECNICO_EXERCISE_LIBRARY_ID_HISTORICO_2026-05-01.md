@@ -1,7 +1,7 @@
 # Plano tecnico — estabilizar historico de carga por `exercise_library_id`
 
 Data: 2026-05-01  
-Status: proposta tecnica, nao executada  
+Status: implementado em branch de correção
 Escopo: preparar o sistema para renomeacoes e fusoes futuras em `exercises_library` sem quebrar historico de carga.
 
 ## 1. Problema
@@ -64,6 +64,12 @@ limit 100;
 
 ## 4. Migration proposta
 
+Implementada em:
+
+```text
+supabase/migrations/20260501100000_add_exercise_library_id_to_session_exercises.sql
+```
+
 ```sql
 alter table public.exercises
 add column if not exists exercise_library_id uuid null;
@@ -105,6 +111,16 @@ order by total desc, e.exercise_name;
 Nao usar fuzzy/`ilike` para preencher FK automaticamente. Pode juntar pessoas/exercicios errados. Fuzzy deve gerar CSV de revisao manual.
 
 ## 6. Mudanca no frontend
+
+Implementada em:
+
+```text
+src/hooks/useExerciseLoadHistory.ts
+src/components/ExerciseLoadHistoryPopover.tsx
+src/components/PrescriptionCard.tsx
+src/components/PrescriptionTVMode.tsx
+src/integrations/supabase/types.ts
+```
 
 ### 6.1 Assinatura do hook
 
@@ -174,4 +190,3 @@ Este plano deve ser executado antes de:
 - fusoes/deletes de IDs de `exercises_library`;
 - atualizacao de nomes canonicos em lote;
 - automatizacao de classificacao por SQL.
-

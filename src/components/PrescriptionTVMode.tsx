@@ -136,6 +136,7 @@ export const PrescriptionTVMode = ({ open, onClose, prescription, exercises }: P
                       <td className="text-center py-5 px-6">
                         <ExerciseLoadHistoryPopover
                           exerciseName={exercise.exercise_name}
+                          exerciseLibraryId={exercise.exercise_library_id}
                           prescriptionId={prescription.id}
                           darkMode
                         >

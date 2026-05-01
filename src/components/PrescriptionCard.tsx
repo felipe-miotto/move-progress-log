@@ -292,6 +292,7 @@ const PrescriptionCardComponent = ({
                           <TableCell className="text-center">
                             <ExerciseLoadHistoryPopover
                               exerciseName={exercise.exercise_name}
+                              exerciseLibraryId={exercise.exercise_library_id}
                               prescriptionId={prescription.id}
                             >
                               {intensityValue ? (
