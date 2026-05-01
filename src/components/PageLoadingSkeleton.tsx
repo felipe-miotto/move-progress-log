@@ -125,12 +125,16 @@ export const PageLoadingSkeleton = ({
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5 }}
             className="fixed inset-0 flex items-center justify-center pointer-events-none"
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
           >
             <div className="flex flex-col items-center gap-4">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground font-medium">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
+              <p className="text-sm text-muted-foreground font-medium" aria-hidden="true">
                 Carregando...
               </p>
+              <span className="sr-only">Carregando página</span>
             </div>
           </motion.div>
         )}

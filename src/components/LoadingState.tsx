@@ -51,7 +51,12 @@ export const LoadingState = ({
   fullScreen = false,
 }: LoadingStateProps) => {
   const content = (
-    <div className={cn("flex flex-col items-center justify-center gap-md", className)}>
+    <div
+      className={cn("flex flex-col items-center justify-center gap-md", className)}
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
       <Icon 
         className={cn(
           "animate-spin text-primary",
@@ -72,7 +77,7 @@ export const LoadingState = ({
 
   if (fullScreen) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-xl">
+      <div className="flex min-h-screen items-center justify-center p-xl" aria-busy="true">
         {content}
       </div>
     );
