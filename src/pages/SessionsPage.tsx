@@ -52,7 +52,7 @@ import {
   User as UserIcon,
   Dumbbell,
 } from "lucide-react";
-import { format } from "date-fns";
+import { endOfWeek, format, startOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useAllSessionsPaginated, SessionWithDetails } from "@/hooks/useAllSessions";
 import { useStudents } from "@/hooks/useStudents";
@@ -89,6 +89,7 @@ export default function SessionsPage() {
   const [startTime, setStartTime] = useState<string>("");
   const [endTime, setEndTime] = useState<string>("");
   const [sessionType, setSessionType] = useState<"all" | "individual" | "group">("all");
+  const [finalizedFilter, setFinalizedFilter] = useState<"all" | "editing" | "finalized">("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Search states
@@ -121,6 +122,10 @@ export default function SessionsPage() {
     startTime: startTime || undefined,
     endTime: endTime || undefined,
     sessionType,
+    finalized:
+      finalizedFilter === "all"
+        ? undefined
+        : finalizedFilter === "finalized",
   });
   const sessions = useMemo(
     () =>
@@ -165,7 +170,31 @@ export default function SessionsPage() {
     setStartTime("");
     setEndTime("");
     setSessionType("all");
+    setFinalizedFilter("all");
   };
+
+  const applyTodayPreset = () => {
+    const today = new Date();
+    setStartDate(today);
+    setEndDate(today);
+  };
+
+  const applyWeekPreset = () => {
+    const today = new Date();
+    setStartDate(startOfWeek(today, { locale: ptBR }));
+    setEndDate(endOfWeek(today, { locale: ptBR }));
+  };
+
+  const formatDateKey = (date?: Date) =>
+    date ? format(date, "yyyy-MM-dd") : "";
+
+  const todayKey = format(new Date(), "yyyy-MM-dd");
+  const weekStartKey = formatDateKey(startOfWeek(new Date(), { locale: ptBR }));
+  const weekEndKey = formatDateKey(endOfWeek(new Date(), { locale: ptBR }));
+  const startDateKey = formatDateKey(startDate);
+  const endDateKey = formatDateKey(endDate);
+  const isTodayPresetActive = startDateKey === todayKey && endDateKey === todayKey;
+  const isWeekPresetActive = startDateKey === weekStartKey && endDateKey === weekEndKey;
 
   const hasActiveFilters = 
     selectedStudentIds.length > 0 ||
@@ -174,7 +203,8 @@ export default function SessionsPage() {
     endDate ||
     startTime ||
     endTime ||
-    sessionType !== "all";
+    sessionType !== "all" ||
+    finalizedFilter !== "all";
 
   const handleViewDetails = (sessionId: string) => {
     setSelectedSessionId(sessionId);
@@ -265,6 +295,7 @@ export default function SessionsPage() {
                     (startDate || endDate) && "data",
                     (startTime || endTime) && "horário",
                     sessionType !== "all" && "tipo",
+                    finalizedFilter !== "all" && "status",
                   ].filter(Boolean).join(", ")}
                 </Badge>
               )}
@@ -277,7 +308,57 @@ export default function SessionsPage() {
               {filtersOpen ? "Ocultar" : "Mostrar"}
             </Button>
           </CardHeader>
-          
+
+          <CardContent className="pt-0">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant={isTodayPresetActive ? "default" : "outline"}
+                size="sm"
+                onClick={applyTodayPreset}
+              >
+                Hoje
+              </Button>
+              <Button
+                type="button"
+                variant={isWeekPresetActive ? "default" : "outline"}
+                size="sm"
+                onClick={applyWeekPreset}
+              >
+                Esta semana
+              </Button>
+              <Button
+                type="button"
+                variant={finalizedFilter === "editing" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFinalizedFilter("editing")}
+              >
+                Em edição
+              </Button>
+              <Button
+                type="button"
+                variant={sessionType === "individual" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSessionType("individual")}
+              >
+                Individual
+              </Button>
+              <Button
+                type="button"
+                variant={sessionType === "group" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSessionType("group")}
+              >
+                Grupo
+              </Button>
+              {hasActiveFilters && (
+                <Button type="button" variant="ghost" size="sm" onClick={handleClearFilters}>
+                  Limpar
+                </Button>
+              )}
+            </div>
+          </CardContent>
+
           {filtersOpen && (
             <CardContent className="space-y-md">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-md">
@@ -393,6 +474,28 @@ export default function SessionsPage() {
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="group" id="type-group" />
                       <Label htmlFor="type-group" className="cursor-pointer">Grupo</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                {/* Status Filter */}
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <RadioGroup
+                    value={finalizedFilter}
+                    onValueChange={(v) => setFinalizedFilter(v as "all" | "editing" | "finalized")}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="all" id="status-all" />
+                      <Label htmlFor="status-all" className="cursor-pointer">Todos</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="editing" id="status-editing" />
+                      <Label htmlFor="status-editing" className="cursor-pointer">Em edição</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="finalized" id="status-finalized" />
+                      <Label htmlFor="status-finalized" className="cursor-pointer">Finalizadas</Label>
                     </div>
                   </RadioGroup>
                 </div>
