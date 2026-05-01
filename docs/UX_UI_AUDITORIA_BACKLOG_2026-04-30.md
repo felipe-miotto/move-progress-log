@@ -33,6 +33,7 @@ O sistema já tem uma fundação visual razoável, com tokens de cor/espaçament
 ```
 - **User impact:** treinador / toda sessão em grupo / severity 5
 - **Recommendation:** Criar uma variante touch/tablet em cards ou linhas grandes: 1 bloco por aluno dentro do exercício atual, com carga, reps e observação em campos de 44-48px, botão “repetir última” como ação textual, rodapé sticky com “Anterior / Próximo / Salvar”. Manter a tabela densa apenas para desktop/monitor (`lg+`). O código pode preservar a lógica atual e trocar só a camada de apresentação com breakpoints responsivos.
+- **Status 2026-05-01:** parcialmente tratado. O fluxo já mantém cards para `<lg`; os botões de navegação do exercício passaram para alvo touch e os indicadores de progresso ganharam alvo clicável maior, foco visível e rótulos acessíveis. Ainda fica pendente avaliar rodapé sticky e reduzir medidas micro no modo desktop.
 - **Effort:** L
 
 ### C — Termos e Política de Privacidade são links falsos no onboarding com consentimento Oura

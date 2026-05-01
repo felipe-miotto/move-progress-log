@@ -501,12 +501,14 @@ export function ExerciseFirstSessionEntry({
       <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
         <Button
           variant="outline"
-          size="sm"
+          size="touch"
           onClick={() => setExerciseIndex((i) => Math.max(0, i - 1))}
           disabled={exerciseIndex === 0}
+          aria-label="Ir para exercício anterior"
+          className="shrink-0"
         >
           <ChevronLeft className="h-4 w-4 mr-1" />
-          Anterior
+          <span className="hidden sm:inline">Anterior</span>
         </Button>
 
         <div className="text-center flex-1 mx-4">
@@ -523,11 +525,13 @@ export function ExerciseFirstSessionEntry({
 
         <Button
           variant="outline"
-          size="sm"
+          size="touch"
           onClick={() => setExerciseIndex((i) => Math.min(totalExercises - 1, i + 1))}
           disabled={exerciseIndex === totalExercises - 1}
+          aria-label="Ir para próximo exercício"
+          className="shrink-0"
         >
-          Próximo
+          <span className="hidden sm:inline">Próximo</span>
           <ChevronRight className="h-4 w-4 ml-1" />
         </Button>
       </div>
@@ -731,7 +735,10 @@ export function ExerciseFirstSessionEntry({
       </Card>
 
       {/* Progress indicator */}
-      <div className="flex gap-1 justify-center">
+      <div
+        className="flex flex-wrap justify-center gap-1"
+        aria-label="Navegação entre exercícios da sessão"
+      >
         {prescriptionExercises.map((_, idx) => {
           const allFilled = selectedStudents.every((s) => {
             const e = data[s.id]?.[idx];
@@ -740,15 +747,22 @@ export function ExerciseFirstSessionEntry({
           return (
             <button
               key={idx}
+              type="button"
               onClick={() => setExerciseIndex(idx)}
-              className={`h-2 rounded-full transition-all ${
-                idx === exerciseIndex
-                  ? "w-6 bg-primary"
-                  : allFilled
-                  ? "w-2 bg-primary/40"
-                  : "w-2 bg-muted-foreground/20"
-              }`}
-            />
+              aria-label={`Ir para exercício ${idx + 1} de ${totalExercises}`}
+              aria-current={idx === exerciseIndex ? "step" : undefined}
+              className="group flex h-8 min-w-8 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <span
+                className={`h-2 rounded-full transition-all group-hover:scale-125 ${
+                  idx === exerciseIndex
+                    ? "w-6 bg-primary"
+                    : allFilled
+                    ? "w-2 bg-primary/40"
+                    : "w-2 bg-muted-foreground/20"
+                }`}
+              />
+            </button>
           );
         })}
       </div>
