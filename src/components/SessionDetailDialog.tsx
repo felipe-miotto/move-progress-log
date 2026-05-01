@@ -7,14 +7,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useSessionDetail } from "@/hooks/useSessionDetail";
+import { useExercisesLibrary } from "@/hooks/useExercisesLibrary";
 import { Calendar, Clock, Users, Dumbbell, TrendingUp, User, Award, Filter } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { LoadingState } from "./LoadingState";
 import { ErrorState } from "./ErrorState";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { formatSessionTime } from "@/utils/sessionTime";
 import { formatSessionDate } from "@/utils/sessionDate";
 import { calculateLoadFromBreakdown } from "@/utils/loadCalculation";
+import { MOVEMENT_PATTERNS } from "@/constants/backToBasics";
 
 interface SessionDetailDialogProps {
   sessionId: string | null;
@@ -60,6 +62,19 @@ const resolveExerciseLoad = (exercise: SessionExercise): { kg: number | null; te
   return { kg: null, text: textCandidates[0] || null };
 };
 
+const UNCLASSIFIED_PATTERN = "__unclassified";
+
+const normalizeComparableText = (value: string): string =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, " ");
+
+const formatMovementPatternLabel = (pattern: string): string =>
+  MOVEMENT_PATTERNS[pattern as keyof typeof MOVEMENT_PATTERNS] || pattern;
+
 export const SessionDetailDialog = ({ 
   sessionId, 
   open, 
@@ -69,9 +84,25 @@ export const SessionDetailDialog = ({
 }: SessionDetailDialogProps) => {
   const navigate = useNavigate();
   const { data: session, isLoading, error } = useSessionDetail(sessionId);
+  const { data: exercisesLibrary } = useExercisesLibrary();
   
   const [movementPatternFilter, setMovementPatternFilter] = useState<string>("all");
   const [intensityFilter, setIntensityFilter] = useState<string>("all");
+
+  const exercisePatternByName = useMemo(() => {
+    const map = new Map<string, string>();
+    exercisesLibrary?.forEach((exercise) => {
+      if (!exercise.name || !exercise.movement_pattern) return;
+      map.set(normalizeComparableText(exercise.name), exercise.movement_pattern);
+    });
+    return map;
+  }, [exercisesLibrary]);
+
+  const getExerciseMovementPattern = useCallback(
+    (exerciseName: string): string | null =>
+      exercisePatternByName.get(normalizeComparableText(exerciseName)) || null,
+    [exercisePatternByName]
+  );
 
   const handleGoToStudent = () => {
     if (session?.student.id) {
@@ -124,14 +155,9 @@ export const SessionDetailDialog = ({
 
     if (movementPatternFilter !== "all") {
       filtered = filtered.filter(ex => {
-        const name = ex.exercise_name.toLowerCase();
-        switch (movementPatternFilter) {
-          case "empurrar": return name.includes("press") || name.includes("supino") || name.includes("development");
-          case "puxar": return name.includes("pull") || name.includes("remada") || name.includes("barra fixa");
-          case "agachar": return name.includes("squat") || name.includes("agachamento") || name.includes("leg press");
-          case "rotacao": return name.includes("twist") || name.includes("rotação") || name.includes("chop");
-          default: return true;
-        }
+        const pattern = getExerciseMovementPattern(ex.exercise_name);
+        if (movementPatternFilter === UNCLASSIFIED_PATTERN) return !pattern;
+        return pattern === movementPatternFilter;
       });
     }
 
@@ -140,20 +166,46 @@ export const SessionDetailDialog = ({
     }
 
     return filtered;
-  }, [session?.exercises, movementPatternFilter, intensityFilter]);
+  }, [session?.exercises, movementPatternFilter, intensityFilter, getExerciseMovementPattern]);
 
   const movementPatterns = useMemo(() => {
     if (!session?.exercises) return [];
     const patterns = new Set<string>();
     session.exercises.forEach(ex => {
-      const name = ex.exercise_name.toLowerCase();
-      if (name.includes("press") || name.includes("supino") || name.includes("development")) patterns.add("empurrar");
-      if (name.includes("pull") || name.includes("remada") || name.includes("barra fixa")) patterns.add("puxar");
-      if (name.includes("squat") || name.includes("agachamento") || name.includes("leg press")) patterns.add("agachar");
-      if (name.includes("twist") || name.includes("rotação") || name.includes("chop")) patterns.add("rotacao");
+      const pattern = getExerciseMovementPattern(ex.exercise_name);
+      if (pattern) patterns.add(pattern);
     });
     return Array.from(patterns);
-  }, [session?.exercises]);
+  }, [session?.exercises, getExerciseMovementPattern]);
+
+  const hasUnclassifiedExercises = useMemo(() => {
+    if (!session?.exercises || !exercisesLibrary) return false;
+    return session.exercises.some((exercise) => !getExerciseMovementPattern(exercise.exercise_name));
+  }, [session?.exercises, exercisesLibrary, getExerciseMovementPattern]);
+
+  const renderExerciseNameCell = (exercise: SessionExercise) => {
+    const pattern = getExerciseMovementPattern(exercise.exercise_name);
+
+    return (
+      <div className="flex items-center gap-2">
+        <div className="min-w-0">
+          <p>{exercise.exercise_name}</p>
+          <p className="mt-0.5 text-xs font-normal text-muted-foreground">
+            {pattern
+              ? formatMovementPatternLabel(pattern)
+              : exercisesLibrary
+              ? "Sem padrão cadastrado"
+              : "Carregando padrão..."}
+          </p>
+        </div>
+        {exercise.is_best_set && (
+          <Badge variant="secondary" className="text-xs">
+            Best Set
+          </Badge>
+        )}
+      </div>
+    );
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -315,10 +367,14 @@ export const SessionDetailDialog = ({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">Todos os padrões</SelectItem>
-                          {movementPatterns.includes("empurrar") && <SelectItem value="empurrar">Empurrar</SelectItem>}
-                          {movementPatterns.includes("puxar") && <SelectItem value="puxar">Puxar</SelectItem>}
-                          {movementPatterns.includes("agachar") && <SelectItem value="agachar">Agachar</SelectItem>}
-                          {movementPatterns.includes("rotacao") && <SelectItem value="rotacao">Rotação</SelectItem>}
+                          {movementPatterns.map((pattern) => (
+                            <SelectItem key={pattern} value={pattern}>
+                              {formatMovementPatternLabel(pattern)}
+                            </SelectItem>
+                          ))}
+                          {hasUnclassifiedExercises && (
+                            <SelectItem value={UNCLASSIFIED_PATTERN}>Sem padrão</SelectItem>
+                          )}
                         </SelectContent>
                       </Select>
                       <Select value={intensityFilter} onValueChange={setIntensityFilter}>
@@ -359,14 +415,7 @@ export const SessionDetailDialog = ({
                           {filteredExercises.map((exercise) => (
                             <TableRow key={exercise.id}>
                               <TableCell className="font-medium">
-                                <div className="flex items-center gap-2">
-                                  {exercise.exercise_name}
-                                  {exercise.is_best_set && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      Best Set
-                                    </Badge>
-                                  )}
-                                </div>
+                                {renderExerciseNameCell(exercise)}
                               </TableCell>
                               <TableCell className="text-center">
                                 {exercise.sets || "-"}
