@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -543,17 +543,37 @@ export default function AuthPage() {
                   )}
                 </div>
 
-                <div className="flex items-center space-x-2">
+                <div className="flex items-start space-x-2">
                   <input
                     type="checkbox"
                     id="accept-terms"
+                    aria-describedby="accept-terms-description"
                     checked={acceptTerms}
                     onChange={(e) => setAcceptTerms(e.target.checked)}
-                    className="h-4 w-4 rounded border-input"
+                    className="mt-1 h-4 w-4 rounded border-input"
                   />
-                  <Label htmlFor="accept-terms" className="text-sm cursor-pointer">
-                    Aceito os termos de uso e política de privacidade
-                  </Label>
+                  <div id="accept-terms-description" className="text-sm">
+                    <Label htmlFor="accept-terms" className="cursor-pointer">
+                      Aceito os
+                    </Label>{" "}
+                    <Link
+                      to={ROUTES.terms}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary underline-offset-4 hover:underline"
+                    >
+                      Termos de Uso
+                    </Link>{" "}
+                    e a{" "}
+                    <Link
+                      to={ROUTES.privacy}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary underline-offset-4 hover:underline"
+                    >
+                      Política de Privacidade
+                    </Link>
+                  </div>
                 </div>
                 
                 <Button 
