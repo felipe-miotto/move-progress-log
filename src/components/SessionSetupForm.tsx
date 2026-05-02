@@ -16,6 +16,7 @@ import { ROUTES } from "@/constants/navigation";
 interface Student {
   id: string;
   name: string;
+  weight_kg?: number;
   has_active_prescription?: boolean;
 }
 
@@ -30,6 +31,9 @@ interface SessionSetupFormProps {
   onStudentToggle: (student: Student) => void;
   prescriptionId?: string | null;
   showValidation?: boolean;
+  availableStudents?: Student[];
+  allowNewStudent?: boolean;
+  emptyStudentsMessage?: string;
 }
 
 export function SessionSetupForm({
@@ -43,13 +47,17 @@ export function SessionSetupForm({
   onStudentToggle,
   prescriptionId,
   showValidation = false,
+  availableStudents,
+  allowNewStudent = true,
+  emptyStudentsMessage,
 }: SessionSetupFormProps) {
   const { data: trainers } = useTrainers();
-  const { data: students } = useStudents();
+  const { data: fetchedStudents } = useStudents();
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddStudentDialog, setShowAddStudentDialog] = useState(false);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const students = availableStudents ?? fetchedStudents;
 
   // Buscar prescrições ativas de todos os alunos
   const studentIds = useMemo(() => students?.map(s => s.id) || [], [students]);
@@ -58,7 +66,7 @@ export function SessionSetupForm({
   // Enriquecer estudantes com informação de prescrição ativa
   const enrichedStudents = useMemo(() => students?.map(student => ({
     ...student,
-    has_active_prescription: activeStudentIds?.has(student.id) || false,
+    has_active_prescription: (student.has_active_prescription ?? activeStudentIds?.has(student.id)) || false,
   })), [students, activeStudentIds]);
 
   // Normalizar texto removendo acentos para busca
@@ -161,16 +169,18 @@ export function SessionSetupForm({
                 <GitCompare className="h-3.5 w-3.5" />
                 Histórico
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setShowAddStudentDialog(true)}
-                className="h-7 gap-1.5 text-xs"
-              >
-                <UserPlus className="h-3.5 w-3.5" />
-                Novo
-              </Button>
+              {allowNewStudent && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAddStudentDialog(true)}
+                  className="h-7 gap-1.5 text-xs"
+                >
+                  <UserPlus className="h-3.5 w-3.5" />
+                  Novo
+                </Button>
+              )}
             </div>
           </div>
           {selectedStudents.length > 0 && (
@@ -227,7 +237,7 @@ export function SessionSetupForm({
             </p>
           ) : !enrichedStudents?.length ? (
             <p className="text-sm text-muted-foreground text-center py-4">
-              Nenhum aluno cadastrado
+              {emptyStudentsMessage ?? "Nenhum aluno cadastrado"}
             </p>
           ) : null}
         </div>

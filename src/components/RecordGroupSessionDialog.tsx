@@ -269,6 +269,7 @@ export function RecordGroupSessionDialog({
   // When prop is provided (e.g. opened from /prescricoes), use it.
   // Otherwise, the user must pick a prescription explicitly in the context-setup step.
   const effectivePrescriptionId = prescriptionId ?? selectedPrescriptionId;
+  const requiresPrescriptionSelection = !prescriptionId;
 
   // Shared hook for exercise replacement
   const {
@@ -288,16 +289,42 @@ export function RecordGroupSessionDialog({
   useEffect(() => { logger.debug("Dialog State mudou para:", dialogState); }, [dialogState]);
   useEffect(() => { logger.debug("Merged Students atualizado:", mergedStudents.length, "alunos"); }, [mergedStudents]);
 
-  const enrichedStudents = useMemo(() => students?.map((student) => ({
-    ...student,
-    has_active_prescription: assignments?.some(a => a.student_id === student.id) || false,
-  })).sort((a, b) => {
-    if (a.has_active_prescription && !b.has_active_prescription) return -1;
-    if (!a.has_active_prescription && b.has_active_prescription) return 1;
-    return a.name.localeCompare(b.name);
-  }), [students, assignments]);
+  const groupPrescriptionOptions = useMemo(
+    () => (prescriptionsList || []).filter((prescription) => prescription.prescription_type === 'group'),
+    [prescriptionsList]
+  );
+
+  const assignedStudentIds = useMemo(
+    () => new Set((assignments || []).map((assignment) => assignment.student_id)),
+    [assignments]
+  );
+
+  const enrichedStudents = useMemo(() => {
+    const mappedStudents = students?.map((student) => ({
+      ...student,
+      has_active_prescription: assignedStudentIds.has(student.id),
+    })) || [];
+
+    const visibleStudents = requiresPrescriptionSelection
+      ? mappedStudents.filter((student) => assignedStudentIds.has(student.id))
+      : mappedStudents;
+
+    return visibleStudents.sort((a, b) => {
+      if (a.has_active_prescription && !b.has_active_prescription) return -1;
+      if (!a.has_active_prescription && b.has_active_prescription) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [students, assignedStudentIds, requiresPrescriptionSelection]);
+
+  const handlePrescriptionChange = (value: string) => {
+    setSelectedPrescriptionId(value);
+    setSelectedStudents([]);
+    setHasAutoSelected(false);
+    setShowValidation(false);
+  };
 
   const handleModeSelection = (mode: 'voice' | 'manual') => {
+    if (!effectivePrescriptionId) { notify.error("Selecione uma prescrição antes de continuar"); return; }
     if (!trainer.trim()) { notify.error("Por favor, selecione o treinador antes de continuar"); return; }
     if (!date || !time) { notify.error("Por favor, preencha data e horário antes de continuar"); return; }
     if (selectedStudents.length === 0) { notify.error("Por favor, selecione pelo menos um aluno antes de continuar"); return; }
@@ -305,12 +332,12 @@ export function RecordGroupSessionDialog({
   };
 
   const loadExistingSessionsData = useCallback(async () => {
-    if (!prescriptionId || !reopenDate || !normalizedReopenTime) return;
+    if (!effectivePrescriptionId || !reopenDate || !normalizedReopenTime) return;
     try {
       const { data: sessions, error: sessionsError } = await supabase
         .from('workout_sessions')
         .select('id, student_id, students!inner(id, name, weight_kg)')
-        .eq('prescription_id', prescriptionId)
+        .eq('prescription_id', effectivePrescriptionId)
         .eq('date', reopenDate)
         .eq('time', normalizedReopenTime);
       if (sessionsError) throw sessionsError;
@@ -349,14 +376,14 @@ export function RecordGroupSessionDialog({
         description: "Não foi possível carregar os dados existentes da sessão. Você pode continuar manualmente.",
       });
     }
-  }, [prescriptionId, reopenDate, normalizedReopenTime]);
+  }, [effectivePrescriptionId, reopenDate, normalizedReopenTime]);
 
   // Load existing sessions when reopening
   useEffect(() => {
-    if (isReopening && prescriptionId && reopenDate && normalizedReopenTime && open) {
+    if (isReopening && effectivePrescriptionId && reopenDate && normalizedReopenTime && open) {
       loadExistingSessionsData();
     }
-  }, [isReopening, prescriptionId, reopenDate, normalizedReopenTime, open, loadExistingSessionsData]);
+  }, [isReopening, effectivePrescriptionId, reopenDate, normalizedReopenTime, open, loadExistingSessionsData]);
 
   const toggleStudent = (student: Student) => {
     setSelectedStudents((prev) => {
@@ -374,7 +401,17 @@ export function RecordGroupSessionDialog({
     toggleStudent({ ...newStudent, has_active_prescription: false });
   };
 
-  const isContextValid = date && time && trainer && selectedStudents.length > 0;
+  const handleAddStudentToGroup = () => {
+    if (requiresPrescriptionSelection) {
+      notify.info("Aluno precisa estar atribuído", {
+        description: "Para registrar por /sessoes, atribua o aluno à prescrição antes de incluí-lo na sessão em grupo.",
+      });
+      return;
+    }
+    setShowAddStudentDialog(true);
+  };
+
+  const isContextValid = !!effectivePrescriptionId && date && time && trainer && selectedStudents.length > 0;
 
   // ─── Merge & Validation Logic ────────────────────────────────────────
 
@@ -899,44 +936,56 @@ export function RecordGroupSessionDialog({
 
         {dialogState === 'context-setup' && (
           <div className="space-y-6">
-            {!prescriptionId && (
+            {requiresPrescriptionSelection && (
               <div className="space-y-2">
                 <Label htmlFor="prescription-select">Prescrição *</Label>
-                <Select
-                  value={selectedPrescriptionId ?? ''}
-                  onValueChange={(value) => {
-                    setSelectedPrescriptionId(value);
-                    // Reset selected students when prescription changes to avoid mismatched assignments
-                    setSelectedStudents([]);
-                    setHasAutoSelected(false);
-                  }}
-                >
+                <Select value={selectedPrescriptionId ?? ''} onValueChange={handlePrescriptionChange}>
                   <SelectTrigger
                     id="prescription-select"
-                    className={showValidation && !selectedPrescriptionId ? 'border-destructive' : ''}
+                    className={showValidation && !effectivePrescriptionId ? 'border-destructive' : ''}
                   >
                     <SelectValue placeholder="Selecione uma prescrição em grupo" />
                   </SelectTrigger>
                   <SelectContent>
-                    {(prescriptionsList ?? [])
-                      .filter((p) => p.prescription_type === 'group')
-                      .map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name}
-                          {p.assigned_students_count > 0 ? ` · ${p.assigned_students_count} aluno(s)` : ''}
-                        </SelectItem>
-                      ))}
+                    {groupPrescriptionOptions.map((prescription) => (
+                      <SelectItem key={prescription.id} value={prescription.id}>
+                        {prescription.name}
+                        {prescription.assigned_students_count ? ` · ${prescription.assigned_students_count} aluno(s)` : ''}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  Os alunos atribuídos à prescrição aparecem destacados na lista abaixo.
-                </p>
+                {effectivePrescriptionId && enrichedStudents.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    Esta prescrição não tem alunos atribuídos. Atribua alunos antes de registrar a sessão em grupo.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Apenas alunos atribuídos à prescrição selecionada aparecem na lista abaixo.
+                  </p>
+                )}
               </div>
             )}
 
-            <SessionSetupForm date={date} time={time} trainerName={trainer} selectedStudents={selectedStudents}
-              onDateChange={setDate} onTimeChange={setTime} onTrainerNameChange={setTrainer}
-              onStudentToggle={toggleStudent} prescriptionId={effectivePrescriptionId} showValidation={showValidation} />
+            <SessionSetupForm
+              date={date}
+              time={time}
+              trainerName={trainer}
+              selectedStudents={selectedStudents}
+              onDateChange={setDate}
+              onTimeChange={setTime}
+              onTrainerNameChange={setTrainer}
+              onStudentToggle={toggleStudent}
+              prescriptionId={effectivePrescriptionId}
+              showValidation={showValidation}
+              availableStudents={requiresPrescriptionSelection ? enrichedStudents : undefined}
+              allowNewStudent={!requiresPrescriptionSelection}
+              emptyStudentsMessage={
+                !effectivePrescriptionId
+                  ? "Selecione uma prescrição para listar os alunos atribuídos"
+                  : "Nenhum aluno atribuído a esta prescrição"
+              }
+            />
           </div>
         )}
 
@@ -944,14 +993,14 @@ export function RecordGroupSessionDialog({
           <div className="space-y-6 py-8">
             <p className="text-center text-muted-foreground">Escolha como deseja registrar a sessão em grupo:</p>
             <div className="grid gap-4 md:grid-cols-2">
-              <Button variant="outline" size="lg" className="h-32 flex flex-col gap-4 items-center justify-center" onClick={() => setDialogState('recording')}>
+              <Button variant="outline" size="lg" className="h-32 flex flex-col gap-4 items-center justify-center" onClick={() => handleModeSelection('voice')}>
                 <Mic className="h-12 w-12" />
                 <div className="text-center">
                   <div className="font-semibold">{NAV_LABELS.recordByVoice}</div>
                   <div className="text-xs text-muted-foreground mt-1">Grave uma única sessão contínua e processe no final</div>
                 </div>
               </Button>
-              <Button variant="outline" size="lg" className="h-32 flex flex-col gap-4 items-center justify-center" onClick={() => setDialogState('manual-entry')}>
+              <Button variant="outline" size="lg" className="h-32 flex flex-col gap-4 items-center justify-center" onClick={() => handleModeSelection('manual')}>
                 <BookOpen className="h-12 w-12" />
                 <div className="text-center">
                   <div className="font-semibold">{NAV_LABELS.fillManually}</div>
@@ -970,7 +1019,7 @@ export function RecordGroupSessionDialog({
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Users className="h-4 w-4" /> Alunos Participantes
                   <Badge variant="secondary" className="ml-auto">{selectedStudents.length}</Badge>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setShowAddStudentDialog(true)} className="gap-1.5 h-7">
+                  <Button type="button" variant="ghost" size="sm" onClick={handleAddStudentToGroup} className="gap-1.5 h-7">
                     <UserPlus className="h-3.5 w-3.5" /> Adicionar
                   </Button>
                 </CardTitle>
@@ -1059,7 +1108,7 @@ export function RecordGroupSessionDialog({
             prescriptionId={effectivePrescriptionId || null}
             onSave={handleSaveManual}
             onCancel={() => setDialogState('mode-selection')}
-            onAddStudent={() => setShowAddStudentDialog(true)}
+            onAddStudent={handleAddStudentToGroup}
           />
         )}
 
@@ -1143,7 +1192,7 @@ export function RecordGroupSessionDialog({
             <>
               <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
               <Button onClick={() => {
-                if (!date || !time || !trainer || selectedStudents.length === 0 || !effectivePrescriptionId) {
+                if (!isContextValid) {
                   setShowValidation(true);
                   notify.error(
                     !effectivePrescriptionId
