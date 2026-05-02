@@ -785,16 +785,20 @@ export function RecordGroupSessionDialog({
   // ─── Close Protection ────────────────────────────────────────
 
   const handleCloseAttempt = (shouldClose: boolean) => {
-    if (dialogState === 'manual-entry' && hasUnsavedChanges({ date, time, trainer, prescriptionId, selectedStudents, studentExercises: {} })) {
+    if (dialogState === 'manual-entry' && hasUnsavedChanges({ date, time, trainer, prescriptionId: effectivePrescriptionId, selectedStudents, studentExercises: {} })) {
       const confirmed = window.confirm('⚠️ Você tem alterações não salvas. Seu rascunho foi salvo automaticamente e estará disponível quando você reabrir. Deseja sair mesmo assim?');
       if (!confirmed) return;
+    }
+    if (!shouldClose) {
+      // Reset internal prescription selection so the next open starts clean
+      setSelectedPrescriptionId(null);
     }
     onOpenChange(shouldClose);
   };
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (dialogState === 'manual-entry' && hasUnsavedChanges({ date, time, trainer, prescriptionId, selectedStudents, studentExercises: {} })) {
+      if (dialogState === 'manual-entry' && hasUnsavedChanges({ date, time, trainer, prescriptionId: effectivePrescriptionId, selectedStudents, studentExercises: {} })) {
         e.preventDefault();
         e.returnValue = '';
       }
@@ -803,7 +807,7 @@ export function RecordGroupSessionDialog({
       window.addEventListener('beforeunload', handleBeforeUnload);
       return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     }
-  }, [open, dialogState, date, time, trainer, prescriptionId, selectedStudents, hasUnsavedChanges]);
+  }, [open, dialogState, date, time, trainer, effectivePrescriptionId, selectedStudents, hasUnsavedChanges]);
 
   // Auto-select students
   useEffect(() => {
