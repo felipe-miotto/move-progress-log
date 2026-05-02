@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Download } from "lucide-react";
 import { useGetOrCreateStudent } from "@/hooks/useStudents";
 import { useCreateWorkoutSession } from "@/hooks/useWorkoutSessions";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -304,6 +304,23 @@ const categorizeImportErrors = (errors: string[]): ImportErrorGroup[] => {
   });
 
   return Object.values(groups).filter((group) => group.errors.length > 0);
+};
+
+const escapeCsvCell = (value: string | number): string => {
+  const text = String(value);
+  return /[",\n\r;]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+};
+
+const buildImportErrorCsv = (errors: string[]): string => {
+  const rows = [["categoria", "acao_recomendada", "indice", "erro"]];
+
+  categorizeImportErrors(errors).forEach((group) => {
+    group.errors.forEach((error, index) => {
+      rows.push([group.title, group.action, String(index + 1), error]);
+    });
+  });
+
+  return rows.map((row) => row.map(escapeCsvCell).join(";")).join("\n");
 };
 
 const formatExcelSerialDate = (serial: number): string | null => {
@@ -899,6 +916,23 @@ export const ImportSessionsDialog = ({ open, onOpenChange }: ImportSessionsDialo
     onOpenChange(false);
   };
 
+  const downloadErrorReport = () => {
+    if (!status?.errors.length) return;
+
+    const csv = buildImportErrorCsv(status.errors);
+    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+
+    link.href = url;
+    link.download = `relatorio-erros-importacao-${timestamp}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -1033,6 +1067,16 @@ export const ImportSessionsDialog = ({ open, onOpenChange }: ImportSessionsDialo
                         ))}
                       </div>
                     </details>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-3"
+                      onClick={downloadErrorReport}
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      Baixar relatório CSV de erros
+                    </Button>
                   </AlertDescription>
                 </Alert>
               )}

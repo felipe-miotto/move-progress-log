@@ -82,6 +82,7 @@ O sistema já tem uma fundação visual razoável, com tokens de cor/espaçament
 ```
 - **User impact:** operação / toda importação de planilha / severity 4
 - **Recommendation:** Trocar a lista por resumo categorizado: `Importadas`, `Duplicadas ignoradas`, `Exercícios atualizados`, `Erros por tipo`. Criar `ImportIssuePanel` com agrupamento por `error.code` e CTA: “Baixar relatório CSV de erros”. Mensagens SQL/RPC devem ser mapeadas em `parseImportError()` para linguagem operacional.
+- **Status 2026-05-02:** parcialmente tratado. O diálogo já exibe resumo por categoria, ação recomendada e detalhes técnicos colapsados; agora também permite baixar um CSV com categoria, ação recomendada, índice e mensagem de erro para revisão da planilha.
 - **Effort:** M
 
 ### D — Componentes-base usam altura padrão abaixo do alvo táctil
