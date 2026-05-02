@@ -556,7 +556,6 @@ export type Database = {
       exercises: {
         Row: {
           created_at: string
-          exercise_library_id: string | null
           exercise_name: string
           id: string
           is_best_set: boolean | null
@@ -570,7 +569,6 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          exercise_library_id?: string | null
           exercise_name: string
           id?: string
           is_best_set?: boolean | null
@@ -584,7 +582,6 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          exercise_library_id?: string | null
           exercise_name?: string
           id?: string
           is_best_set?: boolean | null
@@ -597,13 +594,6 @@ export type Database = {
           sets?: number | null
         }
         Relationships: [
-          {
-            foreignKeyName: "exercises_exercise_library_id_fkey"
-            columns: ["exercise_library_id"]
-            isOneToOne: false
-            referencedRelation: "exercises_library"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "exercises_session_id_fkey"
             columns: ["session_id"]
