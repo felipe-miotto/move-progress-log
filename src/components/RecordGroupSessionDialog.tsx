@@ -1143,9 +1143,13 @@ export function RecordGroupSessionDialog({
             <>
               <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
               <Button onClick={() => {
-                if (!date || !time || !trainer || selectedStudents.length === 0) {
+                if (!date || !time || !trainer || selectedStudents.length === 0 || !effectivePrescriptionId) {
                   setShowValidation(true);
-                  notify.error("Preencha todos os campos obrigatórios");
+                  notify.error(
+                    !effectivePrescriptionId
+                      ? "Selecione uma prescrição antes de continuar"
+                      : "Preencha todos os campos obrigatórios"
+                  );
                   return;
                 }
                 setShowValidation(false);
