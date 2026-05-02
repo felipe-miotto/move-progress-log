@@ -754,7 +754,7 @@ export function RecordGroupSessionDialog({
       });
 
       for (const session of sessionsToCreate) {
-        const { data: workoutSession, error: sessionError } = await supabase.from("workout_sessions").insert({ student_id: session.student_id, prescription_id: prescriptionId, date, time, session_type: 'group', trainer_name: trainer, is_finalized: true, can_reopen: true }).select("id").single();
+        const { data: workoutSession, error: sessionError } = await supabase.from("workout_sessions").insert({ student_id: session.student_id, prescription_id: effectivePrescriptionId, date, time, session_type: 'group', trainer_name: trainer, is_finalized: true, can_reopen: true }).select("id").single();
         if (sessionError) throw sessionError;
         const exercisesToInsert = session.exercises.map((ex) => ({ session_id: workoutSession.id, exercise_name: ex.executed_exercise_name, sets: ex.sets, reps: ex.reps, load_kg: ex.load_kg, load_breakdown: ex.load_breakdown, observations: ex.observations || null }));
         const { error: exercisesError } = await supabase.from("exercises").insert(exercisesToInsert);
