@@ -12,7 +12,7 @@ import { MultiSegmentRecorder } from "./MultiSegmentRecorder";
 import { ManualSessionEntry } from "./ManualSessionEntry";
 import { SessionSetupForm } from "./SessionSetupForm";
 import { useStudents } from "@/hooks/useStudents";
-import { usePrescriptionAssignments } from "@/hooks/usePrescriptions";
+import { usePrescriptionAssignments, usePrescriptions } from "@/hooks/usePrescriptions";
 import { useCreateGroupWorkoutSessions } from "@/hooks/useWorkoutSessions";
 import { usePrescriptionDetails } from "@/hooks/usePrescriptions";
 import type { AssignmentScheduleAdaptations } from "@/hooks/usePrescriptions";
