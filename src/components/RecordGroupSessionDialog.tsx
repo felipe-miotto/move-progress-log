@@ -264,6 +264,11 @@ export function RecordGroupSessionDialog({
   const [trainer, setTrainer] = useState<string>('');
   const [showValidation, setShowValidation] = useState(false);
   const [showAddStudentDialog, setShowAddStudentDialog] = useState(false);
+  const [selectedPrescriptionId, setSelectedPrescriptionId] = useState<string | null>(null);
+
+  // When prop is provided (e.g. opened from /prescricoes), use it.
+  // Otherwise, the user must pick a prescription explicitly in the context-setup step.
+  const effectivePrescriptionId = prescriptionId ?? selectedPrescriptionId;
 
   // Shared hook for exercise replacement
   const {
@@ -275,8 +280,9 @@ export function RecordGroupSessionDialog({
   } = useExerciseReplacement(editableExercises, setEditableExercises);
 
   const { data: students } = useStudents();
-  const { data: assignments } = usePrescriptionAssignments(prescriptionId);
-  const { data: prescriptionDetails } = usePrescriptionDetails(prescriptionId);
+  const { data: prescriptionsList } = usePrescriptions();
+  const { data: assignments } = usePrescriptionAssignments(effectivePrescriptionId);
+  const { data: prescriptionDetails } = usePrescriptionDetails(effectivePrescriptionId);
   const createGroupSessions = useCreateGroupWorkoutSessions();
   
   useEffect(() => { logger.debug("Dialog State mudou para:", dialogState); }, [dialogState]);
