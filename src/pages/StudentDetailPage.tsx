@@ -312,13 +312,28 @@ const StudentDetailPage = () => {
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="training">{NAV_LABELS.tabTraining}</TabsTrigger>
-          <TabsTrigger value="overview">{NAV_LABELS.tabOverview}</TabsTrigger>
-          <TabsTrigger value="sessions">{NAV_LABELS.tabSessions}</TabsTrigger>
-          <TabsTrigger value="exercises">{NAV_LABELS.tabExercises}</TabsTrigger>
-          <TabsTrigger value="prescriptions">{NAV_LABELS.tabPrescriptions}</TabsTrigger>
-          <TabsTrigger value="oura">{NAV_LABELS.tabOura}</TabsTrigger>
+        <TabsList
+          aria-label="Seções do perfil do aluno"
+          className="flex h-auto w-full justify-start gap-1 overflow-x-auto p-1 sm:grid sm:grid-cols-3 lg:grid-cols-6"
+        >
+          <TabsTrigger className="min-h-11 min-w-max px-4" value="training">
+            {NAV_LABELS.tabTraining}
+          </TabsTrigger>
+          <TabsTrigger className="min-h-11 min-w-max px-4" value="overview">
+            {NAV_LABELS.tabOverview}
+          </TabsTrigger>
+          <TabsTrigger className="min-h-11 min-w-max px-4" value="sessions">
+            {NAV_LABELS.tabSessions}
+          </TabsTrigger>
+          <TabsTrigger className="min-h-11 min-w-max px-4" value="exercises">
+            {NAV_LABELS.tabExercises}
+          </TabsTrigger>
+          <TabsTrigger className="min-h-11 min-w-max px-4" value="prescriptions">
+            {NAV_LABELS.tabPrescriptions}
+          </TabsTrigger>
+          <TabsTrigger className="min-h-11 min-w-max px-4" value="oura">
+            {NAV_LABELS.tabOura}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="training" className="space-y-6 animate-fade-in">

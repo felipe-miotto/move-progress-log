@@ -145,6 +145,7 @@ export const ROUTE_CONFIG: RouteDefinition[] = [
 ```
 - **User impact:** treinador / todo acesso ao aluno / severity 4
 - **Recommendation:** Promover `Treinamento` como aba padrão operacional e transformar `Visão geral` em painel executivo compacto. Em tablet/celular, usar nav segmentada com 3 itens principais (`Hoje`, `Histórico`, `Configuração`) e mover `Exercícios/Prescrições/Oura` para subações dentro desses grupos.
+- **Status 2026-05-02:** parcialmente tratado sem reorganizar escopo funcional. As seis abas continuam disponíveis, mas em mobile passam a usar barra horizontal rolável com alvos `44px+`; em telas médias/desktop mantêm grade responsiva.
 - **Effort:** M
 
 ### K — Filtro de padrão de movimento em detalhes da sessão usa heurística por nome
