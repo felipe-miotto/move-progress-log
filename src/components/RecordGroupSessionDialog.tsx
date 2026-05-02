@@ -898,9 +898,46 @@ export function RecordGroupSessionDialog({
         </DialogHeader>
 
         {dialogState === 'context-setup' && (
-          <SessionSetupForm date={date} time={time} trainerName={trainer} selectedStudents={selectedStudents}
-            onDateChange={setDate} onTimeChange={setTime} onTrainerNameChange={setTrainer}
-            onStudentToggle={toggleStudent} prescriptionId={prescriptionId} showValidation={showValidation} />
+          <div className="space-y-6">
+            {!prescriptionId && (
+              <div className="space-y-2">
+                <Label htmlFor="prescription-select">Prescrição *</Label>
+                <Select
+                  value={selectedPrescriptionId ?? ''}
+                  onValueChange={(value) => {
+                    setSelectedPrescriptionId(value);
+                    // Reset selected students when prescription changes to avoid mismatched assignments
+                    setSelectedStudents([]);
+                    setHasAutoSelected(false);
+                  }}
+                >
+                  <SelectTrigger
+                    id="prescription-select"
+                    className={showValidation && !selectedPrescriptionId ? 'border-destructive' : ''}
+                  >
+                    <SelectValue placeholder="Selecione uma prescrição em grupo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(prescriptionsList ?? [])
+                      .filter((p) => p.prescription_type === 'group')
+                      .map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                          {p.assigned_students_count > 0 ? ` · ${p.assigned_students_count} aluno(s)` : ''}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Os alunos atribuídos à prescrição aparecem destacados na lista abaixo.
+                </p>
+              </div>
+            )}
+
+            <SessionSetupForm date={date} time={time} trainerName={trainer} selectedStudents={selectedStudents}
+              onDateChange={setDate} onTimeChange={setTime} onTrainerNameChange={setTrainer}
+              onStudentToggle={toggleStudent} prescriptionId={effectivePrescriptionId} showValidation={showValidation} />
+          </div>
         )}
 
         {dialogState === 'mode-selection' && (
