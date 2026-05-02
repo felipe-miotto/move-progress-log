@@ -734,64 +734,109 @@ export function ExerciseFirstSessionEntry({
         </CardContent>
       </Card>
 
-      {/* Progress indicator */}
-      <div
-        className="flex flex-wrap justify-center gap-1"
-        aria-label="Navegação entre exercícios da sessão"
-      >
-        {prescriptionExercises.map((_, idx) => {
-          const allFilled = selectedStudents.every((s) => {
-            const e = data[s.id]?.[idx];
-            return e && (isLoadExemptCategory(e.exercise_name) || e.load_breakdown) && e.reps > 0;
-          });
-          return (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => setExerciseIndex(idx)}
-              aria-label={`Ir para exercício ${idx + 1} de ${totalExercises}`}
-              aria-current={idx === exerciseIndex ? "step" : undefined}
-              className="group flex h-8 min-w-8 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <span
-                className={`h-2 rounded-full transition-all group-hover:scale-125 ${
-                  idx === exerciseIndex
-                    ? "w-6 bg-primary"
-                    : allFilled
-                    ? "w-2 bg-primary/40"
-                    : "w-2 bg-muted-foreground/20"
-                }`}
-              />
-            </button>
-          );
-        })}
-      </div>
+      {/* Progress and actions */}
+      <div className="sticky bottom-0 z-20 -mx-3 space-y-3 border-t bg-background/95 px-3 py-3 shadow-[0_-8px_24px_rgba(0,0,0,0.12)] backdrop-blur sm:-mx-4 sm:px-4 lg:static lg:mx-0 lg:border-t-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:backdrop-blur-none">
+        <div className="flex items-center justify-between gap-3 lg:hidden">
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground">
+              Exercício {exerciseIndex + 1} de {totalExercises}
+            </p>
+            <p className="truncate text-sm font-semibold">{currentPrescribed.exercise_name}</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <Badge variant="secondary">{selectedStudents.length} alunos</Badge>
+            {onCancel && (
+              <Button onClick={onCancel} variant="ghost" size="sm" disabled={isSubmitting}>
+                Voltar
+              </Button>
+            )}
+          </div>
+        </div>
 
-      {/* Actions */}
-      <div className="flex justify-between gap-2">
-        {onCancel && (
-          <Button onClick={onCancel} variant="outline" size="lg" disabled={isSubmitting}>
-            Voltar
-          </Button>
-        )}
-        <Button
-          onClick={handleSubmit}
-          disabled={!isValid || isSubmitting}
-          size="lg"
-          className="gap-2 ml-auto"
+        <div
+          className="flex flex-wrap justify-center gap-1"
+          aria-label="Navegação entre exercícios da sessão"
         >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Salvando...
-            </>
-          ) : (
-            <>
-              <Save className="h-4 w-4" />
-              Salvar Sessão
-            </>
+          {prescriptionExercises.map((_, idx) => {
+            const allFilled = selectedStudents.every((s) => {
+              const e = data[s.id]?.[idx];
+              return e && (isLoadExemptCategory(e.exercise_name) || e.load_breakdown) && e.reps > 0;
+            });
+            return (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setExerciseIndex(idx)}
+                aria-label={`Ir para exercício ${idx + 1} de ${totalExercises}`}
+                aria-current={idx === exerciseIndex ? "step" : undefined}
+                className="group flex h-8 min-w-8 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <span
+                  className={`h-2 rounded-full transition-all group-hover:scale-125 ${
+                    idx === exerciseIndex
+                      ? "w-6 bg-primary"
+                      : allFilled
+                      ? "w-2 bg-primary/40"
+                      : "w-2 bg-muted-foreground/20"
+                  }`}
+                />
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 lg:flex lg:justify-between">
+          <Button
+            onClick={() => setExerciseIndex((i) => Math.max(0, i - 1))}
+            variant="outline"
+            size="touch"
+            disabled={exerciseIndex === 0 || isSubmitting}
+            className="lg:hidden"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Anterior
+          </Button>
+          {onCancel && (
+            <Button
+              onClick={onCancel}
+              variant="outline"
+              size="lg"
+              disabled={isSubmitting}
+              className="hidden lg:inline-flex"
+            >
+              Voltar
+            </Button>
           )}
-        </Button>
+          <Button
+            onClick={() => setExerciseIndex((i) => Math.min(totalExercises - 1, i + 1))}
+            variant="outline"
+            size="touch"
+            disabled={exerciseIndex === totalExercises - 1 || isSubmitting}
+            className="lg:hidden"
+          >
+            Próximo
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={!isValid || isSubmitting}
+            size="touch"
+            className="gap-2 lg:ml-auto lg:h-12 lg:px-6 lg:text-base"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Salvando...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                <span className="hidden sm:inline">Salvar Sessão</span>
+                <span className="sm:hidden">Salvar</span>
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Exercise selection dialog */}
