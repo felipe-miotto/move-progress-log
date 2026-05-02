@@ -598,14 +598,14 @@ export function RecordGroupSessionDialog({
   // ─── Save Logic ────────────────────────────────────────
 
   const handleSave = async () => {
-    if (mergedStudents.length === 0 || !prescriptionId) return;
+    if (mergedStudents.length === 0 || !effectivePrescriptionId) return;
 
     if (isReopening && reopenDate && normalizedReopenTime) {
       try {
         const { data: existingSessions, error: existingSessionsError } = await supabase
           .from('workout_sessions')
           .select('id')
-          .eq('prescription_id', prescriptionId)
+          .eq('prescription_id', effectivePrescriptionId)
           .eq('date', reopenDate)
           .eq('time', normalizedReopenTime);
         if (existingSessionsError) throw existingSessionsError;
@@ -637,7 +637,7 @@ export function RecordGroupSessionDialog({
       return { student_id: student.id, student_name: student.name, exercises: merged.exercises, clinical_observations: merged.clinical_observations || [] };
     }).filter((s): s is GroupSessionToSave => s !== null);
 
-    await createGroupSessions.mutateAsync({ prescriptionId, date, time, sessions: sessionsToSave });
+    await createGroupSessions.mutateAsync({ prescriptionId: effectivePrescriptionId, date, time, sessions: sessionsToSave });
 
     const sessionLookupStudentIds = selectedStudents.map((student) => student.id);
     const { data: savedSessions, error: savedSessionsError } = await supabase
