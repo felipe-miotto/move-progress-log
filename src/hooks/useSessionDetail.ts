@@ -5,6 +5,7 @@ import { formatSessionTime } from "@/utils/sessionTime";
 
 interface SessionExercise {
   id: string;
+  exercise_library_id: string | null;
   exercise_name: string;
   sets: number | null;
   reps: number | null;
@@ -14,6 +15,10 @@ interface SessionExercise {
   observations: string | null;
   is_best_set: boolean | null;
   created_at: string;
+  exercise_library: {
+    id: string;
+    movement_pattern: string | null;
+  } | null;
 }
 
 interface Student {
@@ -72,6 +77,7 @@ export const useSessionDetail = (sessionId: string | null) => {
             ),
             exercises (
               id,
+              exercise_library_id,
               exercise_name,
               sets,
               reps,
@@ -80,7 +86,11 @@ export const useSessionDetail = (sessionId: string | null) => {
               load_breakdown,
               observations,
               is_best_set,
-              created_at
+              created_at,
+              exercise_library:exercises_library!exercises_exercise_library_id_fkey (
+                id,
+                movement_pattern
+              )
             )
           `)
           .eq("id", sessionId)

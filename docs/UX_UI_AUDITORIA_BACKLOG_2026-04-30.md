@@ -160,6 +160,7 @@ switch (movementPatternFilter) {
 ```
 - **User impact:** treinador e dono / revisão de sessões e relatórios / severity 4
 - **Recommendation:** Trazer `movement_pattern` da relação com `exercises_library` ou gravar snapshot do padrão no exercício executado no momento da sessão. Enquanto isso, marcar o filtro como “experimental” ou remover da UI para evitar falsa precisão.
+- **Status 2026-05-02:** tratado no código. `useSessionDetail` passou a carregar `exercise_library_id` e `movement_pattern` pela FK `exercises_exercise_library_id_fkey`; `SessionDetailDialog` agora prioriza o padrão vindo do ID canônico e mantém fallback por nome apenas para sessões antigas não vinculadas.
 - **Effort:** M
 
 ### C — Cabeçalhos ordenáveis da tabela de usuários não são botões acessíveis

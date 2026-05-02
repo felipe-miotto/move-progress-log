@@ -28,6 +28,7 @@ interface SessionDetailDialogProps {
 
 interface SessionExercise {
   id: string;
+  exercise_library_id: string | null;
   exercise_name: string;
   sets: number | null;
   reps: number | null;
@@ -36,6 +37,10 @@ interface SessionExercise {
   load_breakdown: string | null;
   observations: string | null;
   is_best_set: boolean | null;
+  exercise_library: {
+    id: string;
+    movement_pattern: string | null;
+  } | null;
 }
 
 const resolveExerciseLoad = (exercise: SessionExercise): { kg: number | null; text: string | null } => {
@@ -99,8 +104,10 @@ export const SessionDetailDialog = ({
   }, [exercisesLibrary]);
 
   const getExerciseMovementPattern = useCallback(
-    (exerciseName: string): string | null =>
-      exercisePatternByName.get(normalizeComparableText(exerciseName)) || null,
+    (exercise: SessionExercise): string | null =>
+      exercise.exercise_library?.movement_pattern ||
+      exercisePatternByName.get(normalizeComparableText(exercise.exercise_name)) ||
+      null,
     [exercisePatternByName]
   );
 
@@ -155,7 +162,7 @@ export const SessionDetailDialog = ({
 
     if (movementPatternFilter !== "all") {
       filtered = filtered.filter(ex => {
-        const pattern = getExerciseMovementPattern(ex.exercise_name);
+        const pattern = getExerciseMovementPattern(ex);
         if (movementPatternFilter === UNCLASSIFIED_PATTERN) return !pattern;
         return pattern === movementPatternFilter;
       });
@@ -172,7 +179,7 @@ export const SessionDetailDialog = ({
     if (!session?.exercises) return [];
     const patterns = new Set<string>();
     session.exercises.forEach(ex => {
-      const pattern = getExerciseMovementPattern(ex.exercise_name);
+      const pattern = getExerciseMovementPattern(ex);
       if (pattern) patterns.add(pattern);
     });
     return Array.from(patterns);
@@ -180,11 +187,11 @@ export const SessionDetailDialog = ({
 
   const hasUnclassifiedExercises = useMemo(() => {
     if (!session?.exercises || !exercisesLibrary) return false;
-    return session.exercises.some((exercise) => !getExerciseMovementPattern(exercise.exercise_name));
+    return session.exercises.some((exercise) => !getExerciseMovementPattern(exercise));
   }, [session?.exercises, exercisesLibrary, getExerciseMovementPattern]);
 
   const renderExerciseNameCell = (exercise: SessionExercise) => {
-    const pattern = getExerciseMovementPattern(exercise.exercise_name);
+    const pattern = getExerciseMovementPattern(exercise);
 
     return (
       <div className="flex items-center gap-2">
@@ -402,7 +409,7 @@ export const SessionDetailDialog = ({
                     <>
                       <div className="space-y-3 lg:hidden">
                         {filteredExercises.map((exercise) => {
-                          const pattern = getExerciseMovementPattern(exercise.exercise_name);
+                          const pattern = getExerciseMovementPattern(exercise);
                           const resolvedLoad = resolveExerciseLoad(exercise);
                           const intensity = getExerciseIntensity(exercise);
 
