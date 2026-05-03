@@ -558,8 +558,8 @@ const StudentDetailPage = () => {
                           <AlertDialogTrigger asChild>
                             <Button
                               variant="ghost"
-                              size="icon-sm"
-                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              size="icon"
+                              className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10"
                               aria-label="Excluir atribuição"
                             >
                               <Trash2 className="h-4 w-4" />

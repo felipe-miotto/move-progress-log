@@ -501,9 +501,9 @@ export function RecordIndividualSessionDialog({
 
           {dialogState === 'preview' && (
             <>
-              <Button variant="outline" onClick={handleBack}>← Voltar</Button>
-              <Button variant="secondary" onClick={() => setDialogState('edit')}>✏️ Editar Dados</Button>
-              <Button variant="secondary" onClick={handleAddAnotherRecording} disabled={!mergedData || accumulatedRecordings.length >= MAX_RECORDINGS}>
+              <Button variant="ghost" onClick={handleBack}>← Voltar</Button>
+              <Button variant="outline" onClick={() => setDialogState('edit')}>✏️ Editar Dados</Button>
+              <Button variant="outline" onClick={handleAddAnotherRecording} disabled={!mergedData || accumulatedRecordings.length >= MAX_RECORDINGS}>
                 <Mic className="h-4 w-4 mr-2" />Adicionar Gravação
               </Button>
               <Button onClick={() => { if (!validateExercisesBeforeSave()) return; handleSave(); }}>

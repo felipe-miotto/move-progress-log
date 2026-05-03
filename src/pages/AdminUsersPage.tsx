@@ -313,21 +313,20 @@ export default function AdminUsersPage() {
           </div>
 
           {(searchTerm || roleFilter !== "all") && (
-            <Button variant="outline" size="sm" onClick={clearFilters}>
+            <Button variant="outline" onClick={clearFilters}>
               Limpar filtros
             </Button>
           )}
 
-          <Button 
-            onClick={() => setShowAddDialog(true)} 
+          <Button
+            onClick={() => setShowAddDialog(true)}
             variant="default"
-            size="sm"
           >
             <UserPlus className="h-4 w-4 mr-2" />
             Adicionar Usuário
           </Button>
 
-          <Button onClick={fetchUsers} variant="outline" size="sm">
+          <Button onClick={fetchUsers} variant="outline">
             <RefreshCw className="h-4 w-4 mr-2" />
             Atualizar
           </Button>

@@ -339,7 +339,7 @@ export function ManualSessionEntry({
               variant="ghost"
               size="sm"
               onClick={() => setHistoryDialogOpen(true)}
-              className="h-7 text-xs gap-1"
+              className="text-xs gap-1"
             >
               <History className="h-3 w-3" />
               Histórico
@@ -348,7 +348,7 @@ export function ManualSessionEntry({
               variant="ghost"
               size="sm"
               onClick={clearDraft}
-              className="h-7 text-xs"
+              className="text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
             >
               <Trash className="h-3 w-3 mr-1" />
               Limpar rascunho

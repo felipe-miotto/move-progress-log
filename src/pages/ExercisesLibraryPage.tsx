@@ -526,7 +526,7 @@ export default function ExercisesLibraryPage() {
                   </div>
                 </details>
 
-                <div className="flex gap-xs">
+                <div className="flex gap-xs items-center">
                   <Button
                     variant="outline"
                     size="sm"
@@ -537,13 +537,14 @@ export default function ExercisesLibraryPage() {
                     Editar
                   </Button>
                   <Button
-                    variant="destructive"
-                    size="sm"
+                    variant="ghost"
+                    size="icon"
                     onClick={() => setDeletingExerciseId(exercise.id)}
-                    className="flex-1"
+                    className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
+                    aria-label="Excluir exercício"
+                    title="Excluir exercício"
                   >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Excluir
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </CardContent>

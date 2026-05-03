@@ -69,10 +69,13 @@ export function ExerciseEditor({
               <Label className="font-semibold">Exercício {idx + 1}</Label>
               <Button
                 variant="ghost"
-                size="sm"
+                size="icon"
                 onClick={() => removeExercise(idx)}
+                aria-label="Remover exercício"
+                title="Remover exercício"
+                className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10"
               >
-                <Trash className="h-4 w-4 text-destructive" />
+                <Trash className="h-4 w-4" />
               </Button>
             </div>
 
@@ -89,9 +92,10 @@ export function ExerciseEditor({
                   />
                   <Button
                     variant="outline"
-                    size="sm"
+                    size="icon"
                     onClick={() => onOpenExerciseSelection(idx)}
-                    className="gap-1 shrink-0"
+                    className="h-10 w-10 shrink-0"
+                    aria-label="Substituir por exercício cadastrado"
                     title="Substituir por exercício cadastrado"
                   >
                     <BookOpen className="h-4 w-4" />

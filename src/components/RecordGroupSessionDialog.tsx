@@ -1019,7 +1019,7 @@ export function RecordGroupSessionDialog({
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Users className="h-4 w-4" /> Alunos Participantes
                   <Badge variant="secondary" className="ml-auto">{selectedStudents.length}</Badge>
-                  <Button type="button" variant="ghost" size="sm" onClick={handleAddStudentToGroup} className="gap-1.5 h-7">
+                  <Button type="button" variant="ghost" size="sm" onClick={handleAddStudentToGroup} className="gap-1.5">
                     <UserPlus className="h-3.5 w-3.5" /> Adicionar
                   </Button>
                 </CardTitle>
@@ -1208,12 +1208,12 @@ export function RecordGroupSessionDialog({
           )}
           
           {dialogState === 'mode-selection' && (
-            <Button variant="outline" onClick={() => setDialogState('context-setup')}>Voltar</Button>
+            <Button variant="ghost" onClick={() => setDialogState('context-setup')}>Voltar</Button>
           )}
 
           {dialogState === 'preview' && (
             <>
-              <Button variant="outline" onClick={handleBack} disabled={createGroupSessions.isPending}>Voltar</Button>
+              <Button variant="ghost" onClick={handleBack} disabled={createGroupSessions.isPending}>Voltar</Button>
               <Button variant="outline" onClick={handleStartEditing}><Pencil className="h-4 w-4 mr-2" />Editar Dados</Button>
               <Button onClick={handleSave} disabled={validationIssues.errors.length > 0 || createGroupSessions.isPending}>
                 <Save className="h-4 w-4 mr-2" />{createGroupSessions.isPending ? "Salvando..." : "Salvar Sessão"}

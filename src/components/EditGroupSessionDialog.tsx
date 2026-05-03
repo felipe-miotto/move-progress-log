@@ -393,12 +393,12 @@ export function EditGroupSessionDialog({
             </div>
 
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
+              <Button variant="ghost" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
               {onReopenForRecording && prescriptionId && (
                 <Button
-                  variant="secondary"
+                  variant="outline"
                   onClick={() => {
                     onReopenForRecording(prescriptionId, date, time);
                     onOpenChange(false);

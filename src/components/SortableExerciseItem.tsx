@@ -157,7 +157,7 @@ export function SortableExerciseItem({
                     e.stopPropagation();
                     onAddExerciseBelow();
                   }}
-                  className="h-8 w-8 p-0"
+                  className="h-9 w-9 p-0"
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
@@ -177,7 +177,7 @@ export function SortableExerciseItem({
                     e.stopPropagation();
                     onRemove();
                   }}
-                  className="h-8 w-8 p-0"
+                  className="h-9 w-9 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -348,7 +348,7 @@ export function SortableExerciseItem({
                   variant="ghost"
                   size="sm"
                   onClick={() => onRemoveAdaptation(adaptIndex)}
-                  className="h-8 w-8 p-0"
+                  className="h-9 w-9 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>

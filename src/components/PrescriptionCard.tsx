@@ -175,8 +175,8 @@ const PrescriptionCardComponent = ({
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
-                  size="sm"
-                  className="h-9 w-9 p-0"
+                  size="icon"
+                  className="h-9 w-9"
                 >
                   <MoreVertical className="h-4 w-4" />
                   <span className="sr-only">Menu da prescrição</span>

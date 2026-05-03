@@ -332,7 +332,6 @@ export default function PrescriptionsPage() {
             <Button
               onClick={() => setGenerateSessionDialogOpen(true)}
               variant="outline"
-              size="sm"
               className="gap-2"
               aria-label="Gerar sessão com IA"
             >
@@ -343,7 +342,6 @@ export default function PrescriptionsPage() {
             <Button
               onClick={() => setImportWordDialogOpen(true)}
               variant="outline"
-              size="sm"
               className="gap-2"
               aria-label="Importar prescrição do Word"
             >
