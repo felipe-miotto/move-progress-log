@@ -88,13 +88,16 @@ function isTrustedOrigin(origin: string, canonicalOrigin: string | null): boolea
     if (LOVABLE_EDITOR_HOSTS.has(host)) {
       return false;
     }
+
+    // PUBLIC_APP_URL / SITE_URL is always honored, even if it points to a
+    // dev host. Explicit operator override.
     if (canonicalOrigin && origin === canonicalOrigin) return true;
 
-    return (
-      host.endsWith(LOVABLE_PREVIEW_SUFFIX) ||
-      host === 'localhost' ||
-      host === '127.0.0.1'
-    );
+    // Invite links go to a third party (the student). localhost/127.0.0.1
+    // are unreachable from anywhere except the trainer's own machine, so
+    // they MUST NOT win automatic origin resolution. Same defense as
+    // generate-oura-connect-link.
+    return host.endsWith(LOVABLE_PREVIEW_SUFFIX);
   } catch (_error) {
     return false;
   }

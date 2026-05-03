@@ -56,13 +56,16 @@ const isTrustedOrigin = (origin: string, canonicalOrigin: string | null): boolea
     const host = parsed.hostname.toLowerCase();
 
     if (LOVABLE_EDITOR_HOSTS.has(host)) return false;
+
+    // PUBLIC_APP_URL / SITE_URL is always honored when explicitly set.
     if (canonicalOrigin && origin === canonicalOrigin) return true;
 
-    return (
-      host.endsWith(LOVABLE_PREVIEW_SUFFIX) ||
-      host === 'localhost' ||
-      host === '127.0.0.1'
-    );
+    // OAuth callback redirects to a frontend that the user (the student
+    // who connected their Oura) needs to reach. localhost/127.0.0.1 are
+    // never reachable from a phone or another browser, so reject them
+    // from automatic origin resolution. Same defense as the invite-link
+    // generators (see generate-oura-connect-link).
+    return host.endsWith(LOVABLE_PREVIEW_SUFFIX);
   } catch (_error) {
     return false;
   }
