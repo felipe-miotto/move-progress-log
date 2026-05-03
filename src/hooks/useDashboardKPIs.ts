@@ -43,7 +43,7 @@ interface RpcOk<T> {
 
 interface RpcErr {
   ok: false;
-  error: string;
+  errorName: string;
 }
 
 const callRpc = async <T>(
@@ -56,7 +56,7 @@ const callRpc = async <T>(
   const { data, error } = await (supabase.rpc as any)(name, args ?? {});
   if (error) {
     logger.error(`[useDashboardKPIs] RPC ${name} failed`, error);
-    return { ok: false, error: name };
+    return { ok: false, errorName: name };
   }
   return { ok: true, data: data as T };
 };
@@ -88,20 +88,27 @@ export const useDashboardKPIs = () => {
 
       const errors: DashboardKPIs["errors"] = {};
 
-      const inactive7d = inactive.ok && typeof inactive.data === "number" ? inactive.data : null;
-      if (!inactive.ok) errors.inactive7d = inactive.error;
+      const extractNumber = (
+        result: RpcOk<number> | RpcErr,
+        key: DashboardKPIKey,
+      ): number | null => {
+        if (result.ok === false) {
+          errors[key] = result.errorName;
+          return null;
+        }
+        return typeof result.data === "number" ? result.data : null;
+      };
 
-      const frequencyDropping =
-        dropping.ok && typeof dropping.data === "number" ? dropping.data : null;
-      if (!dropping.ok) errors.frequencyDropping = dropping.error;
+      const inactive7d = extractNumber(inactive, "inactive7d");
+      const frequencyDropping = extractNumber(dropping, "frequencyDropping");
+      const stagnant4w = extractNumber(stagnant, "stagnant4w");
 
-      const weekAdherence =
-        adherence.ok && isWeekAdherence(adherence.data) ? adherence.data : null;
-      if (!adherence.ok) errors.weekAdherence = adherence.error;
-
-      const stagnant4w =
-        stagnant.ok && typeof stagnant.data === "number" ? stagnant.data : null;
-      if (!stagnant.ok) errors.stagnant4w = stagnant.error;
+      let weekAdherence: DashboardKPIs["weekAdherence"] = null;
+      if (adherence.ok === false) {
+        errors.weekAdherence = adherence.errorName;
+      } else if (isWeekAdherence(adherence.data)) {
+        weekAdherence = adherence.data;
+      }
 
       return {
         inactive7d,

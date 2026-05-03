@@ -2282,6 +2282,24 @@ export type Database = {
         }
         Returns: boolean
       }
+      list_prescriptions_stagnant: {
+        Args: { p_weeks: number }
+        Returns: {
+          prescription_id: string
+        }[]
+      }
+      list_students_frequency_dropping: {
+        Args: never
+        Returns: {
+          student_id: string
+        }[]
+      }
+      list_students_inactive: {
+        Args: { p_days: number }
+        Returns: {
+          student_id: string
+        }[]
+      }
       migrate_oura_tokens_to_vault: { Args: never; Returns: undefined }
       normalize_objective: { Args: { obj: string }; Returns: string }
       search_exercises_by_name: {
