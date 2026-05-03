@@ -106,10 +106,17 @@ function resolveFrontendUrl(req: Request, bodyFrontendOrigin: string | null) {
     Deno.env.get('APP_PUBLIC_URL') ??
     null
   );
+  // PUBLIC_APP_URL has absolute priority when configured. It must never be
+  // overridden by request headers (Origin/Referer), body frontend_origin or
+  // SITE_URL. This guarantees invite links always point to the canonical
+  // public domain even when the request originates from the editor preview
+  // or a localhost dev server.
+  if (publicAppOrigin) {
+    return publicAppOrigin;
+  }
   const siteUrlOrigin = toOrigin(Deno.env.get('SITE_URL') ?? null);
-  const canonicalOrigin = publicAppOrigin ?? siteUrlOrigin;
+  const canonicalOrigin = siteUrlOrigin;
   const requestOrigins = [
-    publicAppOrigin,
     toOrigin(bodyFrontendOrigin),
     siteUrlOrigin,
     toOrigin(req.headers.get('origin')),
@@ -126,10 +133,6 @@ function resolveFrontendUrl(req: Request, bodyFrontendOrigin: string | null) {
         .filter((origin): origin is string => Boolean(origin))
     )
   );
-
-  if (publicAppOrigin && normalizedTrustedOrigins.includes(publicAppOrigin)) {
-    return publicAppOrigin;
-  }
 
   if (siteUrlOrigin && normalizedTrustedOrigins.includes(siteUrlOrigin) && !isIdPreviewOrigin(siteUrlOrigin)) {
     return siteUrlOrigin;
