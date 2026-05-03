@@ -414,7 +414,7 @@ export default function PrescriptionsPage() {
                 : isApplyingStagnantFilter
                   ? `Aplicando filtro: prescrições estagnadas há ${stagnantWeeks}+ semanas…`
                   : stagnantSet
-                    ? `${stagnantSet.size} prescrição${stagnantSet.size === 1 ? "" : "ões"} estagnada${stagnantSet.size === 1 ? "" : "s"} (sem atualização há ${stagnantWeeks}+ semanas)`
+                    ? `${stagnantSet.size} ${stagnantSet.size === 1 ? "prescrição estagnada" : "prescrições estagnadas"} (sem atualização há ${stagnantWeeks}+ semanas)`
                     : `Filtro ativo: prescrições estagnadas há ${stagnantWeeks}+ semanas`}
             </span>
             <Button
