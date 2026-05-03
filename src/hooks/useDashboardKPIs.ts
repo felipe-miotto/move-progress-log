@@ -88,20 +88,33 @@ export const useDashboardKPIs = () => {
 
       const errors: DashboardKPIs["errors"] = {};
 
-      const inactive7d = inactive.ok && typeof inactive.data === "number" ? inactive.data : null;
-      if (!inactive.ok) errors.inactive7d = inactive.error;
+      let inactive7d: number | null = null;
+      if (inactive.ok) {
+        if (typeof inactive.data === "number") inactive7d = inactive.data;
+      } else {
+        errors.inactive7d = inactive.error;
+      }
 
-      const frequencyDropping =
-        dropping.ok && typeof dropping.data === "number" ? dropping.data : null;
-      if (!dropping.ok) errors.frequencyDropping = dropping.error;
+      let frequencyDropping: number | null = null;
+      if (dropping.ok) {
+        if (typeof dropping.data === "number") frequencyDropping = dropping.data;
+      } else {
+        errors.frequencyDropping = dropping.error;
+      }
 
-      const weekAdherence =
-        adherence.ok && isWeekAdherence(adherence.data) ? adherence.data : null;
-      if (!adherence.ok) errors.weekAdherence = adherence.error;
+      let weekAdherence: DashboardKPIs["weekAdherence"] = null;
+      if (adherence.ok) {
+        if (isWeekAdherence(adherence.data)) weekAdherence = adherence.data;
+      } else {
+        errors.weekAdherence = adherence.error;
+      }
 
-      const stagnant4w =
-        stagnant.ok && typeof stagnant.data === "number" ? stagnant.data : null;
-      if (!stagnant.ok) errors.stagnant4w = stagnant.error;
+      let stagnant4w: number | null = null;
+      if (stagnant.ok) {
+        if (typeof stagnant.data === "number") stagnant4w = stagnant.data;
+      } else {
+        errors.stagnant4w = stagnant.error;
+      }
 
       return {
         inactive7d,
