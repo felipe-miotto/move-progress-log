@@ -91,7 +91,6 @@ function resolveFrontendUrl(req: Request, bodyFrontendOrigin: string | null) {
   const siteUrlOrigin = toOrigin(Deno.env.get('SITE_URL') ?? null);
   const canonicalOrigin = siteUrlOrigin;
   const requestOrigins = [
-    publicAppOrigin,
     toOrigin(bodyFrontendOrigin),
     siteUrlOrigin,
     toOrigin(req.headers.get('origin')),
@@ -108,10 +107,6 @@ function resolveFrontendUrl(req: Request, bodyFrontendOrigin: string | null) {
         .filter((origin): origin is string => Boolean(origin))
     )
   );
-
-  if (publicAppOrigin && normalizedTrustedOrigins.includes(publicAppOrigin)) {
-    return publicAppOrigin;
-  }
 
   if (siteUrlOrigin && normalizedTrustedOrigins.includes(siteUrlOrigin) && !isIdPreviewOrigin(siteUrlOrigin)) {
     return siteUrlOrigin;
