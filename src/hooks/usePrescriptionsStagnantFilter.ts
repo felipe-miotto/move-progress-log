@@ -15,10 +15,6 @@ import { logger } from "@/utils/logger";
  * CURRENT_DATE boundary, no Date.now()/Date.parse() drift around midnight.
  */
 
-interface IdRow {
-  prescription_id: string;
-}
-
 /**
  * Returns a Set<string> of prescription ids that are stagnant. When `weeks`
  * is null the query is disabled and `data` stays undefined; the caller
@@ -34,8 +30,7 @@ export const usePrescriptionsStagnantFilter = (weeks: number | null) => {
     refetchOnWindowFocus: false,
     queryFn: async (): Promise<Set<string>> => {
       if (weeks === null) return new Set();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)(
+      const { data, error } = await supabase.rpc(
         "list_prescriptions_stagnant",
         { p_weeks: weeks },
       );
@@ -46,7 +41,7 @@ export const usePrescriptionsStagnantFilter = (weeks: number | null) => {
         );
         throw error;
       }
-      return new Set(((data ?? []) as IdRow[]).map((r) => r.prescription_id));
+      return new Set((data ?? []).map((r) => r.prescription_id));
     },
   });
 };
