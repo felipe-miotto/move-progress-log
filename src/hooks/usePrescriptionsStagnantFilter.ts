@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/utils/logger";
 
 /**
  * Drill-down filter for the prescriptions list, driven by the dashboard
@@ -8,46 +9,20 @@ import { supabase } from "@/integrations/supabase/client";
  *   AND has at least one ACTIVE assignment (start_date <= today AND
  *       (end_date IS NULL OR end_date >= today))
  *
- * Mirrors the server-side rule of count_prescriptions_stagnant(p_weeks).
- * Returns a Set<string> of stagnant prescription_ids that the page can
- * intersect with the full prescription list. Computing client-side keeps
- * the change surgical (no new RPC, no migration). Volume is bounded by
- * the active-assignment count, which stays small.
+ * Uses list_prescriptions_stagnant(p_weeks) on the server, mirroring
+ * count_prescriptions_stagnant(p_weeks) exactly. Computing on the server
+ * keeps the count card and the filtered list perfectly consistent — same
+ * CURRENT_DATE boundary, no Date.now()/Date.parse() drift around midnight.
  */
 
-interface AssignmentRow {
+interface IdRow {
   prescription_id: string;
-  start_date: string;
-  end_date: string | null;
 }
-
-interface PrescriptionRow {
-  id: string;
-  updated_at: string;
-}
-
-const computeStagnantIds = (
-  prescriptions: PrescriptionRow[],
-  activeAssignments: AssignmentRow[],
-  weeks: number,
-): Set<string> => {
-  const cutoff = Date.now() - weeks * 7 * 24 * 60 * 60 * 1000;
-  const activePrescriptionIds = new Set(activeAssignments.map((a) => a.prescription_id));
-
-  const stagnant = new Set<string>();
-  for (const p of prescriptions) {
-    if (!activePrescriptionIds.has(p.id)) continue;
-    const updatedAt = Date.parse(p.updated_at);
-    if (Number.isNaN(updatedAt)) continue;
-    if (updatedAt < cutoff) stagnant.add(p.id);
-  }
-  return stagnant;
-};
 
 /**
- * Returns a Set<string> of prescription ids that are stagnant (older than
- * `weeks` weeks AND have an active assignment), or `null` when `weeks` is
- * not provided (caller should bypass filtering entirely).
+ * Returns a Set<string> of prescription ids that are stagnant. When `weeks`
+ * is null the query is disabled and `data` stays undefined; the caller
+ * should bypass filtering entirely.
  */
 export const usePrescriptionsStagnantFilter = (weeks: number | null) => {
   return useQuery({
@@ -59,30 +34,19 @@ export const usePrescriptionsStagnantFilter = (weeks: number | null) => {
     refetchOnWindowFocus: false,
     queryFn: async (): Promise<Set<string>> => {
       if (weeks === null) return new Set();
-      const todayISO = new Date().toISOString().slice(0, 10);
-
-      const [prescriptionsResp, assignmentsResp] = await Promise.all([
-        supabase
-          .from("workout_prescriptions")
-          .select("id, updated_at"),
-        supabase
-          .from("prescription_assignments")
-          .select("prescription_id, start_date, end_date")
-          .lte("start_date", todayISO),
-      ]);
-
-      if (prescriptionsResp.error) throw prescriptionsResp.error;
-      if (assignmentsResp.error) throw assignmentsResp.error;
-
-      const activeAssignments = ((assignmentsResp.data ?? []) as AssignmentRow[]).filter(
-        (a) => a.end_date === null || a.end_date >= todayISO,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase.rpc as any)(
+        "list_prescriptions_stagnant",
+        { p_weeks: weeks },
       );
-
-      return computeStagnantIds(
-        (prescriptionsResp.data ?? []) as PrescriptionRow[],
-        activeAssignments,
-        weeks,
-      );
+      if (error) {
+        logger.error(
+          "[usePrescriptionsStagnantFilter] list_prescriptions_stagnant failed",
+          error,
+        );
+        throw error;
+      }
+      return new Set(((data ?? []) as IdRow[]).map((r) => r.prescription_id));
     },
   });
 };

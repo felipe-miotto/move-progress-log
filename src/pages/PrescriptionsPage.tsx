@@ -74,13 +74,21 @@ export default function PrescriptionsPage() {
     return Number.isFinite(n) && n > 0 ? n : null;
   }, [searchParams]);
 
-  const { data: stagnantSet } = usePrescriptionsStagnantFilter(stagnantWeeks);
+  const {
+    data: stagnantSet,
+    isLoading: isStagnantLoading,
+    isError: isStagnantError,
+  } = usePrescriptionsStagnantFilter(stagnantWeeks);
 
   const clearStagnantFilter = () => {
     const next = new URLSearchParams(searchParams);
     next.delete("stagnant");
     setSearchParams(next, { replace: true });
   };
+
+  // While the stagnant filter is loading, hide the full prescription list to
+  // avoid the flash of "all prescriptions" before the drill-down narrows it.
+  const isApplyingStagnantFilter = stagnantWeeks !== null && isStagnantLoading;
 
   // Use search results if filters are active, otherwise use all prescriptions
   const { data: searchResults } = usePrescriptionSearch(searchFilters);
@@ -90,6 +98,9 @@ export default function PrescriptionsPage() {
   const baseList = hasActiveSearch ? searchResults : allPrescriptions;
   const prescriptions = useMemo(() => {
     if (!baseList) return baseList;
+    // Hide the underlying list while the drill-down filter is still loading
+    // so the UI does not flash "all prescriptions" first.
+    if (stagnantWeeks !== null && !stagnantSet) return [];
     if (stagnantWeeks === null || !stagnantSet) return baseList;
     return baseList.filter((p) => stagnantSet.has(p.id));
   }, [baseList, stagnantWeeks, stagnantSet]);
@@ -386,12 +397,25 @@ export default function PrescriptionsPage() {
       />
 
         {stagnantWeeks !== null && (
-          <div className="flex items-center gap-sm rounded-md border border-warning/30 bg-warning/5 px-md py-sm text-sm">
-            <FileWarning className="h-4 w-4 text-warning" aria-hidden="true" />
+          <div
+            className={`flex items-center gap-sm rounded-md border px-md py-sm text-sm ${
+              isStagnantError
+                ? "border-destructive/30 bg-destructive/5"
+                : "border-warning/30 bg-warning/5"
+            }`}
+          >
+            <FileWarning
+              className={`h-4 w-4 ${isStagnantError ? "text-destructive" : "text-warning"}`}
+              aria-hidden="true"
+            />
             <span className="font-medium">
-              {stagnantSet
-                ? `${stagnantSet.size} prescrição${stagnantSet.size === 1 ? "" : "ões"} estagnada${stagnantSet.size === 1 ? "" : "s"} (sem atualização há ${stagnantWeeks}+ semanas)`
-                : `Filtro ativo: prescrições estagnadas há ${stagnantWeeks}+ semanas`}
+              {isStagnantError
+                ? "Erro ao aplicar filtro do dashboard"
+                : isApplyingStagnantFilter
+                  ? `Aplicando filtro: prescrições estagnadas há ${stagnantWeeks}+ semanas…`
+                  : stagnantSet
+                    ? `${stagnantSet.size} prescrição${stagnantSet.size === 1 ? "" : "ões"} estagnada${stagnantSet.size === 1 ? "" : "s"} (sem atualização há ${stagnantWeeks}+ semanas)`
+                    : `Filtro ativo: prescrições estagnadas há ${stagnantWeeks}+ semanas`}
             </span>
             <Button
               variant="ghost"
@@ -423,7 +447,7 @@ export default function PrescriptionsPage() {
           />
         )}
 
-        {isLoading ? (
+        {isLoading || isApplyingStagnantFilter ? (
           <div className="space-y-md">
             {[...Array(4)].map((_, i) => (
               <PrescriptionCardSkeleton key={i} />

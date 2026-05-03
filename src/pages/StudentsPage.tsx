@@ -328,7 +328,11 @@ const StudentsPage = () => {
     return { kind: "none" };
   }, [searchParams]);
 
-  const { data: activityFilterSet } = useStudentsActivityFilter(activityFilter, studentIds);
+  const {
+    data: activityFilterSet,
+    isLoading: isActivityFilterLoading,
+    isError: isActivityFilterError,
+  } = useStudentsActivityFilter(activityFilter);
 
   const clearActivityFilter = () => {
     const next = new URLSearchParams(searchParams);
@@ -346,6 +350,11 @@ const StudentsPage = () => {
     setRecordingStudentId(id);
     setRecordingStudentName(name);
   };
+
+  // While the activity filter is loading, hide the full list to avoid the
+  // flash of "all students" before the drill-down narrows it down.
+  const isApplyingActivityFilter =
+    activityFilter.kind !== "none" && isActivityFilterLoading;
 
   const filteredStudents = students?.filter(student => {
     const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -444,12 +453,25 @@ const StudentsPage = () => {
         </div>
 
         {activityFilterLabel && ActivityFilterIcon && (
-          <div className="flex items-center gap-sm rounded-md border border-warning/30 bg-warning/5 px-md py-sm text-sm">
-            <ActivityFilterIcon className="h-4 w-4 text-warning" aria-hidden="true" />
+          <div
+            className={`flex items-center gap-sm rounded-md border px-md py-sm text-sm ${
+              isActivityFilterError
+                ? "border-destructive/30 bg-destructive/5"
+                : "border-warning/30 bg-warning/5"
+            }`}
+          >
+            <ActivityFilterIcon
+              className={`h-4 w-4 ${isActivityFilterError ? "text-destructive" : "text-warning"}`}
+              aria-hidden="true"
+            />
             <span className="font-medium">
-              {activityFilterCount !== null
-                ? `${activityFilterCount} aluno${activityFilterCount === 1 ? "" : "s"}: ${activityFilterLabel.toLowerCase()}`
-                : `Filtro ativo: ${activityFilterLabel.toLowerCase()}`}
+              {isActivityFilterError
+                ? "Erro ao aplicar filtro do dashboard"
+                : isApplyingActivityFilter
+                  ? `Aplicando filtro: ${activityFilterLabel.toLowerCase()}…`
+                  : activityFilterCount !== null
+                    ? `${activityFilterCount} aluno${activityFilterCount === 1 ? "" : "s"}: ${activityFilterLabel.toLowerCase()}`
+                    : `Filtro ativo: ${activityFilterLabel.toLowerCase()}`}
             </span>
             <Button
               variant="ghost"
@@ -464,7 +486,7 @@ const StudentsPage = () => {
           </div>
         )}
 
-        {isLoading ? (
+        {isLoading || isApplyingActivityFilter ? (
           <div className="grid gap-md md:grid-cols-2 lg:grid-cols-3">
             {[...Array(6)].map((_, i) => (
               <StudentCardSkeleton key={i} />

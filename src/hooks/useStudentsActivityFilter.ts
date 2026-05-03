@@ -1,20 +1,23 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/utils/logger";
 
 /**
  * Activity-based filters for the students list, driven by the dashboard
  * KPI drill-downs:
  *  - "inactive" : students that exist for at least N days but had no
- *                 workout_session in the last N days. Mirrors the
- *                 server-side rule of count_students_inactive(p_days).
+ *                 workout_session in the last N days. Mirrors
+ *                 count_students_inactive(p_days) exactly via the
+ *                 list_students_inactive(p_days) RPC.
  *  - "dropping" : students whose session count in the last 28 days is
  *                 strictly less than in the prior 28 days. Mirrors
- *                 count_students_frequency_dropping().
+ *                 count_students_frequency_dropping() exactly via the
+ *                 list_students_frequency_dropping() RPC.
  *
- * Both filters return a Set of student_ids that the page can intersect
- * with the full student list. Computing client-side keeps the change
- * surgical (no new RPC, no migration). Volume is capped to recent
- * sessions (<= 56 days) so the payload stays small.
+ * Both filters return a Set of student_ids. Using the server-side RPC
+ * (instead of recomputing client-side) keeps the count card and the
+ * filtered list perfectly consistent — same CURRENT_DATE boundaries,
+ * no timezone drift, no "new students" leakage in the inactive bucket.
  */
 
 export type StudentsActivityFilter =
@@ -22,89 +25,51 @@ export type StudentsActivityFilter =
   | { kind: "inactive"; days: number }
   | { kind: "dropping" };
 
-interface SessionRow {
+interface IdRow {
   student_id: string;
-  date: string;
 }
-
-const sessionsLookbackForDropping = 56;
-
-const computeInactiveIds = (
-  studentIds: string[],
-  recentSessions: SessionRow[],
-): Set<string> => {
-  const activeIds = new Set(recentSessions.map((s) => s.student_id));
-  return new Set(studentIds.filter((id) => !activeIds.has(id)));
-};
-
-const computeDroppingIds = (sessions: SessionRow[]): Set<string> => {
-  const now = Date.now();
-  const day = 24 * 60 * 60 * 1000;
-  const recentCutoff = now - 28 * day;
-  const priorCutoff = now - 56 * day;
-
-  const recent = new Map<string, number>();
-  const prior = new Map<string, number>();
-
-  for (const s of sessions) {
-    const t = Date.parse(s.date);
-    if (Number.isNaN(t)) continue;
-    if (t >= recentCutoff) {
-      recent.set(s.student_id, (recent.get(s.student_id) ?? 0) + 1);
-    } else if (t >= priorCutoff) {
-      prior.set(s.student_id, (prior.get(s.student_id) ?? 0) + 1);
-    }
-  }
-
-  const dropping = new Set<string>();
-  for (const [studentId, priorCount] of prior) {
-    if (priorCount === 0) continue;
-    const recentCount = recent.get(studentId) ?? 0;
-    if (recentCount < priorCount) dropping.add(studentId);
-  }
-  return dropping;
-};
 
 /**
  * Returns a Set<string> of student ids that match the given activity filter,
- * or null if the filter is "none" (caller should bypass filtering entirely).
+ * or undefined while loading. When `filter.kind === "none"` the query is
+ * disabled and `data` stays undefined; the caller should bypass filtering
+ * entirely in that case.
  */
-export const useStudentsActivityFilter = (
-  filter: StudentsActivityFilter,
-  allStudentIds: string[],
-) => {
-  const idsKey = [...allStudentIds].sort().join(",");
-
+export const useStudentsActivityFilter = (filter: StudentsActivityFilter) => {
   return useQuery({
-    queryKey: ["students-activity-filter", filter, idsKey],
-    enabled: filter.kind !== "none" && allStudentIds.length > 0,
+    queryKey: ["students-activity-filter", filter],
+    enabled: filter.kind !== "none",
     staleTime: 60 * 1000,
     gcTime: 5 * 60 * 1000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     queryFn: async (): Promise<Set<string>> => {
       if (filter.kind === "inactive") {
-        const cutoffISO = new Date(Date.now() - filter.days * 24 * 60 * 60 * 1000)
-          .toISOString()
-          .slice(0, 10);
-        const { data, error } = await supabase
-          .from("workout_sessions")
-          .select("student_id, date")
-          .gte("date", cutoffISO);
-        if (error) throw error;
-        return computeInactiveIds(allStudentIds, (data ?? []) as SessionRow[]);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data, error } = await (supabase.rpc as any)(
+          "list_students_inactive",
+          { p_days: filter.days },
+        );
+        if (error) {
+          logger.error("[useStudentsActivityFilter] list_students_inactive failed", error);
+          throw error;
+        }
+        return new Set(((data ?? []) as IdRow[]).map((r) => r.student_id));
       }
 
       // dropping
-      const cutoffISO = new Date(Date.now() - sessionsLookbackForDropping * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .slice(0, 10);
-      const { data, error } = await supabase
-        .from("workout_sessions")
-        .select("student_id, date")
-        .gte("date", cutoffISO);
-      if (error) throw error;
-      return computeDroppingIds((data ?? []) as SessionRow[]);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase.rpc as any)(
+        "list_students_frequency_dropping",
+      );
+      if (error) {
+        logger.error(
+          "[useStudentsActivityFilter] list_students_frequency_dropping failed",
+          error,
+        );
+        throw error;
+      }
+      return new Set(((data ?? []) as IdRow[]).map((r) => r.student_id));
     },
   });
 };

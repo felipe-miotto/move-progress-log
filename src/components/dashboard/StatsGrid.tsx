@@ -36,6 +36,9 @@ const stagnantTone = (n: number | null): StatCardTone => {
   return "success";
 };
 
+const ERROR_SUBTITLE = "Erro ao carregar KPI";
+const ERROR_VALUE = "—";
+
 export const StatsGrid = () => {
   const navigate = useNavigate();
   const { data: kpis, isLoading } = useDashboardKPIs();
@@ -51,52 +54,70 @@ export const StatsGrid = () => {
     );
   }
 
+  const errors = kpis?.errors ?? {};
   const inactive = kpis?.inactive7d ?? null;
   const dropping = kpis?.frequencyDropping ?? null;
   const adherence = kpis?.weekAdherence ?? null;
   const stagnant = kpis?.stagnant4w ?? null;
 
+  const inactiveErrored = Boolean(errors.inactive7d);
+  const droppingErrored = Boolean(errors.frequencyDropping);
+  const adherenceErrored = Boolean(errors.weekAdherence);
+  const stagnantErrored = Boolean(errors.stagnant4w);
+
   return (
     <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-md">
       <StatCard
         title={NAV_LABELS.statInactive7d}
-        value={formatValueOrDash(inactive)}
+        value={inactiveErrored ? ERROR_VALUE : formatValueOrDash(inactive)}
         icon={UserX}
-        subtitle="Alunos sem sessão registrada"
-        tone={inactiveTone(inactive)}
-        onClick={() => navigate("/alunos?inactive=7")}
+        subtitle={inactiveErrored ? ERROR_SUBTITLE : "Alunos sem sessão registrada"}
+        tone={inactiveErrored ? "danger" : inactiveTone(inactive)}
+        onClick={
+          inactiveErrored ? undefined : () => navigate("/alunos?inactive=7")
+        }
       />
       <StatCard
         title={NAV_LABELS.statFrequencyDropping}
-        value={formatValueOrDash(dropping)}
+        value={droppingErrored ? ERROR_VALUE : formatValueOrDash(dropping)}
         icon={TrendingDown}
-        subtitle="Queda nas últimas 4 semanas"
-        tone={droppingTone(dropping)}
-        onClick={() => navigate("/alunos?dropping=true")}
+        subtitle={droppingErrored ? ERROR_SUBTITLE : "Queda nas últimas 4 semanas"}
+        tone={droppingErrored ? "danger" : droppingTone(dropping)}
+        onClick={
+          droppingErrored ? undefined : () => navigate("/alunos?dropping=true")
+        }
       />
       <StatCard
         title={NAV_LABELS.statWeekAdherence}
         value={
-          adherence
-            ? `${adherence.realized}/${adherence.prescribed}`
-            : "—"
+          adherenceErrored
+            ? ERROR_VALUE
+            : adherence
+              ? `${adherence.realized}/${adherence.prescribed}`
+              : "—"
         }
         icon={CalendarCheck}
         subtitle={
-          adherence
-            ? `${adherence.percentage}% das sessões prescritas`
-            : "Aguardando dados"
+          adherenceErrored
+            ? ERROR_SUBTITLE
+            : adherence
+              ? `${adherence.percentage}% das sessões prescritas`
+              : "Aguardando dados"
         }
-        tone={adherenceTone(adherence?.percentage ?? null)}
-        onClick={() => navigate("/sessoes?week=current")}
+        tone={adherenceErrored ? "danger" : adherenceTone(adherence?.percentage ?? null)}
+        onClick={
+          adherenceErrored ? undefined : () => navigate("/sessoes?week=current")
+        }
       />
       <StatCard
         title={NAV_LABELS.statPrescriptionsStagnant}
-        value={formatValueOrDash(stagnant)}
+        value={stagnantErrored ? ERROR_VALUE : formatValueOrDash(stagnant)}
         icon={FileWarning}
-        subtitle="Sem atualização há 4+ semanas"
-        tone={stagnantTone(stagnant)}
-        onClick={() => navigate("/prescricoes?stagnant=4")}
+        subtitle={stagnantErrored ? ERROR_SUBTITLE : "Sem atualização há 4+ semanas"}
+        tone={stagnantErrored ? "danger" : stagnantTone(stagnant)}
+        onClick={
+          stagnantErrored ? undefined : () => navigate("/prescricoes?stagnant=4")
+        }
       />
     </section>
   );
