@@ -47,22 +47,22 @@ export const TRAINING_METHODS = {
   AMRAP: {
     name: "AMRAP",
     indication: "Resistência muscular e mental",
-    description: "As Many Reps As Possible - máximo de repetições em tempo determinado ou com carga específica. Desenvolve capacidade de trabalho e tolerância à fadiga."
+    description: "As Many Reps As Possible (AMRAP) — máximo de repetições em tempo determinado ou com carga específica. Desenvolve capacidade de trabalho e tolerância à fadiga."
   },
   EMOM: {
     name: "EMOM",
     indication: "Condicionamento e consistência",
-    description: "Every Minute On the Minute - executar trabalho definido a cada minuto. Tempo restante é descanso. Treina gestão de fadiga e ritmo de trabalho."
+    description: "Every Minute On the Minute (EMOM) — executar o trabalho definido a cada minuto cheio. O tempo restante do minuto é descanso. Treina gestão de fadiga e ritmo de trabalho."
   },
   E2MOM: {
     name: "E2MOM",
     indication: "Volume com recuperação controlada",
-    description: "Every 2 Minutes On the Minute - executar trabalho definido a cada 2 minutos. Permite maior volume ou intensidade com recuperação adequada entre rounds."
+    description: "Every 2 Minutes On the Minute (E2MOM) — executar o trabalho definido a cada 2 minutos. Permite maior volume ou intensidade com recuperação adequada entre rodadas."
   },
   E3MOM: {
     name: "E3MOM",
     indication: "Força e potência com recuperação completa",
-    description: "Every 3 Minutes On the Minute - executar trabalho definido a cada 3 minutos. Ideal para trabalhos de força e potência que exigem recuperação mais longa."
+    description: "Every 3 Minutes On the Minute (E3MOM) — executar o trabalho definido a cada 3 minutos. Ideal para trabalhos de força e potência que exigem recuperação mais longa."
   },
   FOR_TIME: {
     name: "For Time",
@@ -72,7 +72,7 @@ export const TRAINING_METHODS = {
   CONTRASTE: {
     name: "Contraste",
     indication: "Potência e explosão",
-    description: "Alterna exercício de força com exercício explosivo (ex: agachamento pesado + salto). Potencializa ativação neuromuscular (PAP - Post-Activation Potentiation)."
+    description: "Alterna exercício de força com exercício explosivo (ex: agachamento pesado + salto). Potencializa ativação neuromuscular (PAP — Potencialização Pós-Ativação)."
   },
   PRE_EXAUSTAO: {
     name: "Pré-Exaustão",
