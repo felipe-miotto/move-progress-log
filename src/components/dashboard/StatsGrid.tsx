@@ -26,12 +26,14 @@ export const StatsGrid = () => {
             icon={Dumbbell}
             subtitle="Total consolidado"
             gradient
+            onClick={() => navigate('/sessoes')}
           />
           <StatCard
             title={NAV_LABELS.statThisMonth}
             value={stats?.thisMonth || 0}
             icon={Calendar}
             subtitle={`Sessões em ${new Date().toLocaleDateString('pt-BR', { month: 'long' })}`}
+            onClick={() => navigate('/sessoes')}
           />
           <StatCard
             title={NAV_LABELS.statActiveStudents}
@@ -45,6 +47,7 @@ export const StatsGrid = () => {
             value={`${stats?.avgLoad || 0}kg`}
             icon={TrendingUp}
             subtitle="Por sessão"
+            onClick={() => navigate('/sessoes')}
           />
         </>
       )}
