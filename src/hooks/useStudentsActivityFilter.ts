@@ -25,10 +25,6 @@ export type StudentsActivityFilter =
   | { kind: "inactive"; days: number }
   | { kind: "dropping" };
 
-interface IdRow {
-  student_id: string;
-}
-
 /**
  * Returns a Set<string> of student ids that match the given activity filter,
  * or undefined while loading. When `filter.kind === "none"` the query is
@@ -45,8 +41,7 @@ export const useStudentsActivityFilter = (filter: StudentsActivityFilter) => {
     refetchOnWindowFocus: false,
     queryFn: async (): Promise<Set<string>> => {
       if (filter.kind === "inactive") {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data, error } = await (supabase.rpc as any)(
+        const { data, error } = await supabase.rpc(
           "list_students_inactive",
           { p_days: filter.days },
         );
@@ -54,12 +49,11 @@ export const useStudentsActivityFilter = (filter: StudentsActivityFilter) => {
           logger.error("[useStudentsActivityFilter] list_students_inactive failed", error);
           throw error;
         }
-        return new Set(((data ?? []) as IdRow[]).map((r) => r.student_id));
+        return new Set((data ?? []).map((r) => r.student_id));
       }
 
       // dropping
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)(
+      const { data, error } = await supabase.rpc(
         "list_students_frequency_dropping",
       );
       if (error) {
@@ -69,7 +63,7 @@ export const useStudentsActivityFilter = (filter: StudentsActivityFilter) => {
         );
         throw error;
       }
-      return new Set(((data ?? []) as IdRow[]).map((r) => r.student_id));
+      return new Set((data ?? []).map((r) => r.student_id));
     },
   });
 };
