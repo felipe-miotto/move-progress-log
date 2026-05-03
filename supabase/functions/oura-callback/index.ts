@@ -74,10 +74,14 @@ const resolveFrontendUrl = (req: Request, encodedStateOrigin?: string | null): s
     Deno.env.get('APP_PUBLIC_URL') ??
     null
   );
+  // PUBLIC_APP_URL has absolute priority when configured. Never override with
+  // request headers, encoded state origin or SITE_URL.
+  if (publicAppOrigin) {
+    return publicAppOrigin;
+  }
   const siteUrlOrigin = toOrigin(Deno.env.get('SITE_URL') ?? null);
-  const canonicalOrigin = publicAppOrigin ?? siteUrlOrigin;
+  const canonicalOrigin = siteUrlOrigin;
   const candidates = [
-    publicAppOrigin,
     toOrigin(decodeBase64Url(encodedStateOrigin ?? '') ?? null),
     siteUrlOrigin,
     toOrigin(req.headers.get('origin')),
@@ -94,10 +98,6 @@ const resolveFrontendUrl = (req: Request, encodedStateOrigin?: string | null): s
         .filter((origin): origin is string => Boolean(origin))
     )
   );
-
-  if (publicAppOrigin && normalizedTrustedOrigins.includes(publicAppOrigin)) {
-    return publicAppOrigin;
-  }
 
   if (siteUrlOrigin && normalizedTrustedOrigins.includes(siteUrlOrigin) && !isIdPreviewOrigin(siteUrlOrigin)) {
     return siteUrlOrigin;
