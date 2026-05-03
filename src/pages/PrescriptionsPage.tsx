@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Plus, Search, FolderPlus, MoreVertical, Sparkles, FileUp } from "lucide-react";
+import { Plus, Search, FolderPlus, MoreVertical, Sparkles, FileUp, FileWarning, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,6 +11,7 @@ import {
 import { usePrescriptions, useDeletePrescription } from "@/hooks/usePrescriptions";
 import { useFolders, useMovePrescription, useReorderPrescriptions, useDeleteFolder, PrescriptionFolder } from "@/hooks/useFolders";
 import { usePrescriptionSearch } from "@/hooks/usePrescriptionSearch";
+import { usePrescriptionsStagnantFilter } from "@/hooks/usePrescriptionsStagnantFilter";
 import { CreatePrescriptionDialog } from "@/components/CreatePrescriptionDialog";
 import { ImportPrescriptionFromWordDialog } from "@/components/ImportPrescriptionFromWordDialog";
 import { EditPrescriptionDialog } from "@/components/EditPrescriptionDialog";
@@ -48,6 +50,7 @@ export default function PrescriptionsPage() {
   usePageTitle(NAV_LABELS.prescriptions);
   useSEOHead(SEO_PRESETS.private);
   
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data: allPrescriptions, isLoading } = usePrescriptions();
   const { data: folders } = useFolders();
   const movePrescription = useMovePrescription();
@@ -63,12 +66,33 @@ export default function PrescriptionsPage() {
   }>({});
   const [showSearch, setShowSearch] = useState(false);
 
+  // Drill-down filter from dashboard KPI (?stagnant=N)
+  const stagnantWeeks = useMemo<number | null>(() => {
+    const raw = searchParams.get("stagnant");
+    if (!raw) return null;
+    const n = Number.parseInt(raw, 10);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }, [searchParams]);
+
+  const { data: stagnantSet } = usePrescriptionsStagnantFilter(stagnantWeeks);
+
+  const clearStagnantFilter = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("stagnant");
+    setSearchParams(next, { replace: true });
+  };
+
   // Use search results if filters are active, otherwise use all prescriptions
   const { data: searchResults } = usePrescriptionSearch(searchFilters);
   const hasActiveSearch = Boolean(searchFilters.searchText?.trim())
     || searchFilters.folderId !== undefined
     || Boolean(searchFilters.dayOfWeek);
-  const prescriptions = hasActiveSearch ? searchResults : allPrescriptions;
+  const baseList = hasActiveSearch ? searchResults : allPrescriptions;
+  const prescriptions = useMemo(() => {
+    if (!baseList) return baseList;
+    if (stagnantWeeks === null || !stagnantSet) return baseList;
+    return baseList.filter((p) => stagnantSet.has(p.id));
+  }, [baseList, stagnantWeeks, stagnantSet]);
 
   // Dialog states
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -361,6 +385,27 @@ export default function PrescriptionsPage() {
         }
       />
 
+        {stagnantWeeks !== null && (
+          <div className="flex items-center gap-sm rounded-md border border-warning/30 bg-warning/5 px-md py-sm text-sm">
+            <FileWarning className="h-4 w-4 text-warning" aria-hidden="true" />
+            <span className="font-medium">
+              {stagnantSet
+                ? `${stagnantSet.size} prescrição${stagnantSet.size === 1 ? "" : "ões"} estagnada${stagnantSet.size === 1 ? "" : "s"} (sem atualização há ${stagnantWeeks}+ semanas)`
+                : `Filtro ativo: prescrições estagnadas há ${stagnantWeeks}+ semanas`}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearStagnantFilter}
+              className="ml-auto h-7 px-sm"
+              aria-label="Limpar filtro de prescrições estagnadas"
+            >
+              <X className="h-3 w-3 mr-1" />
+              Limpar filtro
+            </Button>
+          </div>
+        )}
+
         {/* Search bar */}
         {showSearch && (
           <PrescriptionSearchBar
@@ -439,6 +484,16 @@ export default function PrescriptionsPage() {
             secondaryAction={{
               label: "Nova Prescrição",
               onClick: () => setCreateDialogOpen(true)
+            }}
+          />
+        ) : stagnantWeeks !== null ? (
+          <EmptyState
+            icon={<FileWarning className="h-6 w-6" />}
+            title="Nenhuma prescrição estagnada"
+            description={`Não há prescrições com atribuição ativa que estejam sem atualização há ${stagnantWeeks}+ semanas. Tudo em dia!`}
+            primaryAction={{
+              label: "Limpar filtro",
+              onClick: clearStagnantFilter,
             }}
           />
         ) : (

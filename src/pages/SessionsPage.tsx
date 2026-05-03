@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useSEOHead, SEO_PRESETS } from "@/hooks/useSEOHead";
 import { useOpenGraph, FABRIK_OG_DEFAULTS } from "@/hooks/useOpenGraph";
@@ -81,11 +82,23 @@ export default function SessionsPage() {
     url: true,
   });
 
+  const [searchParams, setSearchParams] = useSearchParams();
+
   // Filters state
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [selectedPrescriptionIds, setSelectedPrescriptionIds] = useState<string[]>([]);
-  const [startDate, setStartDate] = useState<Date | undefined>();
-  const [endDate, setEndDate] = useState<Date | undefined>();
+  const [startDate, setStartDate] = useState<Date | undefined>(() => {
+    if (searchParams.get("week") === "current") {
+      return startOfWeek(new Date(), { locale: ptBR });
+    }
+    return undefined;
+  });
+  const [endDate, setEndDate] = useState<Date | undefined>(() => {
+    if (searchParams.get("week") === "current") {
+      return endOfWeek(new Date(), { locale: ptBR });
+    }
+    return undefined;
+  });
   const [startTime, setStartTime] = useState<string>("");
   const [endTime, setEndTime] = useState<string>("");
   const [sessionType, setSessionType] = useState<"all" | "individual" | "group">("all");
@@ -95,6 +108,16 @@ export default function SessionsPage() {
   // Search states
   const [studentSearchTerm, setStudentSearchTerm] = useState("");
   const [prescriptionSearchTerm, setPrescriptionSearchTerm] = useState("");
+
+  // Strip the ?week=current marker after consuming it so the user can clear
+  // the date range normally and the URL stays clean.
+  useEffect(() => {
+    if (searchParams.get("week") === "current") {
+      const next = new URLSearchParams(searchParams);
+      next.delete("week");
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   // Dialog states
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
