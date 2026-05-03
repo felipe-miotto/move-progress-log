@@ -43,7 +43,7 @@ interface RpcOk<T> {
 
 interface RpcErr {
   ok: false;
-  error: string;
+  errorName: string;
 }
 
 const callRpc = async <T>(
