@@ -56,7 +56,7 @@ const callRpc = async <T>(
   const { data, error } = await (supabase.rpc as any)(name, args ?? {});
   if (error) {
     logger.error(`[useDashboardKPIs] RPC ${name} failed`, error);
-    return { ok: false, error: name };
+    return { ok: false, errorName: name };
   }
   return { ok: true, data: data as T };
 };
@@ -92,28 +92,28 @@ export const useDashboardKPIs = () => {
       if (inactive.ok) {
         if (typeof inactive.data === "number") inactive7d = inactive.data;
       } else {
-        errors.inactive7d = inactive.error;
+        errors.inactive7d = inactive.errorName;
       }
 
       let frequencyDropping: number | null = null;
       if (dropping.ok) {
         if (typeof dropping.data === "number") frequencyDropping = dropping.data;
       } else {
-        errors.frequencyDropping = dropping.error;
+        errors.frequencyDropping = dropping.errorName;
       }
 
       let weekAdherence: DashboardKPIs["weekAdherence"] = null;
       if (adherence.ok) {
         if (isWeekAdherence(adherence.data)) weekAdherence = adherence.data;
       } else {
-        errors.weekAdherence = adherence.error;
+        errors.weekAdherence = adherence.errorName;
       }
 
       let stagnant4w: number | null = null;
       if (stagnant.ok) {
         if (typeof stagnant.data === "number") stagnant4w = stagnant.data;
       } else {
-        errors.stagnant4w = stagnant.error;
+        errors.stagnant4w = stagnant.errorName;
       }
 
       return {
