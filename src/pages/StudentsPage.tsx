@@ -6,9 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import i18n from "@/i18n/pt-BR.json";
 import EmptyState from "@/components/EmptyState";
 import { StudentCardSkeleton } from "@/components/skeletons/StudentCardSkeleton";
-import { Users, Edit, Trash2, Eye, GitCompare, Plus, Link2, Mic, UserPlus, Info, AlertCircle, Search, Shield, NotebookPen, MoreVertical, RefreshCw, Activity } from "lucide-react";
+import { Users, Edit, Trash2, Eye, GitCompare, Plus, Link2, Mic, UserPlus, Info, AlertCircle, Search, Shield, NotebookPen, MoreVertical, RefreshCw, Activity, X, UserX, TrendingDown } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ROUTES } from "@/constants/navigation";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { StudentAvatarImage } from "@/components/StudentAvatarImage";
@@ -28,6 +28,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useStudentsCardData, StudentCardData } from "@/hooks/useStudentsCardData";
+import { useStudentsActivityFilter, type StudentsActivityFilter } from "@/hooks/useStudentsActivityFilter";
 import type { Student } from "@/hooks/useStudents";
 import { PageLayout } from "@/components/PageLayout";
 import { PageHeader } from "@/components/PageHeader";
@@ -290,6 +291,7 @@ const StudentsPage = () => {
   });
   
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data: students, isLoading } = useStudents();
   const { isAdmin } = useIsAdmin();
   const { mutate: syncAll, isPending: isSyncing } = useOuraSyncAll();
@@ -310,6 +312,31 @@ const StudentsPage = () => {
   const studentIds = useMemo(() => students?.map(s => s.id) ?? [], [students]);
   const { data: studentsCardData } = useStudentsCardData(studentIds);
 
+  // Drill-down filter from dashboard KPIs (?inactive=N | ?dropping=true)
+  const activityFilter = useMemo<StudentsActivityFilter>(() => {
+    const inactiveParam = searchParams.get("inactive");
+    const droppingParam = searchParams.get("dropping");
+    if (inactiveParam) {
+      const days = Number.parseInt(inactiveParam, 10);
+      if (Number.isFinite(days) && days > 0) {
+        return { kind: "inactive", days };
+      }
+    }
+    if (droppingParam === "true") {
+      return { kind: "dropping" };
+    }
+    return { kind: "none" };
+  }, [searchParams]);
+
+  const { data: activityFilterSet } = useStudentsActivityFilter(activityFilter, studentIds);
+
+  const clearActivityFilter = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("inactive");
+    next.delete("dropping");
+    setSearchParams(next, { replace: true });
+  };
+
   const handleDelete = async (id: string) => {
     await deleteStudent.mutateAsync(id);
     setDeletingStudentId(null);
@@ -320,9 +347,25 @@ const StudentsPage = () => {
     setRecordingStudentName(name);
   };
 
-  const filteredStudents = students?.filter(student =>
-    student.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredStudents = students?.filter(student => {
+    const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesActivity = activityFilterSet ? activityFilterSet.has(student.id) : true;
+    return matchesSearch && matchesActivity;
+  });
+
+  const activityFilterCount = activityFilterSet?.size ?? null;
+  const activityFilterLabel =
+    activityFilter.kind === "inactive"
+      ? `Sem treinar há ${activityFilter.days}+ dias`
+      : activityFilter.kind === "dropping"
+        ? "Frequência caindo"
+        : null;
+  const ActivityFilterIcon =
+    activityFilter.kind === "inactive"
+      ? UserX
+      : activityFilter.kind === "dropping"
+        ? TrendingDown
+        : null;
 
   return (
     <PageLayout
@@ -400,6 +443,27 @@ const StudentsPage = () => {
           />
         </div>
 
+        {activityFilterLabel && ActivityFilterIcon && (
+          <div className="flex items-center gap-sm rounded-md border border-warning/30 bg-warning/5 px-md py-sm text-sm">
+            <ActivityFilterIcon className="h-4 w-4 text-warning" aria-hidden="true" />
+            <span className="font-medium">
+              {activityFilterCount !== null
+                ? `${activityFilterCount} aluno${activityFilterCount === 1 ? "" : "s"}: ${activityFilterLabel.toLowerCase()}`
+                : `Filtro ativo: ${activityFilterLabel.toLowerCase()}`}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearActivityFilter}
+              className="ml-auto h-7 px-sm"
+              aria-label="Limpar filtro de atividade"
+            >
+              <X className="h-3 w-3 mr-1" />
+              Limpar filtro
+            </Button>
+          </div>
+        )}
+
         {isLoading ? (
           <div className="grid gap-md md:grid-cols-2 lg:grid-cols-3">
             {[...Array(6)].map((_, i) => (
@@ -432,6 +496,20 @@ const StudentsPage = () => {
             primaryAction={{
               label: "Limpar busca",
               onClick: () => setSearchTerm(""),
+            }}
+          />
+        ) : activityFilter.kind !== "none" ? (
+          <EmptyState
+            icon={<Users className="h-6 w-6" />}
+            title="Nenhum aluno corresponde ao filtro"
+            description={
+              activityFilter.kind === "inactive"
+                ? `Não há alunos sem treinar há ${activityFilter.days}+ dias. Tudo certo por aqui!`
+                : "Não há alunos com frequência em queda nas últimas 4 semanas."
+            }
+            primaryAction={{
+              label: "Limpar filtro",
+              onClick: clearActivityFilter,
             }}
           />
         ) : (

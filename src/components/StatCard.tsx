@@ -2,6 +2,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { LucideIcon, TrendingUp, TrendingDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+export type StatCardTone = "default" | "success" | "warning" | "danger";
 
 interface StatCardProps {
   title: string;
@@ -16,21 +19,41 @@ interface StatCardProps {
     value: number;
     label: string;
   };
+  /**
+   * Visual tone for thresholded KPIs. Affects the icon container background
+   * and the value color. "default" keeps the existing neutral look.
+   */
+  tone?: StatCardTone;
 }
 
-const StatCard = ({ 
-  title, 
-  value, 
-  icon: Icon, 
-  subtitle, 
-  gradient, 
+const TONE_VALUE_CLASS: Record<StatCardTone, string> = {
+  default: "text-foreground",
+  success: "text-success",
+  warning: "text-warning",
+  danger: "text-destructive",
+};
+
+const TONE_ICON_CLASS: Record<StatCardTone, string> = {
+  default: "bg-secondary text-primary",
+  success: "bg-success/10 text-success",
+  warning: "bg-warning/10 text-warning",
+  danger: "bg-destructive/10 text-destructive",
+};
+
+const StatCard = ({
+  title,
+  value,
+  icon: Icon,
+  subtitle,
+  gradient,
   onClick,
   progress,
   badge,
-  trend
+  trend,
+  tone = "default"
 }: StatCardProps) => {
   return (
-    <Card 
+    <Card
       className={`animate-fade-in ${onClick ? 'card-interactive' : ''}`}
       onClick={onClick}
       role={onClick ? "button" : undefined}
@@ -45,14 +68,14 @@ const StatCard = ({
       <CardHeader className="pb-sm p-lg">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-medium text-muted-foreground leading-normal">{title}</CardTitle>
-          <div className="p-sm rounded-md bg-secondary">
-            <Icon className="h-4 w-4 text-primary" />
+          <div className={cn("p-sm rounded-md", TONE_ICON_CLASS[tone])}>
+            <Icon className="h-4 w-4" />
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-md p-lg pt-0">
         <div className="flex items-baseline gap-xs">
-          <div className="text-4xl font-bold leading-tight text-foreground">
+          <div className={cn("text-4xl font-bold leading-tight", TONE_VALUE_CLASS[tone])}>
             {value}
           </div>
           {trend && (
