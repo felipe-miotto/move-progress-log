@@ -355,7 +355,7 @@ export function RecordGroupSessionDialog({
           typedSessions.map(async (session) => {
             const { data: exercises, error: exercisesError } = await supabase
               .from('exercises')
-              .select('id, session_id, exercise_name, sets, reps, load_kg, load_breakdown, observations, is_best_set')
+              .select('id, session_id, exercise_library_id, exercise_name, sets, reps, load_kg, load_breakdown, observations, is_best_set')
               .eq('session_id', session.id);
             if (exercisesError) {
               throw exercisesError;
