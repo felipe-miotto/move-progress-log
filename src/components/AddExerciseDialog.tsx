@@ -36,6 +36,7 @@ import {
 import { useDuplicateExerciseCheck } from "@/hooks/useDuplicateExerciseCheck";
 import { normalizeExerciseName } from "@/hooks/duplicateExerciseUtils";
 import { EQUIPMENT_CATEGORIES } from "@/constants/equipment";
+import { LEVEL_OPTIONS } from "@/constants/backToBasics";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { notify } from "@/lib/notify";
