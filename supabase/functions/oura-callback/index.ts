@@ -18,6 +18,14 @@ const decodeBase64Url = (value: string): string | null => {
   }
 };
 
+interface ValidatedOuraInvite {
+  id: string;
+  invite_token: string;
+  created_student_id: string | null;
+  expires_at: string | null;
+  is_used: boolean;
+}
+
 // Wrapper that decodes the OAuth state's base64-url-encoded origin before
 // delegating to the shared resolver. Keeps the OAuth-specific decoding here
 // while the trust/canonicalization logic lives in `_shared/frontendOrigin`.
@@ -47,8 +55,8 @@ Deno.serve(async (req) => {
 
     console.log('Oura callback - code received');
 
-    // Parse state to get student_id and invite_token (+ optional frontend origin)
-    const [student_id, invite_token, encodedFrontendOrigin] = state.split(':');
+    // Parse state to get student_id and invite_id (+ optional frontend origin)
+    const [student_id, invite_id, encodedFrontendOrigin] = state.split(':');
 
     if (!student_id) {
       console.error('Invalid state format');
@@ -62,8 +70,15 @@ Deno.serve(async (req) => {
       console.error('OCB-04: Invalid student_id format in state');
       return new Response('Invalid OAuth state', { status: 400 });
     }
-    if (invite_token && invite_token !== 'retry' && !UUID_RE.test(invite_token)) {
-      console.error('OCB-04: Invalid invite_token format in state');
+    if (!invite_id || invite_id === 'retry') {
+      // Retry-by-student-id was previously accepted here. That bypassed invite
+      // expiry/replay checks, so all OAuth callbacks must now carry a real
+      // student_invites.id from a still-valid invite.
+      console.error('OCB-08: Missing or deprecated retry invite marker in state');
+      return new Response('Invalid OAuth state', { status: 400 });
+    }
+    if (!UUID_RE.test(invite_id)) {
+      console.error('OCB-04: Invalid invite_id format in state');
       return new Response('Invalid OAuth state', { status: 400 });
     }
 
@@ -75,53 +90,64 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    if (invite_token && invite_token !== 'retry') {
-      // Validate that this invite exists and belongs to this student
-      const { data: invite, error: inviteError } = await supabaseValidationClient
-        .from('student_invites')
-        .select('id, created_student_id, expires_at, is_used')
-        .eq('id', invite_token)
-        .single();
+    // Validate that this invite exists and belongs to this student.
+    const { data: invite, error: inviteError } = await supabaseValidationClient
+      .from('student_invites')
+      .select('id, invite_token, created_student_id, expires_at, is_used')
+      .eq('id', invite_id)
+      .single();
 
-      if (inviteError || !invite) {
-        console.error('OCB-01: Invalid state - invite not found');
-        return new Response('Invalid OAuth state', { status: 400 });
-      }
-
-      // If student was already created, verify it matches the state
-      if (invite.created_student_id && invite.created_student_id !== student_id) {
-        console.error('OCB-01: State mismatch - student_id does not match invite');
-        return new Response('Invalid OAuth state', { status: 400 });
-      }
-
-      // OCB-05: Reject expired invites — even if signed correctly by Oura,
-      // an invite past expires_at must not be honored.
-      if (invite.expires_at && new Date(invite.expires_at).getTime() < Date.now()) {
-        console.error('OCB-05: Invite expired');
-        return new Response('Invalid OAuth state', { status: 400 });
-      }
-
-      // OCB-06: Reject replay — a state captured from a successful OAuth
-      // round-trip must not be re-usable. is_used is flipped by the Oura
-      // connect flow on success; a true value here means an attacker is
-      // replaying an old state.
-      if (invite.is_used === true) {
-        console.error('OCB-06: Invite already used (replay attempt)');
-        return new Response('Invalid OAuth state', { status: 400 });
-      }
-    } else {
-      // Retry flow: validate that the student exists
-      const { data: student, error: studentError } = await supabaseValidationClient
-        .from('students')
-        .select('id')
-        .eq('id', student_id)
-        .single();
-
-      if (studentError || !student) {
-        console.error('OCB-01: Invalid state - student not found for retry');
-        return new Response('Invalid OAuth state', { status: 400 });
-      }
+    if (inviteError || !invite) {
+      console.error('OCB-01: Invalid state - invite not found');
+      return new Response('Invalid OAuth state', { status: 400 });
     }
+
+    let validatedInvite = invite as ValidatedOuraInvite;
+
+    // If student was already created, verify it matches the state
+    if (validatedInvite.created_student_id && validatedInvite.created_student_id !== student_id) {
+      console.error('OCB-01: State mismatch - student_id does not match invite');
+      return new Response('Invalid OAuth state', { status: 400 });
+    }
+
+    // OCB-05: Reject expired invites — even if signed correctly by Oura,
+    // an invite past expires_at must not be honored.
+    if (
+      validatedInvite.expires_at &&
+      new Date(validatedInvite.expires_at).getTime() < Date.now()
+    ) {
+      console.error('OCB-05: Invite expired');
+      return new Response('Invalid OAuth state', { status: 400 });
+    }
+
+    // OCB-06: Reject replay — a state captured from a successful OAuth
+    // round-trip must not be re-usable. is_used is flipped by this callback
+    // after tokens are saved successfully.
+    if (validatedInvite.is_used === true) {
+      console.error('OCB-06: Invite already used (replay attempt)');
+      return new Response('Invalid OAuth state', { status: 400 });
+    }
+
+    // OCB-09: Atomically claim the invite before exchanging the code. This
+    // closes the race where two concurrent callbacks could both observe
+    // is_used=false and both store tokens. Recoverable failures below reset
+    // the flag so the user can retry through the original invite link.
+    const nowIso = new Date().toISOString();
+    const { data: claimedInvite, error: claimInviteError } = await supabaseValidationClient
+      .from('student_invites')
+      .update({ is_used: true })
+      .eq('id', validatedInvite.id)
+      .eq('is_used', false)
+      .gt('expires_at', nowIso)
+      .select('id, invite_token, created_student_id, expires_at, is_used')
+      .single();
+
+    if (claimInviteError || !claimedInvite) {
+      console.error('OCB-09: Failed to claim Oura invite (replay/expired/race)');
+      return new Response('Invalid OAuth state', { status: 400 });
+    }
+
+    validatedInvite = claimedInvite as ValidatedOuraInvite;
 
     // Exchange code for tokens
     const ouraClientId = Deno.env.get('OURA_CLIENT_ID');
@@ -134,6 +160,26 @@ Deno.serve(async (req) => {
       console.error('Invalid frontend URL resolution for Oura callback');
       return new Response('Frontend URL inválida para callback Oura', { status: 400 });
     }
+
+    const buildOuraErrorUrl = (reason: string): string => {
+      const params = new URLSearchParams({
+        student_id,
+        invite_token: validatedInvite.invite_token,
+        reason,
+      });
+      return `${frontendUrl}/onboarding/oura-error?${params.toString()}`;
+    };
+
+    const releaseInviteForRetry = async (reason: string) => {
+      const { error: releaseError } = await supabaseValidationClient
+        .from('student_invites')
+        .update({ is_used: false })
+        .eq('id', validatedInvite.id);
+
+      if (releaseError) {
+        console.error(`OCB-09: Failed to release Oura invite after ${reason}:`, releaseError);
+      }
+    };
 
     console.log('Token exchange attempt:', {
       redirectUri,
@@ -178,10 +224,8 @@ Deno.serve(async (req) => {
         errorDescription,
       });
 
-      return Response.redirect(
-        `${frontendUrl}/onboarding/oura-error?student_id=${student_id}&reason=token_exchange`,
-        302
-      );
+      await releaseInviteForRetry('token_exchange');
+      return Response.redirect(buildOuraErrorUrl('token_exchange'), 302);
     }
 
     const tokenData = await tokenResponse.json();
@@ -205,10 +249,8 @@ Deno.serve(async (req) => {
     if (insertError) {
       console.error('Failed to save Oura connection:', insertError);
       
-      return Response.redirect(
-        `${frontendUrl}/onboarding/oura-error?student_id=${student_id}&reason=database`,
-        302
-      );
+      await releaseInviteForRetry('database');
+      return Response.redirect(buildOuraErrorUrl('database'), 302);
     }
 
     console.log(`Oura connection saved for student ${student_id}`);
@@ -254,15 +296,9 @@ Deno.serve(async (req) => {
     }
 
     // Redirect based on origin
-    if (invite_token && invite_token !== 'retry') {
-      // Came from student onboarding
-      console.log('Redirecting to onboarding success');
-      return Response.redirect(`${frontendUrl}/onboarding/success?student_id=${student_id}`, 302);
-    } else {
-      // Came from trainer interface or retry
-      console.log('Redirecting to student detail');
-      return Response.redirect(`${frontendUrl}/alunos/${student_id}`, 302);
-    }
+    // Came from a valid Oura invite / onboarding link.
+    console.log('Redirecting to onboarding success');
+    return Response.redirect(`${frontendUrl}/onboarding/success?student_id=${student_id}`, 302);
   } catch (error) {
     console.error('Error in oura-callback:', error);
     return new Response('Internal server error', { status: 500 });

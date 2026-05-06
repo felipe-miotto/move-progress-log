@@ -3,28 +3,25 @@ import { ROUTES } from "@/constants/navigation";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { logger } from "@/utils/logger";
 
 export default function OuraErrorPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const studentId = searchParams.get("student_id");
+  const inviteToken = searchParams.get("invite_token");
   const reason = searchParams.get("reason");
-  const [isRetrying, setIsRetrying] = useState(false);
 
   const errorMessages: Record<string, { title: string; description: string; suggestion: string }> = {
     token_exchange: {
       title: "Autorização Não Concluída",
       description: "Não conseguimos completar a autorização com o Oura Ring.",
-      suggestion: "Isso acontece quando você cancela a autorização ou há um problema de conexão. Clique em 'Tentar Novamente' para uma nova tentativa."
+      suggestion: "Isso acontece quando você cancela a autorização ou há um problema de conexão."
     },
     database: {
       title: "Erro ao Salvar Conexão",
       description: "A autorização com o Oura Ring foi bem-sucedida, mas não conseguimos salvar no sistema.",
-      suggestion: "Este é um erro temporário. Tente novamente em alguns instantes. Se o problema persistir, entre em contato com seu treinador."
+      suggestion: "Este é um erro temporário. Tente novamente com o mesmo convite se ele ainda estiver válido."
     },
     sync: {
       title: "Erro na Sincronização Inicial",
@@ -39,70 +36,18 @@ export default function OuraErrorPage() {
   };
 
   const error = errorMessages[reason || "default"] || errorMessages.default;
+  const retrySuggestion = inviteToken
+    ? `${error.suggestion} Use o botão abaixo para reabrir o convite seguro.`
+    : `${error.suggestion} Solicite ao seu treinador um novo link de convite.`;
 
-  const handleRetry = async () => {
-    if (!studentId) {
-      toast.error("ID do estudante não encontrado");
+  const handleRetry = () => {
+    if (!inviteToken) {
+      toast.info("Solicite um novo link ao seu treinador", {
+        description: "Por segurança, não é possível tentar novamente sem um convite válido.",
+      });
       return;
     }
-
-    setIsRetrying(true);
-    
-    try {
-      const { data: student, error: studentError } = await supabase
-        .from("students")
-        .select("id")
-        .eq("id", studentId)
-        .single();
-
-      if (studentError || !student) {
-        toast.error("Erro ao buscar informações do estudante");
-        setIsRetrying(false);
-        return;
-      }
-
-      const ouraClientId = import.meta.env.VITE_OURA_CLIENT_ID;
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const redirectUri = `${supabaseUrl}/functions/v1/oura-callback`;
-      const encodedOrigin = (() => {
-        try {
-          return btoa(window.location.origin)
-            .replace(/\+/g, "-")
-            .replace(/\//g, "_")
-            .replace(/=+$/g, "");
-        } catch (_error) {
-          return "";
-        }
-      })();
-      const state = encodedOrigin ? `${studentId}:retry:${encodedOrigin}` : `${studentId}:retry`;
-
-      if (!ouraClientId) {
-        toast.error("Configuração do Oura Ring não encontrada");
-        setIsRetrying(false);
-        return;
-      }
-
-      const scope = 'email personal daily heartrate workout session spo2 tag sleep stress ring_configuration';
-      const ouraAuthUrl = `https://cloud.ouraring.com/oauth/authorize?` +
-        `response_type=code&` +
-        `client_id=${ouraClientId}&` +
-        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-        `scope=${encodeURIComponent(scope)}&` +
-        `state=${encodeURIComponent(state)}`;
-
-      toast.info("Redirecionando para Oura Ring...", {
-        description: "Tentando conectar novamente",
-        duration: 2000,
-      });
-
-      setTimeout(() => {
-        window.location.href = ouraAuthUrl;
-      }, 2000);
-    } catch (error) {
-      logger.error("Error generating OAuth URL:", error);
-      toast.error("Erro ao tentar reconectar");
-      setIsRetrying(false);
-    }
+    navigate(`/oura-connect/${inviteToken}`);
   };
 
   const handleContinueWithoutOura = () => {
@@ -126,7 +71,7 @@ export default function OuraErrorPage() {
           <div className="space-y-2 text-sm text-muted-foreground">
             <p>{error.description}</p>
             <p className="text-sm font-medium text-foreground mt-2">
-              💡 {error.suggestion}
+              💡 {retrySuggestion}
             </p>
           </div>
         </CardHeader>
@@ -134,20 +79,10 @@ export default function OuraErrorPage() {
           <div className="space-y-2">
             <Button
               onClick={handleRetry}
-              disabled={isRetrying}
               className="w-full"
             >
-              {isRetrying ? (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  Redirecionando...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Tentar Novamente
-                </>
-              )}
+              <RefreshCw className="mr-2 h-4 w-4" />
+              {inviteToken ? "Tentar Novamente" : "Solicitar Novo Link"}
             </Button>
 
             <Button
