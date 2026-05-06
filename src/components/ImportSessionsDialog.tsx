@@ -18,6 +18,12 @@ import { calculateLoadFromBreakdown } from "@/utils/loadCalculation";
 import { logger } from "@/utils/logger";
 import { formatSessionTime } from "@/utils/sessionTime";
 import { invalidateSessionQueries } from "@/hooks/sessionQueryInvalidation";
+import {
+  buildUniqueExerciseLibraryMatchMap,
+  normalizeExerciseLibraryMatchName,
+  resolveExerciseLibraryIdByName,
+  type ExerciseLibraryMatchMap,
+} from "@/utils/exerciseLibraryMatching";
 
 type SpreadsheetRow = Record<string, unknown>;
 
@@ -210,6 +216,7 @@ interface SessionRow {
   data: string;
   hora: string;
   exercicio: string;
+  exercise_library_id?: string | null;
   series?: number;
   reps?: number;
   carga?: number;
@@ -346,14 +353,20 @@ const isDuplicateSessionError = (errorInfo: ParsedErrorInfo): boolean => {
   );
 };
 
-const normalizeExerciseName = (value: string) =>
-  value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, " ")
-    .replace(/[^a-z0-9 ]/g, "");
+const normalizeExerciseName = normalizeExerciseLibraryMatchName;
+
+const loadExactExerciseLibraryMatchMap = async (): Promise<ExerciseLibraryMatchMap> => {
+  const { data, error } = await supabase
+    .from("exercises_library")
+    .select("id, name");
+
+  if (error) {
+    logger.warn("[ImportSessionsDialog] Failed to load exercise library matches", error);
+    return new Map();
+  }
+
+  return buildUniqueExerciseLibraryMatchMap(data || []);
+};
 
 const parseTimeToMinutes = (timeValue: string): number | null => {
   const [h, m] = timeValue.split(":");
@@ -369,6 +382,7 @@ const mergeDuplicateSessionData = async (params: {
   date: string;
   time: string;
   exercises: SessionRow[];
+  exerciseLibraryMatchMap: ExerciseLibraryMatchMap;
 }): Promise<number> => {
   const { data: candidateSessions, error: sessionError } = await supabase
     .from("workout_sessions")
@@ -410,7 +424,7 @@ const mergeDuplicateSessionData = async (params: {
 
   const { data: existingExercises, error: exercisesError } = await supabase
     .from("exercises")
-    .select("id, exercise_name, sets, reps, load_kg, load_description, observations, created_at")
+    .select("id, exercise_library_id, exercise_name, sets, reps, load_kg, load_description, observations, created_at")
     .eq("session_id", selectedSession.id)
     .order("created_at", { ascending: true });
 
@@ -450,6 +464,9 @@ const mergeDuplicateSessionData = async (params: {
     const { imported, existing } = pair;
 
     const patch: Record<string, unknown> = {};
+    const resolvedExerciseLibraryId =
+      imported.exercise_library_id ??
+      resolveExerciseLibraryIdByName(imported.exercicio, params.exerciseLibraryMatchMap);
     const normalizedLoadDescription = imported.cargaDescricao?.trim() || "";
     const normalizedObservation = imported.observacoes?.trim() || "";
     const parsedLoadFromDescription = normalizedLoadDescription
@@ -507,6 +524,9 @@ const mergeDuplicateSessionData = async (params: {
       normalizedObservation
     ) {
       patch.observations = normalizedObservation;
+    }
+    if (!existing.exercise_library_id && resolvedExerciseLibraryId) {
+      patch.exercise_library_id = resolvedExerciseLibraryId;
     }
 
     if (Object.keys(patch).length === 0) continue;
@@ -744,6 +764,7 @@ export const ImportSessionsDialog = ({ open, onOpenChange }: ImportSessionsDialo
         description: "Importando dados para o sistema"
       });
 
+      const exerciseLibraryMatchMap = await loadExactExerciseLibraryMatchMap();
       let attempted = 0;
       let processed = 0;
       let mergedDuplicates = 0;
@@ -780,6 +801,9 @@ export const ImportSessionsDialog = ({ open, onOpenChange }: ImportSessionsDialo
             date: firstRow.data,
             time: firstRow.hora,
             exercises: exercises.map((ex) => ({
+              exercise_library_id:
+                ex.exercise_library_id ??
+                resolveExerciseLibraryIdByName(ex.exercicio, exerciseLibraryMatchMap),
               exercise_name: ex.exercicio,
               sets: ex.series,
               reps: ex.reps,
@@ -813,6 +837,7 @@ export const ImportSessionsDialog = ({ open, onOpenChange }: ImportSessionsDialo
                 date: firstRow.data,
                 time: firstRow.hora,
                 exercises,
+                exerciseLibraryMatchMap,
               });
               if (merged > 0) {
                 mergedDuplicates += merged;
