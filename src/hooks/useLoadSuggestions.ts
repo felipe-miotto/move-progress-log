@@ -25,6 +25,7 @@ export interface LoadSuggestionItem {
 }
 
 interface ExerciseExecution {
+  exerciseLibraryId: string | null;
   exerciseName: string;
   loadKg: number;
   reps: number;
@@ -99,30 +100,36 @@ export const useLoadSuggestions = (
         await Promise.all([
           supabase
             .from("workout_sessions")
-            .select("id, date, prescription_id, exercises(exercise_name, load_kg, reps, observations)")
+            .select("id, date, prescription_id, exercises(exercise_library_id, exercise_name, load_kg, reps, observations)")
             .eq("student_id", studentId)
             .gte("date", periodStart)
             .order("date", { ascending: false }),
-          supabase.from("exercises_library").select("name, category, equipment_required"),
+          supabase.from("exercises_library").select("id, name, category, equipment_required"),
         ]);
 
       if (sessionsError) throw sessionsError;
       if (libraryError) throw libraryError;
 
+      const libraryById = new Map<
+        string,
+        { category: string | null; equipmentRequired: string[] | null }
+      >();
       const libraryByName = new Map<
         string,
         { category: string | null; equipmentRequired: string[] | null }
       >();
       for (const row of libraryRows || []) {
         if (!row?.name) continue;
+        const meta = {
+          category: row.category,
+          equipmentRequired: Array.isArray(row.equipment_required)
+            ? row.equipment_required.filter((item): item is string => typeof item === "string")
+            : null,
+        };
+        libraryById.set(row.id, meta);
         const key = normalizeComparableText(row.name);
         if (!libraryByName.has(key)) {
-          libraryByName.set(key, {
-            category: row.category,
-            equipmentRequired: Array.isArray(row.equipment_required)
-              ? row.equipment_required.filter((item): item is string => typeof item === "string")
-              : null,
-          });
+          libraryByName.set(key, meta);
         }
       }
 
@@ -130,6 +137,8 @@ export const useLoadSuggestions = (
       for (const session of sessions || []) {
         const exerciseRows = Array.isArray(session.exercises) ? session.exercises : [];
         for (const row of exerciseRows) {
+          const exerciseLibraryId =
+            typeof row.exercise_library_id === "string" ? row.exercise_library_id : null;
           const exerciseName = typeof row.exercise_name === "string" ? row.exercise_name.trim() : "";
           const loadKg = typeof row.load_kg === "number" ? row.load_kg : NaN;
           const reps = typeof row.reps === "number" ? row.reps : NaN;
@@ -138,9 +147,12 @@ export const useLoadSuggestions = (
             continue;
           }
 
-          const key = normalizeComparableText(exerciseName);
+          const key = exerciseLibraryId
+            ? `id:${exerciseLibraryId}`
+            : `name:${normalizeComparableText(exerciseName)}`;
           const list = byExercise.get(key) || [];
           list.push({
+            exerciseLibraryId,
             exerciseName,
             loadKg,
             reps,
@@ -161,7 +173,9 @@ export const useLoadSuggestions = (
           const first = list[0];
           if (!first) return null;
 
-          const libMeta = libraryByName.get(key);
+          const libMeta = first.exerciseLibraryId
+            ? libraryById.get(first.exerciseLibraryId)
+            : libraryByName.get(normalizeComparableText(first.exerciseName));
           const eligibleByCategory = isEligibleStrengthCategory(libMeta?.category);
           if (!eligibleByCategory) return null;
 
