@@ -772,6 +772,7 @@ export function RecordGroupSessionDialog({
         if (se.exercises.length === 0) validationErrors.push(`${studentName}: nenhum exercício registrado`);
         se.exercises.forEach((ex, exIdx) => {
           if (!ex.exercise_name || ex.exercise_name.trim() === '') validationErrors.push(`${studentName} - Exercício ${exIdx + 1}: nome obrigatório`);
+          if (!ex.exercise_library_id) validationErrors.push(`${studentName} - ${ex.exercise_name || `Exercício ${exIdx + 1}`}: selecione um exercício cadastrado`);
           if (ex.sets <= 0) validationErrors.push(`${studentName} - ${ex.exercise_name}: séries deve ser maior que 0`);
           if (ex.reps <= 0) validationErrors.push(`${studentName} - ${ex.exercise_name}: reps deve ser maior que 0`);
           const matchedPrescribed = prescriptionDetails?.exercises?.find(

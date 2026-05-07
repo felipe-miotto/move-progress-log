@@ -378,7 +378,7 @@ export function ExerciseFirstSessionEntry({
   const isValid = selectedStudents.every((student) =>
     prescriptionExercises.every((_, idx) => {
       const entry = data[student.id]?.[idx];
-      return entry && entry.exercise_name && entry.sets > 0 && entry.reps > 0 && (isLoadExemptCategory(entry.exercise_name) || entry.load_breakdown);
+      return entry && entry.exercise_library_id && entry.exercise_name && entry.sets > 0 && entry.reps > 0 && (isLoadExemptCategory(entry.exercise_name) || entry.load_breakdown);
     })
   );
 
@@ -784,7 +784,7 @@ export function ExerciseFirstSessionEntry({
           {prescriptionExercises.map((_, idx) => {
             const allFilled = selectedStudents.every((s) => {
               const e = data[s.id]?.[idx];
-              return e && (isLoadExemptCategory(e.exercise_name) || e.load_breakdown) && e.reps > 0;
+              return e && e.exercise_library_id && (isLoadExemptCategory(e.exercise_name) || e.load_breakdown) && e.reps > 0;
             });
             return (
               <button

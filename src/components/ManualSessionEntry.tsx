@@ -272,7 +272,7 @@ export function ManualSessionEntry({
 
   const isValid = selectedStudents.every(student => 
     studentExercises[student.id]?.every(ex => 
-      ex.exercise_name && ex.sets > 0 && ex.reps > 0 && (isLoadExemptCategory(ex.exercise_name) || ex.load_breakdown)
+      ex.exercise_library_id && ex.exercise_name && ex.sets > 0 && ex.reps > 0 && (isLoadExemptCategory(ex.exercise_name) || ex.load_breakdown)
     )
   );
 
@@ -282,6 +282,7 @@ export function ManualSessionEntry({
     
     const errors: string[] = [];
     if (!exercise.exercise_name) errors.push("Nome obrigatório");
+    if (!exercise.exercise_library_id) errors.push("Selecione um exercício cadastrado");
     if (exercise.sets <= 0) errors.push("Séries deve ser > 0");
     if (exercise.reps <= 0) errors.push("Reps deve ser > 0");
     if (!isLoadExemptCategory(exercise.exercise_name) && !exercise.load_breakdown) errors.push("Descrição da carga obrigatória");
@@ -465,7 +466,7 @@ export function ManualSessionEntry({
                          value={exercise.exercise_name}
                          onChange={(e) => updateExercise(currentStudent.id, idx, 'exercise_name', e.target.value)}
                          placeholder="Nome do exercício"
-                         className={!exercise.exercise_name ? "border-destructive" : ""}
+                         className={!exercise.exercise_name || !exercise.exercise_library_id ? "border-destructive" : ""}
                          readOnly
                          title="Use o botão 'Substituir' para trocar o exercício"
                        />
