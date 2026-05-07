@@ -464,7 +464,6 @@ export function ManualSessionEntry({
                        </div>
                        <Input
                          value={exercise.exercise_name}
-                         onChange={(e) => updateExercise(currentStudent.id, idx, 'exercise_name', e.target.value)}
                          placeholder="Nome do exercício"
                          className={!exercise.exercise_name || !exercise.exercise_library_id ? "border-destructive" : ""}
                          readOnly
