@@ -44,6 +44,16 @@ export interface Exercise {
 type WorkoutSessionRow = Database["public"]["Tables"]["workout_sessions"]["Row"];
 type ExerciseRow = Database["public"]["Tables"]["exercises"]["Row"];
 type ExerciseInsert = Database["public"]["Tables"]["exercises"]["Insert"];
+type SessionExercisePayload = {
+  exercise_library_id?: string | null;
+  exercise_name: string;
+  sets?: number | null;
+  reps?: number | null;
+  load_kg?: number | null;
+  load_description?: string | null;
+  load_breakdown?: string | null;
+  observations?: string | null;
+};
 type GroupSessionCreationResult = {
   student: string;
   success: boolean;
@@ -100,18 +110,18 @@ const isMissingRpcFunctionError = (error: unknown, functionName: string): boolea
   );
 };
 
+const assertExercisesHaveLibraryIds = (exercises: SessionExercisePayload[]) => {
+  const unlinkedExercise = exercises.find((exercise) => !exercise.exercise_library_id);
+  if (!unlinkedExercise) return;
+
+  throw new Error(
+    `Selecione um exercício cadastrado para "${unlinkedExercise.exercise_name || "exercício sem nome"}".`
+  );
+};
+
 const mapExercisesToInsert = (
   sessionId: string,
-  exercises: Array<{
-    exercise_library_id?: string | null;
-    exercise_name: string;
-    sets?: number | null;
-    reps?: number | null;
-    load_kg?: number | null;
-    load_description?: string | null;
-    load_breakdown?: string | null;
-    observations?: string | null;
-  }>
+  exercises: SessionExercisePayload[]
 ): ExerciseInsert[] =>
   exercises.map((exercise) => ({
     session_id: sessionId,
@@ -131,17 +141,10 @@ const createSessionWithDirectInsert = async (params: {
   time: string;
   session_type: "individual" | "group";
   prescription_id?: string;
-  exercises: Array<{
-    exercise_library_id?: string | null;
-    exercise_name: string;
-    sets?: number | null;
-    reps?: number | null;
-    load_kg?: number | null;
-    load_description?: string | null;
-    load_breakdown?: string | null;
-    observations?: string | null;
-  }>;
+  exercises: SessionExercisePayload[];
 }) => {
+  assertExercisesHaveLibraryIds(params.exercises);
+
   const { data: session, error: sessionError } = await supabase
     .from("workout_sessions")
     .insert({
@@ -280,6 +283,7 @@ export const useCreateWorkoutSession = () => {
         load_breakdown: ex.load_breakdown ?? null,
         observations: ex.observations ?? null,
       }));
+      assertExercisesHaveLibraryIds(exercisesPayload);
 
       const { data: createdSession, error } = await (supabase.rpc as CallableFunction)(
         "create_workout_session_with_exercises",
@@ -393,6 +397,7 @@ export const useCreateGroupWorkoutSessions = () => {
               observations: finalObservations || null,
             };
           });
+          assertExercisesHaveLibraryIds(exercisesPayload);
 
           const { data: createdSession, error: creationError } = await (supabase.rpc as CallableFunction)(
             "create_group_workout_session_with_exercises",
