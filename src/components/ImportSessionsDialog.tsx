@@ -245,7 +245,7 @@ interface ImportErrorGroup {
 }
 
 const formatUnlinkedExerciseWarning = (totalRows: number): string =>
-  totalRows > 0 ? ` ${totalRows} exercício(s) sem vínculo ao catálogo.` : "";
+  totalRows > 0 ? ` ${totalRows} exercício(s) sem vínculo ao catálogo; importação bloqueada.` : "";
 
 const categorizeImportErrors = (errors: string[]): ImportErrorGroup[] => {
   const groups: Record<string, ImportErrorGroup> = {
@@ -786,6 +786,38 @@ export const ImportSessionsDialog = ({ open, onOpenChange }: ImportSessionsDialo
             }
           : prev
       );
+
+      if (unlinkedExerciseReport.totalRows > 0) {
+        const exercisePreview = unlinkedExerciseReport.names
+          .slice(0, 5)
+          .map((exercise) => `${exercise.name} (${exercise.count})`)
+          .join(", ");
+        const blockingErrors = [
+          `Importação bloqueada: ${unlinkedExerciseReport.totalRows} exercício(s) sem vínculo exato e único ao catálogo.`,
+          ...unlinkedExerciseReport.names.map(
+            (exercise) => `Sem vínculo ao catálogo: ${exercise.name} (${exercise.count} linha(s))`
+          ),
+        ];
+
+        toast.dismiss(toastId);
+        toast.error("Importação bloqueada", {
+          description: `Cadastre ou consolide os exercícios antes de importar. Exemplos: ${exercisePreview}.`,
+          duration: 9000,
+        });
+        setStatus({
+          total: totalSessions,
+          attempted: 0,
+          processed: 0,
+          mergedDuplicates: 0,
+          skippedDuplicates: 0,
+          unlinkedExerciseRows: unlinkedExerciseReport.totalRows,
+          unlinkedExerciseNames: unlinkedExerciseReport.names,
+          errors: [...validationErrors, ...blockingErrors],
+          success: false,
+        });
+        return;
+      }
+
       let attempted = 0;
       let processed = 0;
       let mergedDuplicates = 0;
@@ -1086,7 +1118,7 @@ export const ImportSessionsDialog = ({ open, onOpenChange }: ImportSessionsDialo
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
-                    <strong>Importação concluída com erros</strong>
+                    <strong>{status.unlinkedExerciseRows > 0 && status.processed === 0 ? "Importação bloqueada" : "Importação concluída com erros"}</strong>
                     <br />
                     {status.processed} importada(s), {status.skippedDuplicates} duplicada(s) ignorada(s), {status.mergedDuplicates} exercício(s) atualizado(s), {status.errors.length} erro(s).
                     <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
@@ -1160,8 +1192,8 @@ export const ImportSessionsDialog = ({ open, onOpenChange }: ImportSessionsDialo
                   <AlertDescription>
                     <strong>{status.unlinkedExerciseRows} exercício(s) sem vínculo ao catálogo</strong>
                     <p className="mt-1 text-sm">
-                      A importação não foi bloqueada, mas estes nomes não tiveram match exato e único na biblioteca.
-                      Revise o catálogo antes de usar esses exercícios para histórico de carga por exercício.
+                      A importação foi bloqueada porque estes nomes não tiveram match exato e único na biblioteca.
+                      Cadastre, consolide ou ajuste a nomenclatura antes de importar.
                     </p>
                     <div className="mt-3 space-y-1 text-xs">
                       {status.unlinkedExerciseNames.map((exercise) => (
