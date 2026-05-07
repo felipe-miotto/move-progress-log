@@ -2360,6 +2360,17 @@ export type Database = {
           student_id: string
         }[]
       }
+      list_unlinked_session_exercise_review: {
+        Args: never
+        Returns: {
+          display_name: string
+          load_samples: string[]
+          normalized_name: string
+          observation_samples: string[]
+          total_rows: number
+          variants: string[]
+        }[]
+      }
       migrate_oura_tokens_to_vault: { Args: never; Returns: undefined }
       normalize_objective: { Args: { obj: string }; Returns: string }
       search_exercises_by_name: {

@@ -14,7 +14,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { InlineExerciseNameEditor } from "@/components/InlineExerciseNameEditor";
 import { ExerciseDimensionReview } from "@/components/ExerciseDimensionReview";
 import { buildErrorDescription } from "@/utils/errorParsing";
-import { normalizeExerciseLibraryMatchName } from "@/utils/exerciseLibraryMatching";
 import {
   EXERCISE_CATEGORIES,
   MOVEMENT_PATTERNS,
@@ -66,18 +65,11 @@ interface EditedExercise {
   [key: string]: string | null | undefined;
 }
 
-interface LegacySessionExerciseRow {
-  exercise_name: string | null;
-  load_kg: number | null;
-  load_breakdown: string | null;
-  observations: string | null;
-}
-
 interface LegacyExerciseGroup {
   normalizedName: string;
   displayName: string;
   count: number;
-  variants: Array<{ name: string; count: number }>;
+  variants: string[];
   loadSamples: string[];
   observationSamples: string[];
 }
@@ -122,38 +114,16 @@ const ExerciseReviewPage = () => {
     },
   });
 
-  const { data: legacyRows, isLoading: legacyLoading, error: legacyError } = useQuery({
-    queryKey: ["legacy-unlinked-session-exercises"],
+  const { data: legacyReviewRows, isLoading: legacyLoading, error: legacyError } = useQuery({
+    queryKey: ["legacy-unlinked-session-exercise-review"],
     staleTime: 2 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     queryFn: async () => {
-      type LegacyRow = LegacySessionExerciseRow;
-      let allData: LegacyRow[] = [];
-      let from = 0;
-      const batchSize = 500;
-      let hasMore = true;
-
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from("exercises")
-          .select("exercise_name, load_kg, load_breakdown, observations")
-          .is("exercise_library_id", null)
-          .order("exercise_name")
-          .range(from, from + batchSize - 1);
-
-        if (error) throw error;
-        if (data) {
-          allData = [...allData, ...data];
-          hasMore = data.length === batchSize;
-          from += batchSize;
-        } else {
-          hasMore = false;
-        }
-      }
-
-      return allData;
+      const { data, error } = await supabase.rpc("list_unlinked_session_exercise_review");
+      if (error) throw error;
+      return data || [];
     },
   });
 
@@ -234,62 +204,19 @@ const ExerciseReviewPage = () => {
   }, [exercises]);
 
   const legacyGroups = useMemo<LegacyExerciseGroup[]>(() => {
-    if (!legacyRows) return [];
+    if (!legacyReviewRows) return [];
 
-    const groups = new Map<string, {
-      count: number;
-      variantCounts: Map<string, number>;
-      loadSamples: Set<string>;
-      observationSamples: Set<string>;
-    }>();
+    return legacyReviewRows.map((row) => ({
+      normalizedName: row.normalized_name,
+      displayName: row.display_name,
+      count: row.total_rows,
+      variants: row.variants || [],
+      loadSamples: row.load_samples || [],
+      observationSamples: row.observation_samples || [],
+    }));
+  }, [legacyReviewRows]);
 
-    for (const row of legacyRows) {
-      const rawName = row.exercise_name?.trim() || "";
-      const normalizedName = normalizeExerciseLibraryMatchName(rawName);
-      if (!normalizedName) continue;
-
-      const group = groups.get(normalizedName) || {
-        count: 0,
-        variantCounts: new Map<string, number>(),
-        loadSamples: new Set<string>(),
-        observationSamples: new Set<string>(),
-      };
-
-      group.count += 1;
-      group.variantCounts.set(rawName, (group.variantCounts.get(rawName) || 0) + 1);
-
-      const loadSample = row.load_breakdown?.trim() || (row.load_kg !== null ? `${Number(row.load_kg)} kg` : "");
-      if (loadSample && group.loadSamples.size < 3) {
-        group.loadSamples.add(loadSample);
-      }
-
-      const observationSample = row.observations?.trim();
-      if (observationSample && group.observationSamples.size < 2) {
-        group.observationSamples.add(observationSample);
-      }
-
-      groups.set(normalizedName, group);
-    }
-
-    return Array.from(groups.entries())
-      .map(([normalizedName, group]) => {
-        const variants = Array.from(group.variantCounts.entries())
-          .map(([name, count]) => ({ name, count }))
-          .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "pt-BR"));
-
-        return {
-          normalizedName,
-          displayName: variants[0]?.name || normalizedName,
-          count: group.count,
-          variants,
-          loadSamples: Array.from(group.loadSamples),
-          observationSamples: Array.from(group.observationSamples),
-        };
-      })
-      .sort((a, b) => b.count - a.count || a.displayName.localeCompare(b.displayName, "pt-BR"));
-  }, [legacyRows]);
-
-  const legacyTotalRows = legacyRows?.length ?? 0;
+  const legacyTotalRows = legacyGroups.reduce((sum, group) => sum + group.count, 0);
 
   const getSubcategoryOptions = (category: string | null, movementPattern: string | null) => {
     if (category === "forca_hipertrofia" && movementPattern && STRENGTH_SUBCATEGORIES[movementPattern]) {
@@ -322,7 +249,7 @@ const ExerciseReviewPage = () => {
         group.displayName,
         group.normalizedName,
         String(group.count),
-        group.variants.map((variant) => `${variant.name} (${variant.count})`).join(" | "),
+        group.variants.join(" | "),
         group.loadSamples.join(" | "),
         group.observationSamples.join(" | "),
       ]),
@@ -438,8 +365,8 @@ const ExerciseReviewPage = () => {
                         <TableCell className="font-semibold">{group.count}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">
                           {group.variants.slice(0, 4).map((variant) => (
-                            <div key={variant.name}>
-                              {variant.name} ({variant.count})
+                            <div key={variant}>
+                              {variant}
                             </div>
                           ))}
                           {group.variants.length > 4 && (
