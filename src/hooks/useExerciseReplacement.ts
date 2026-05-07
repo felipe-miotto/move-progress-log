@@ -29,7 +29,11 @@ export function useExerciseReplacement(
     
     const { exerciseIndex } = selectedExerciseForReplacement;
     const updated = [...editableExercises];
-    updated[exerciseIndex].executed_exercise_name = exerciseName;
+    updated[exerciseIndex] = {
+      ...updated[exerciseIndex],
+      exercise_library_id: exerciseId,
+      executed_exercise_name: exerciseName,
+    };
     setEditableExercises(updated);
     
     setSelectedExerciseForReplacement(null);

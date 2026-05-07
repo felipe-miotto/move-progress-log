@@ -15,6 +15,7 @@ interface RawObservation {
 
 interface RawExercise {
   name: string;
+  exercise_library_id?: string | null;
   reps?: number;
   load_kg?: number;
   observations?: string;

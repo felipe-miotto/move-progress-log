@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MultiSegmentRecorder } from "./MultiSegmentRecorder";
 import { SessionContextForm } from "./SessionContextForm";
-import { usePrescriptionAssignments } from "@/hooks/usePrescriptions";
+import { usePrescriptionDetails } from "@/hooks/usePrescriptions";
 import { useCreateWorkoutSession } from "@/hooks/useWorkoutSessions";
 import { supabase } from "@/integrations/supabase/client";
 import { Mic, Save, BookOpen } from "lucide-react";
@@ -22,6 +22,12 @@ import { calculateLoadFromBreakdown } from "@/utils/loadCalculation";
 import { logger } from "@/utils/logger";
 import { formatSessionTime, getCurrentSessionTimeHHmm } from "@/utils/sessionTime";
 import { buildErrorDescription } from "@/utils/errorParsing";
+import { useExercisesLibrary } from "@/hooks/useExercisesLibrary";
+import {
+  buildUniqueExerciseLibraryMatchMap,
+  normalizeExerciseLibraryMatchName,
+  resolveExerciseLibraryIdByName,
+} from "@/utils/exerciseLibraryMatching";
 
 // Shared types, utilities & components
 import {
@@ -94,7 +100,6 @@ export function RecordIndividualSessionDialog({
     handleExerciseSelected,
   } = useExerciseReplacement(editableExercises, setEditableExercises);
 
-  const { data: assignments } = usePrescriptionAssignments(studentId);
   const createSession = useCreateWorkoutSession();
   const isReopening = !!existingSessionId;
 
@@ -113,6 +118,42 @@ export function RecordIndividualSessionDialog({
     refetchOnWindowFocus: false,
   });
   const studentWeightKg = studentData?.weight_kg ?? undefined;
+  const { data: selectedPrescriptionDetails } = usePrescriptionDetails(selectedPrescriptionId);
+  const { data: exercisesLibrary } = useExercisesLibrary();
+
+  const exactExerciseLibraryMatchMap = useMemo(
+    () => buildUniqueExerciseLibraryMatchMap(
+      exercisesLibrary?.map((exercise) => ({ id: exercise.id, name: exercise.name })) ?? []
+    ),
+    [exercisesLibrary]
+  );
+
+  const prescriptionExerciseLibraryByName = useMemo(() => {
+    const matches = new Map<string, string>();
+    selectedPrescriptionDetails?.exercises?.forEach((exercise) => {
+      if (!exercise.exercise_library_id || !exercise.exercise_name) return;
+      matches.set(normalizeExerciseLibraryMatchName(exercise.exercise_name), exercise.exercise_library_id);
+    });
+    return matches;
+  }, [selectedPrescriptionDetails?.exercises]);
+
+  const resolveSessionExerciseLibraryId = useCallback(
+    (exercise: SessionExercise): string | null => {
+      if (exercise.exercise_library_id) return exercise.exercise_library_id;
+
+      const candidateNames = [exercise.prescribed_exercise_name, exercise.executed_exercise_name];
+      for (const name of candidateNames) {
+        if (!name) continue;
+        const prescriptionMatch = prescriptionExerciseLibraryByName.get(
+          normalizeExerciseLibraryMatchName(name)
+        );
+        if (prescriptionMatch) return prescriptionMatch;
+      }
+
+      return resolveExerciseLibraryIdByName(exercise.executed_exercise_name, exactExerciseLibraryMatchMap);
+    },
+    [exactExerciseLibraryMatchMap, prescriptionExerciseLibraryByName]
+  );
 
   const { data: existingSessionData } = useQuery({
     queryKey: ['existing-session', existingSessionId],
@@ -126,7 +167,7 @@ export function RecordIndividualSessionDialog({
       if (sessionError) throw sessionError;
       const { data: exercises, error: exercisesError } = await supabase
         .from('exercises')
-        .select('id, session_id, exercise_name, sets, reps, load_kg, load_breakdown, observations, is_best_set')
+        .select('id, session_id, exercise_library_id, exercise_name, sets, reps, load_kg, load_breakdown, observations, is_best_set')
         .eq('session_id', existingSessionId);
       if (exercisesError) throw exercisesError;
       return { session, exercises };
@@ -147,6 +188,7 @@ export function RecordIndividualSessionDialog({
       setSelectedPrescriptionId(session.prescription_id || null);
       if (exercises && exercises.length > 0) {
         const convertedExercises: SessionExercise[] = exercises.map(ex => ({
+          exercise_library_id: ex.exercise_library_id ?? null,
           executed_exercise_name: ex.exercise_name, sets: ex.sets, reps: ex.reps || 0,
           load_kg: ex.load_kg, load_breakdown: ex.load_breakdown || '', observations: ex.observations, is_best_set: ex.is_best_set || false,
         }));
@@ -283,11 +325,15 @@ export function RecordIndividualSessionDialog({
     const invalidExercises: number[] = [];
     editableExercises.forEach((ex, idx) => {
       const criticalIssues = [];
-      if (!ex.executed_exercise_name.trim()) { criticalIssues.push('Nome vazio'); invalidExercises.push(idx); }
-      if (!selectedPrescriptionId && (ex.sets === null || ex.sets === 0)) { criticalIssues.push('Séries obrigatórias (treino livre)'); invalidExercises.push(idx); }
-      if (!ex.load_breakdown || ex.load_kg === null || ex.load_kg === 0) { criticalIssues.push('Carga não informada'); invalidExercises.push(idx); }
-      if (ex.reps === null || ex.reps === 0) { criticalIssues.push('Reps não informadas'); invalidExercises.push(idx); }
-      if (criticalIssues.length > 0) logger.debug(`Exercício #${idx + 1} (${ex.executed_exercise_name || 'SEM NOME'}):`, criticalIssues);
+      if (!ex.executed_exercise_name.trim()) criticalIssues.push('Nome vazio');
+      if (!resolveSessionExerciseLibraryId(ex)) criticalIssues.push('Vincular ao catálogo');
+      if (!selectedPrescriptionId && (ex.sets === null || ex.sets === 0)) criticalIssues.push('Séries obrigatórias (treino livre)');
+      if (!ex.load_breakdown || ex.load_kg === null || ex.load_kg === 0) criticalIssues.push('Carga não informada');
+      if (ex.reps === null || ex.reps === 0) criticalIssues.push('Reps não informadas');
+      if (criticalIssues.length > 0) {
+        invalidExercises.push(idx);
+        logger.debug(`Exercício #${idx + 1} (${ex.executed_exercise_name || 'SEM NOME'}):`, criticalIssues);
+      }
     });
     if (invalidExercises.length > 0) { setExercisesNeedingValidation(invalidExercises); setShowValidationDialog(true); return false; }
     return true;
@@ -319,8 +365,15 @@ export function RecordIndividualSessionDialog({
       }
 
       const exercises = editableExercises.map(ex => ({
-        session_id: sessionId, exercise_name: ex.executed_exercise_name, sets: ex.sets, reps: ex.reps,
-        load_kg: ex.load_kg, load_breakdown: ex.load_breakdown, observations: ex.observations, is_best_set: ex.is_best_set,
+        session_id: sessionId,
+        exercise_library_id: resolveSessionExerciseLibraryId(ex),
+        exercise_name: ex.executed_exercise_name,
+        sets: ex.sets,
+        reps: ex.reps,
+        load_kg: ex.load_kg,
+        load_breakdown: ex.load_breakdown,
+        observations: ex.observations,
+        is_best_set: ex.is_best_set,
       }));
       const { error: exercisesError } = await supabase.from('exercises').insert(exercises);
       if (exercisesError) throw exercisesError;
@@ -417,6 +470,7 @@ export function RecordIndividualSessionDialog({
                     if (session.exercises) {
                       session.exercises.forEach(ex => {
                         allExercises.push({
+                          exercise_library_id: ex.exercise_library_id ?? null,
                           executed_exercise_name: ex.name, reps: ex.reps ?? null, load_kg: ex.load_kg ?? null,
                           load_breakdown: '', observations: ex.observations ?? null, is_best_set: false,
                         });
@@ -536,6 +590,7 @@ export function RecordIndividualSessionDialog({
                     const ex = editableExercises[idx];
                     const issues = [];
                     if (!ex.executed_exercise_name.trim()) issues.push("Nome do exercício");
+                    if (!resolveSessionExerciseLibraryId(ex)) issues.push("Vínculo com a biblioteca de exercícios");
                     if (!selectedPrescriptionId && (ex.sets === null || ex.sets === 0)) issues.push("Número de séries (obrigatório em treinos livres)");
                     if (!ex.load_breakdown || ex.load_kg === null || ex.load_kg === 0) issues.push("Carga (obrigatório)");
                     if (ex.reps === null || ex.reps === 0) issues.push("Repetições (obrigatório)");
