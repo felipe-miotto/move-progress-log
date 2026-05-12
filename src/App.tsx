@@ -107,7 +107,7 @@ const App = () => {
                                   <Route path="/protocolos" element={<RecoveryProtocolsPage />} />
                                   <Route path="/admin/diagnostico-oura" element={<AdminRoute><AdminDiagnosticsPage /></AdminRoute>} />
                                   <Route path="/admin/usuarios" element={<AdminRoute><AdminUsersPage /></AdminRoute>} />
-                                  <Route path="/admin/revisao-exercicios" element={<AdminRoute><ExerciseReviewPage /></AdminRoute>} />
+                                  <Route path={ROUTES.adminExerciseReview} element={<AdminRoute><ExerciseReviewPage /></AdminRoute>} />
                                   <Route path="/ai-builder" element={<AIBuilderPage />} />
                                   <Route path="/athlete-insights" element={<AthleteInsightsDashboard />} />
                                   <Route path="/coach-console" element={<CoachConsole />} />
