@@ -7,14 +7,40 @@ const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
   try {
-    // PR-01: Validate JWT authentication
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) return json({ error: 'Não autorizado' }, 401);
-    const authClient = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '', { global: { headers: { Authorization: authHeader } } });
-    const { data: { user }, error: authError } = await authClient.auth.getUser();
-    if (authError || !user) return json({ error: 'Não autorizado' }, 401);
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
-    const svc = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
+    if (!supabaseUrl || !anonKey || !serviceRoleKey) {
+      return json({ error: 'Configuração incompleta do backend' }, 500);
+    }
+
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) return json({ error: 'Não autorizado' }, 401);
+
+    const token = authHeader.replace('Bearer ', '').trim();
+    if (!token) return json({ error: 'Não autorizado' }, 401);
+
+    const isServiceRole = token === serviceRoleKey;
+    const svc = createClient(supabaseUrl, serviceRoleKey);
+
+    if (!isServiceRole) {
+      const authClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
+      const { data: { user }, error: authError } = await authClient.auth.getUser();
+      if (authError || !user) return json({ error: 'Não autorizado' }, 401);
+
+      const { data: roleData, error: roleError } = await svc
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .limit(1)
+        .maybeSingle();
+
+      if (roleError) return json({ error: 'Falha ao verificar permissões' }, 500);
+      if (!roleData) return json({ error: 'Acesso restrito a administradores' }, 403);
+    }
+
     // PR-02: Detect PRs from sessions up to 7 days ago (not just yesterday) to catch delayed registrations
     const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString().split('T')[0];
     const today = new Date().toISOString().split('T')[0];

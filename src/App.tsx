@@ -108,9 +108,9 @@ const App = () => {
                                   <Route path="/admin/diagnostico-oura" element={<AdminRoute><AdminDiagnosticsPage /></AdminRoute>} />
                                   <Route path="/admin/usuarios" element={<AdminRoute><AdminUsersPage /></AdminRoute>} />
                                   <Route path={ROUTES.adminExerciseReview} element={<AdminRoute><ExerciseReviewPage /></AdminRoute>} />
-                                  <Route path="/ai-builder" element={<AIBuilderPage />} />
-                                  <Route path="/athlete-insights" element={<AthleteInsightsDashboard />} />
-                                  <Route path="/coach-console" element={<CoachConsole />} />
+                                  <Route path="/ai-builder" element={<AdminRoute><AIBuilderPage /></AdminRoute>} />
+                                  <Route path="/athlete-insights" element={<AdminRoute><AthleteInsightsDashboard /></AdminRoute>} />
+                                  <Route path="/coach-console" element={<AdminRoute><CoachConsole /></AdminRoute>} />
                                   <Route path="*" element={<NotFound />} />
                                 </Routes>
                               </ErrorBoundary>
