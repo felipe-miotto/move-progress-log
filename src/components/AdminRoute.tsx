@@ -25,7 +25,7 @@ export function AdminRoute({ children }: AdminRouteProps) {
         .from("user_roles")
         .select("role")
         .eq("user_id", session.user.id)
-        .in("role", ["admin", "moderator"])
+        .eq("role", "admin")
         .maybeSingle();
 
       if (error) {
