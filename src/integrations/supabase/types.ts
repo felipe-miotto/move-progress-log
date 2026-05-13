@@ -3203,6 +3203,40 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_precision12_assessment: {
+        Args: {
+          p_bike_stages?: Json
+          p_cardiovascular?: Json
+          p_child_data?: Json
+          p_child_kind: string
+          p_parent: Json
+          p_subjective?: Json
+        }
+        Returns: {
+          age_years: number | null
+          assessment_date: string
+          assessment_type: string
+          completed_at: string | null
+          created_at: string
+          height_cm: number | null
+          id: string
+          notes: string | null
+          professional_id: string | null
+          sex: string | null
+          started_at: string | null
+          status: string
+          student_id: string
+          trainer_id: string | null
+          updated_at: string
+          weight_kg: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "assessments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_workout_session_with_exercises: {
         Args: {
           p_date: string
