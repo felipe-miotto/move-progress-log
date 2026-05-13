@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { authenticateServiceRoleOrUserRole } from '../_shared/auth.ts';
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version' };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
@@ -33,11 +34,16 @@ async function callAI(payload: object, apiKey: string, retries = 1): Promise<Res
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
   try {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) return json({ error: 'Não autorizado' }, 401);
-    const client = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '', { global: { headers: { Authorization: authHeader } } });
-    const { data: { user }, error } = await client.auth.getUser();
-    if (error || !user) return json({ error: 'Não autorizado' }, 401);
+    // AI-06: Coach Console é admin-only no front (/coach-console com
+    // <AdminRoute>). Endurecer backend pra rejeitar bypass via API direta.
+    const authResult = await authenticateServiceRoleOrUserRole(req, {
+      corsHeaders: cors,
+      allowedRoles: ['admin'],
+      missingAuthMessage: 'Não autorizado',
+      invalidTokenMessage: 'Não autorizado',
+      forbiddenMessage: 'Acesso restrito a administradores (Coach Console)',
+    });
+    if (authResult instanceof Response) return authResult;
 
     const body: unknown = await req.json();
     if (!body || typeof body !== 'object' || Array.isArray(body)) {
@@ -64,16 +70,17 @@ serve(async (req) => {
       return json({ error: `O período máximo permitido é de ${MAX_REPORT_RANGE_DAYS} dias` }, 400);
     }
 
-    // AI-01: Validate trainer ownership
+    // AI-06: Caller é admin ou service role (já validado acima). Admin tem
+    // acesso global no Coach Console — ownership check de trainer_id seria
+    // incompatível. Mantém apenas a validação de existência do aluno.
     const svc = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
-    
+
     const { data: student, error: studentError } = await svc
       .from('students')
       .select('id, trainer_id, name, fitness_level, objectives, limitations, injury_history')
       .eq('id', student_id)
       .single();
     if (studentError || !student) return json({ error: 'Atleta não encontrado' }, 404);
-    if (student.trainer_id !== user.id) return json({ error: 'Acesso negado — aluno não pertence a este treinador' }, 403);
 
     // AI-01: Use existing tables instead of non-existent athlete_daily_loads
     const [{ data: sessions }, { data: records }] = await Promise.all([
