@@ -94,6 +94,18 @@ async function sha256Hex(input: string): Promise<string> {
   return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/**
+ * Data ISO (YYYY-MM-DD) no fuso de São Paulo. Usa Intl.DateTimeFormat
+ * com locale `sv-SE` (Swedish) que produz nativamente o formato
+ * `YYYY-MM-DD`, evitando bug onde `new Date().toISOString()` retorna a
+ * data em UTC e diverge do calendário local Brasil após 21h.
+ */
+function todayInSaoPaulo(): string {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "America/Sao_Paulo",
+  }).format(new Date());
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Handler
 // ────────────────────────────────────────────────────────────────────────────
@@ -169,7 +181,29 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "assessment_id inválido" }, 400);
     }
 
-    // 4. Validar ownership do student
+    // 4. Resolver URL pública ANTES de qualquer escrita no banco
+    //    (evita assessment/link órfão se origin inválido)
+    const baseUrl = resolveFrontendUrl(req, frontendOrigin);
+    if (!baseUrl) {
+      console.error(
+        "[create-p12-link] no trusted public origin",
+        {
+          publicAppUrlSet: Boolean(
+            Deno.env.get("PUBLIC_APP_URL") ?? Deno.env.get("APP_PUBLIC_URL"),
+          ),
+          siteUrlSet: Boolean(Deno.env.get("SITE_URL")),
+        },
+      );
+      return jsonResponse(
+        {
+          error:
+            "Não foi possível determinar a URL pública do app. Configure PUBLIC_APP_URL nos secrets do Supabase.",
+        },
+        400,
+      );
+    }
+
+    // 5. Validar ownership do student
     const { data: student, error: studentError } = await adminClient
       .from("students")
       .select("id, trainer_id, name")
@@ -232,7 +266,7 @@ Deno.serve(async (req) => {
       // direto via service role é a forma correta aqui.
       const trainerId = isAdmin ? student.trainer_id ?? user.id : user.id;
 
-      const todayIso = new Date().toISOString().slice(0, 10);
+      const todayIso = todayInSaoPaulo();
 
       const { data: assessment, error: insertAssessmentError } = await adminClient
         .from("assessments")
@@ -294,27 +328,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Falha ao criar link" }, 500);
     }
 
-    // 8. Resolver URL pública
-    const baseUrl = resolveFrontendUrl(req, frontendOrigin);
-    if (!baseUrl) {
-      console.error(
-        "[create-p12-link] no trusted public origin",
-        {
-          publicAppUrlSet: Boolean(
-            Deno.env.get("PUBLIC_APP_URL") ?? Deno.env.get("APP_PUBLIC_URL"),
-          ),
-          siteUrlSet: Boolean(Deno.env.get("SITE_URL")),
-        },
-      );
-      return jsonResponse(
-        {
-          error:
-            "Não foi possível determinar a URL pública do app. Configure PUBLIC_APP_URL nos secrets do Supabase.",
-        },
-        400,
-      );
-    }
-
+    // baseUrl já resolvido e validado no passo 4 (antes de qualquer write)
     const inviteUrl = `${baseUrl}/precision-questionnaire/${token}`;
 
     console.log("[create-p12-link] link generated for student", {
