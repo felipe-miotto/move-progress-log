@@ -197,6 +197,28 @@ end $$;
 -- 3.5 · Garante check constraint pra status (drop antigo se existir)
 alter table public.assessments
   drop constraint if exists assessments_status_check;
+
+-- 3.5.1 · Backfill de status legado antes de aplicar o novo check.
+--         Schema novo aceita: 'in_progress', 'completed', 'aborted', 'blocked'.
+--         Schema legado tinha (entre outros): 'draft', 'archived', e potencialmente
+--         outros valores não previstos. Mapeamento:
+--           draft     → in_progress (rascunho = ainda em progresso)
+--           archived  → aborted     (arquivado = interrompido; blocked é só pra PAR-Q)
+--           qualquer outro não previsto → aborted (fallback defensivo)
+update public.assessments
+   set status = case
+     when status = 'completed'   then 'completed'
+     when status = 'in_progress' then 'in_progress'
+     when status = 'aborted'     then 'aborted'
+     when status = 'blocked'     then 'blocked'
+     when status = 'draft'       then 'in_progress'
+     when status = 'archived'    then 'aborted'
+     when status is null         then 'in_progress'
+     else 'aborted'  -- safety fallback pra qualquer valor não previsto
+   end
+ where status is null
+    or status not in ('in_progress', 'completed', 'aborted', 'blocked');
+
 alter table public.assessments
   add constraint assessments_status_check
   check (status in ('in_progress', 'completed', 'aborted', 'blocked'));
