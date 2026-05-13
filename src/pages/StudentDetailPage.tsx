@@ -35,6 +35,7 @@ import { EditSessionDialog } from "@/components/EditSessionDialog";
 import { SessionDetailDialog } from "@/components/SessionDetailDialog";
 import { EditStudentDialog } from "@/components/EditStudentDialog";
 import { StudentOverviewDashboard } from "@/components/StudentOverviewDashboard";
+import { AssessmentsTab } from "@/components/assessments/AssessmentsTab";
 import { useOuraMetrics, useLatestOuraMetrics } from "@/hooks/useOuraMetrics";
 import { useOuraConnection } from "@/hooks/useOuraConnection";
 import { useState, useMemo, useEffect } from "react";
@@ -352,7 +353,7 @@ const StudentDetailPage = () => {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList
           aria-label="Seções do perfil do aluno"
-          className="flex h-auto w-full justify-start gap-1 overflow-x-auto p-1 sm:grid sm:grid-cols-3 lg:grid-cols-6"
+          className="flex h-auto w-full justify-start gap-1 overflow-x-auto p-1 sm:grid sm:grid-cols-4 lg:grid-cols-7"
         >
           <TabsTrigger className="min-h-11 min-w-max px-4" value="training">
             {NAV_LABELS.tabTraining}
@@ -368,6 +369,9 @@ const StudentDetailPage = () => {
           </TabsTrigger>
           <TabsTrigger className="min-h-11 min-w-max px-4" value="prescriptions">
             {NAV_LABELS.tabPrescriptions}
+          </TabsTrigger>
+          <TabsTrigger className="min-h-11 min-w-max px-4" value="assessments">
+            {NAV_LABELS.tabAssessments}
           </TabsTrigger>
           <TabsTrigger className="min-h-11 min-w-max px-4" value="oura">
             {NAV_LABELS.tabOura}
@@ -655,6 +659,23 @@ const StudentDetailPage = () => {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        <TabsContent value="assessments" className="space-y-4 animate-fade-in">
+          <AssessmentsTab
+            studentId={id!}
+            studentDefaults={{
+              age_years: student.birth_date
+                ? Math.floor(
+                    (Date.now() - new Date(student.birth_date).getTime()) /
+                      (365.25 * 24 * 60 * 60 * 1000),
+                  )
+                : null,
+              weight_kg: student.weight_kg ?? null,
+              height_cm: student.height_cm ?? null,
+              sex: null,
+            }}
+          />
         </TabsContent>
 
         <TabsContent value="oura" className="space-y-6 animate-fade-in">
