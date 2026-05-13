@@ -1,11 +1,21 @@
 -- ============================================================================
--- PRECISION 12 — Avaliação Fabrik / Foundation (E1)
+-- PRECISION 12 — Avaliação Fabrik / Foundation (E1) · IDEMPOTENT REWRITE
 -- ============================================================================
 --
 -- Migration consolidada da Etapa 1 do módulo de avaliação física + programa
 -- Precision 12. Cria toda a base de tabelas + RLS + seeds + storage buckets
 -- pra os PRs seguintes (E2 forms coach, E3 questionário, E4 programa, E5
 -- evidence, E6/E7 PDFs) construírem em cima.
+--
+-- ⚠ IMPORTANTE — Versão 2 idempotente (re-write 2026-05-13):
+--   A primeira tentativa falhou em produção porque a tabela `assessments`
+--   já existia (de módulo antigo de avaliação funcional), com schema
+--   diferente, e o `create table if not exists` silenciou a criação. O
+--   próximo statement `create index` então falhou (`assessment_date` não
+--   existia), abortando a transação inteira.
+--   Esta versão usa ADD COLUMN IF NOT EXISTS + DROP POLICY IF EXISTS +
+--   conversão defensiva de enum status → text + atualização explícita de
+--   constraints, pra rodar tanto greenfield quanto sobre o schema legado.
 --
 -- Convenções:
 --   • Toda tabela com dado de aluno tem RLS ativo (espelha student_reports)
@@ -14,7 +24,7 @@
 --   • Aluno read-only nas próprias avaliações
 --   • Tabelas de referência: SELECT público, INSERT/UPDATE só admin
 --
--- Idempotente: usa IF NOT EXISTS / OR REPLACE onde aplicável.
+-- Idempotente em todos os pontos: pode ser re-executada com segurança.
 -- ============================================================================
 
 
@@ -27,16 +37,38 @@ alter table public.students
 
 alter table public.students
   add column if not exists student_type text
-    not null default 'fabrik'
-    check (student_type in ('fabrik', 'precision_external'));
+    not null default 'fabrik';
+
+do $$ begin
+  if not exists (
+    select 1 from information_schema.constraint_column_usage
+    where table_schema = 'public' and table_name = 'students'
+      and constraint_name = 'students_student_type_check'
+  ) then
+    alter table public.students
+      add constraint students_student_type_check
+      check (student_type in ('fabrik', 'precision_external'));
+  end if;
+end $$;
 
 alter table public.students
   add column if not exists home_gym_name text;
 
 alter table public.students
   add column if not exists program_tier text
-    not null default 'regular'
-    check (program_tier in ('regular', 'precision_12'));
+    not null default 'regular';
+
+do $$ begin
+  if not exists (
+    select 1 from information_schema.constraint_column_usage
+    where table_schema = 'public' and table_name = 'students'
+      and constraint_name = 'students_program_tier_check'
+  ) then
+    alter table public.students
+      add constraint students_program_tier_check
+      check (program_tier in ('regular', 'precision_12'));
+  end if;
+end $$;
 
 alter table public.students
   add column if not exists program_started_at date;
@@ -58,40 +90,44 @@ comment on column public.students.program_ends_at is
 -- SECTION 2 · Modalidade em workout_sessions
 -- ────────────────────────────────────────────────────────────────────────────
 
+alter table public.workout_sessions
+  add column if not exists modality text;
+
 do $$ begin
   if not exists (
-    select 1 from information_schema.columns
-    where table_schema = 'public'
-      and table_name = 'workout_sessions'
-      and column_name = 'modality'
+    select 1 from information_schema.constraint_column_usage
+    where table_schema = 'public' and table_name = 'workout_sessions'
+      and constraint_name = 'workout_sessions_modality_check'
   ) then
     alter table public.workout_sessions
-      add column modality text
-        check (modality in ('functional','spin','walking','running','strength','swimming','other'));
+      add constraint workout_sessions_modality_check
+      check (modality in ('functional','spin','walking','running','strength','swimming','other'));
   end if;
 end $$;
 
 
 -- ────────────────────────────────────────────────────────────────────────────
--- SECTION 3 · Tabela mãe assessments
+-- SECTION 3 · Tabela assessments — reconcilia schema legado com novo
+-- ────────────────────────────────────────────────────────────────────────────
+-- Schema legado (módulo antigo de avaliação funcional):
+--   id, professional_id, student_id, status (enum assessment_status),
+--   started_at, completed_at, notes, created_at, updated_at
+--
+-- Schema novo (Precision 12 + bateria de testes):
+--   id, student_id, trainer_id, assessment_type, assessment_date,
+--   status (text), age_years, weight_kg, height_cm, sex, notes,
+--   created_at, updated_at
 -- ────────────────────────────────────────────────────────────────────────────
 
+-- 3.1 · Cria a tabela do zero (greenfield) — se não existe.
 create table if not exists public.assessments (
   id uuid primary key default gen_random_uuid(),
   student_id uuid not null references public.students(id) on delete cascade,
   trainer_id uuid references auth.users(id),
 
-  assessment_type text not null check (assessment_type in (
-    'vo2_bike_max', 'vo2_bike_submax',
-    'vo2_treadmill_walk_submax', 'vo2_treadmill_run_submax', 'vo2_treadmill_run_max',
-    'handgrip', 'dexa', 'sit_to_stand', 'questionnaire_precision12'
-  )),
-
+  assessment_type text,
   assessment_date date not null default current_date,
-
-  status text not null default 'in_progress' check (status in (
-    'in_progress', 'completed', 'aborted', 'blocked'
-  )),
+  status text not null default 'in_progress',
 
   -- Snapshot do aluno (preservar mesmo que aluno mude depois)
   age_years int,
@@ -105,6 +141,87 @@ create table if not exists public.assessments (
   updated_at timestamptz not null default now()
 );
 
+-- 3.2 · Adiciona colunas faltantes em schema legado (idempotente)
+alter table public.assessments
+  add column if not exists trainer_id uuid references auth.users(id);
+
+alter table public.assessments
+  add column if not exists assessment_type text;
+
+alter table public.assessments
+  add column if not exists assessment_date date not null default current_date;
+
+alter table public.assessments
+  add column if not exists age_years int;
+
+alter table public.assessments
+  add column if not exists weight_kg numeric(5,2);
+
+alter table public.assessments
+  add column if not exists height_cm numeric(5,2);
+
+alter table public.assessments
+  add column if not exists sex text;
+
+-- 3.3 · Garante constraint sex M/F (drop antiga se existir, recria)
+alter table public.assessments
+  drop constraint if exists assessments_sex_check;
+alter table public.assessments
+  add constraint assessments_sex_check
+  check (sex is null or sex in ('M', 'F'));
+
+-- 3.4 · Converte status de enum → text (se necessário, defensivo).
+--       Schema legado tinha status como `assessment_status` enum.
+--       Schema novo precisa de text + check constraint.
+do $$
+declare
+  status_udt text;
+begin
+  select udt_name into status_udt
+  from information_schema.columns
+  where table_schema = 'public'
+    and table_name = 'assessments'
+    and column_name = 'status';
+
+  -- Se for enum (udt_name != text/varchar), converter
+  if status_udt is not null and status_udt not in ('text', 'varchar', 'character varying') then
+    -- Remove default antigo (se existir)
+    execute 'alter table public.assessments alter column status drop default';
+    -- Converte tipo
+    execute 'alter table public.assessments alter column status type text using status::text';
+    -- Aplica novo default
+    execute 'alter table public.assessments alter column status set default ''in_progress''';
+  end if;
+end $$;
+
+-- 3.5 · Garante check constraint pra status (drop antigo se existir)
+alter table public.assessments
+  drop constraint if exists assessments_status_check;
+alter table public.assessments
+  add constraint assessments_status_check
+  check (status in ('in_progress', 'completed', 'aborted', 'blocked'));
+
+-- 3.6 · Garante check constraint pra assessment_type
+alter table public.assessments
+  drop constraint if exists assessments_assessment_type_check;
+
+-- Backfill defensivo de assessment_type pra qualquer linha legada
+update public.assessments
+  set assessment_type = 'questionnaire_precision12'
+  where assessment_type is null;
+
+alter table public.assessments
+  add constraint assessments_assessment_type_check
+  check (assessment_type in (
+    'vo2_bike_max', 'vo2_bike_submax',
+    'vo2_treadmill_walk_submax', 'vo2_treadmill_run_submax', 'vo2_treadmill_run_max',
+    'handgrip', 'dexa', 'sit_to_stand', 'questionnaire_precision12'
+  ));
+
+alter table public.assessments
+  alter column assessment_type set not null;
+
+-- 3.7 · Índices (agora podem ser criados — colunas existem)
 create index if not exists assessments_student_date_idx
   on public.assessments (student_id, assessment_date desc);
 
@@ -114,7 +231,13 @@ create index if not exists assessments_type_idx
 create index if not exists assessments_trainer_idx
   on public.assessments (trainer_id);
 
+-- 3.8 · Habilita RLS (idempotente)
 alter table public.assessments enable row level security;
+
+-- 3.9 · Limpa policies antigas/conflitantes e cria as novas
+drop policy if exists "Students can view their assessments" on public.assessments;
+drop policy if exists "Trainers can manage their assessments" on public.assessments;
+drop policy if exists "assessments_trainer_own_or_admin" on public.assessments;
 
 create policy "assessments_trainer_own_or_admin"
   on public.assessments
@@ -147,29 +270,29 @@ create policy "assessments_trainer_own_or_admin"
 create table if not exists public.vo2_assessment_details (
   assessment_id uuid primary key references public.assessments(id) on delete cascade,
 
-  fc_max_predicted int,           -- Tanaka 208 - 0.7*idade
-  fc_peak int,                    -- FC máxima observada
-  vo2_final numeric(5,2),         -- ml/kg/min
-  vo2_classification text,        -- 'Muito Fraco' | 'Fraco' | 'Regular' | 'Bom' | 'Excelente' | 'Superior'
+  fc_max_predicted int,
+  fc_peak int,
+  vo2_final numeric(5,2),
+  vo2_classification text,
 
-  recovery_drop_1min int,         -- FC pico - FC após 1 min recuperação
-  recovery_classification text,   -- '≥30 Excelente' | '20-29 Muito boa' | '12-19 Moderada' | '<12 Baixa'
+  recovery_drop_1min int,
+  recovery_classification text,
 
   -- Esteira (null pra bike)
   total_time_min numeric(5,2),
   final_speed_kmh numeric(4,1),
   final_incline_pct numeric(4,1),
-  protocol_name text,              -- 'Bruce' | 'Bruce Modificado' | 'Naughton' | etc.
+  protocol_name text,
 
   -- Bike (null pra esteira)
   last_valid_load numeric(4,1),
   last_valid_watts int,
-  abort_reason text                -- 'pse_10' | 'cadence_failure' | 'pse_9_submax' | 'fc_above_90pct' | 'safety_bp' | 'safety_ischemia' | 'student_request' | 'equipment'
+  abort_reason text
 );
 
 
 -- ────────────────────────────────────────────────────────────────────────────
--- SECTION 5 · Estágios da bike (só bike, esteira não usa)
+-- SECTION 5 · Estágios da bike
 -- ────────────────────────────────────────────────────────────────────────────
 
 create table if not exists public.vo2_bike_stages (
@@ -177,17 +300,17 @@ create table if not exists public.vo2_bike_stages (
   assessment_id uuid not null references public.assessments(id) on delete cascade,
 
   stage_order int not null,
-  time_label text,                 -- '0-2', '2-4', etc.
+  time_label text,
   phase text check (phase in ('warmup', 'test', 'recovery')),
 
-  load_value numeric(4,1),         -- carga fixa do protocolo
-  rpm_target text,                 -- '80-90' (texto pq é faixa)
+  load_value numeric(4,1),
+  rpm_target text,
 
-  watts_observed int,              -- registrado pelo coach
-  hr_final int,                    -- FC ao final do estágio (ou pós-1min se phase=recovery)
+  watts_observed int,
+  hr_final int,
   pse int check (pse between 6 and 10),
 
-  vo2_estimated numeric(5,2),      -- calculado app: (10.8 × watts / weight_kg) + 7
+  vo2_estimated numeric(5,2),
 
   notes text
 );
@@ -205,28 +328,26 @@ create table if not exists public.handgrip_results (
 
   dominant_hand text check (dominant_hand in ('left', 'right')),
 
-  -- Mathiowetz 1985: 3 tentativas por mão, usar a maior
   right_kg_attempts numeric(5,2)[] default '{}',
   left_kg_attempts numeric(5,2)[] default '{}',
 
-  right_kg numeric(5,2),           -- melhor das 3 (preenchido pelo app)
+  right_kg numeric(5,2),
   left_kg numeric(5,2),
   best_kg numeric(5,2) generated always as (
     greatest(coalesce(right_kg, 0), coalesce(left_kg, 0))
   ) stored,
 
-  classification text              -- 'Muito Baixo' | 'Baixo' | 'Médio' | 'Alto' | 'Muito Alto'
+  classification text
 );
 
 
 -- ────────────────────────────────────────────────────────────────────────────
--- SECTION 7 · DEXA (composição corporal — schema enxuto + 6 promovidos + TMB)
+-- SECTION 7 · DEXA (schema enxuto + 6 promovidos + TMB)
 -- ────────────────────────────────────────────────────────────────────────────
 
 create table if not exists public.dexa_results (
   assessment_id uuid primary key references public.assessments(id) on delete cascade,
 
-  -- 9 base do brief original
   total_mass_kg numeric(5,2),
   fat_mass_kg numeric(5,2),
   fat_pct numeric(4,1),
@@ -237,56 +358,50 @@ create table if not exists public.dexa_results (
   android_gynoid_ratio numeric(4,2),
   scan_pdf_url text,
 
-  -- TMB (2 fórmulas — first-class)
   bmr_harris_benedict_kcal int,
   bmr_mifflin_stjeor_kcal int,
 
-  -- 6 campos promovidos (clinicamente relevantes)
-  appendicular_lean_mass_kg numeric(5,2),    -- MMA (sarcopenia screening)
-  imma_baumgartner numeric(5,2),             -- ALM/h² (sarcopenia)
-  fmi numeric(4,2),                          -- Fat Mass Index (Gallagher)
-  fat_percentile int,                        -- percentil populacional
-  regional_distribution jsonb,               -- { trunk, arms_r, arms_l, legs_r, legs_l, gynoid, android }
-  conclusion_text text,                      -- laudo textual do médico
+  appendicular_lean_mass_kg numeric(5,2),
+  imma_baumgartner numeric(5,2),
+  fmi numeric(4,2),
+  fat_percentile int,
+  regional_distribution jsonb,
+  conclusion_text text,
 
-  -- Storage + extração IA (Claude Sonnet)
   scan_pdf_storage_path text,
-  raw_extracted_json jsonb,                  -- TODOS os campos do PDF preservados
+  raw_extracted_json jsonb,
   extraction_confidence numeric(3,2),
   extraction_method text check (extraction_method in ('manual','ai','hybrid'))
 );
 
 
 -- ────────────────────────────────────────────────────────────────────────────
--- SECTION 8 · Sit-to-Stand (Araújo 2012, split sentar/levantar)
+-- SECTION 8 · Sit-to-Stand (Araújo 2012 split sentar/levantar)
 -- ────────────────────────────────────────────────────────────────────────────
 
 create table if not exists public.sit_to_stand_results (
   assessment_id uuid primary key references public.assessments(id) on delete cascade,
 
-  -- Fase sentar (parcial começa em 5,0)
   sit_score numeric(2,1) check (sit_score between 0 and 5),
   sit_supports jsonb default '{"hand":0,"knee":0,"forearm":0,"leg_side":0,"hand_on_knee":0}'::jsonb,
   sit_instabilities int default 0,
 
-  -- Fase levantar (parcial começa em 5,0)
   rise_score numeric(2,1) check (rise_score between 0 and 5),
   rise_supports jsonb default '{"hand":0,"knee":0,"forearm":0,"leg_side":0,"hand_on_knee":0}'::jsonb,
   rise_instabilities int default 0,
 
-  -- Total + classificação (Araújo 2012/2025)
   total_score numeric(3,1) generated always as (
     coalesce(sit_score, 0) + coalesce(rise_score, 0)
   ) stored,
 
-  classification text,                     -- 'Excelente' | 'Bom' | 'Atenção' | 'Alerta'
+  classification text,
 
   notes text
 );
 
 
 -- ────────────────────────────────────────────────────────────────────────────
--- SECTION 9 · Cardiovascular baseline (PA + FCR + medicação + médico ref)
+-- SECTION 9 · Cardiovascular baseline
 -- ────────────────────────────────────────────────────────────────────────────
 
 create table if not exists public.cardiovascular_baseline (
@@ -297,17 +412,17 @@ create table if not exists public.cardiovascular_baseline (
   resting_hr_bpm int check (resting_hr_bpm between 30 and 200),
 
   on_medication boolean default false,
-  medication_details text,                 -- "losartana 50mg/dia"
+  medication_details text,
 
   reference_doctor_name text,
   reference_doctor_contact text,
 
-  classification text                      -- 'Normal' | 'Pré-hipertensão' | 'Hipertensão Estágio 1' | 'Hipertensão Estágio 2'
+  classification text
 );
 
 
 -- ────────────────────────────────────────────────────────────────────────────
--- SECTION 10 · Subjective scores (6 valores 0-10 — snapshot por avaliação)
+-- SECTION 10 · Subjective scores
 -- ────────────────────────────────────────────────────────────────────────────
 
 create table if not exists public.subjective_scores (
@@ -336,19 +451,19 @@ create index if not exists subjective_scores_assessment_idx
 
 
 -- ────────────────────────────────────────────────────────────────────────────
--- SECTION 11 · Questionário Precision 12 (54 perguntas, wide table)
+-- SECTION 11 · Questionário Precision 12 (54 perguntas)
 -- ────────────────────────────────────────────────────────────────────────────
 
 create table if not exists public.questionnaire_responses (
   assessment_id uuid primary key references public.assessments(id) on delete cascade,
   questionnaire_version text not null default 'precision12_v1',
 
-  -- Bloco 1 — Identificação
+  -- Bloco 1
   full_name text, email text, phone text, birthdate date,
   gender text check (gender in ('M', 'F')),
   profession text, routine text,
 
-  -- Bloco 2 — PAR-Q (7 perguntas; bloqueia submit se qualquer SIM)
+  -- Bloco 2 — PAR-Q
   parq_q8_heart_condition boolean,
   parq_q9_chest_pain_exercise boolean,
   parq_q10_chest_pain_recent boolean,
@@ -366,61 +481,45 @@ create table if not exists public.questionnaire_responses (
     or coalesce(parq_q14_other_health_reason,false)
   ) stored,
 
-  -- Bloco 3 — Objetivos
+  -- Bloco 3
   goals text[], goal_details text, previous_attempts text,
 
-  -- Bloco 4 — Histórico
+  -- Bloco 4
   exercise_history text,
   fitness_self_rating smallint check (fitness_self_rating between 1 and 5),
   body_satisfaction smallint check (body_satisfaction between 1 and 5),
 
-  -- Bloco 5 — Disponibilidade
+  -- Bloco 5
   session_duration text, weekly_frequency int, training_period text,
   frequent_traveler boolean, routine_description text,
 
-  -- Bloco 6 — Dor / limitação
-  pain_status text,
-  pain_movements text[],
-  pain_location text,
-  biggest_difficulty text[],
+  -- Bloco 6
+  pain_status text, pain_movements text[],
+  pain_location text, biggest_difficulty text[],
 
-  -- Bloco 7 — Sono / recuperação / estresse
+  -- Bloco 7
   sleep_hours text,
   sleep_quality smallint check (sleep_quality between 1 and 5),
   stress_level smallint check (stress_level between 1 and 5),
   energy_level smallint check (energy_level between 1 and 5),
   recovery_quality text,
 
-  -- Bloco 8 — Wearable
-  uses_wearable boolean,
-  wearable_brand text,                     -- 'Oura Ring' | 'Whoop' | 'Outro'
-  share_data boolean,
+  -- Bloco 8
+  uses_wearable boolean, wearable_brand text, share_data boolean,
 
-  -- Bloco 9 — Saúde / hábitos
-  has_medical_condition boolean,
-  medical_condition_details text,
-  recovery_strategies text[],
-  alcohol text,
-  tobacco text,
-  caffeine_doses text,
+  -- Bloco 9
+  has_medical_condition boolean, medical_condition_details text,
+  recovery_strategies text[], alcohol text, tobacco text, caffeine_doses text,
 
-  -- Bloco 10 — Perfil comportamental
-  motivations text[],
-  discomfort_response text,
-  difficulty_helper text,
-  missed_session_response text,
-  firm_professional_response text,
-  accompaniment_preference text,
-  correction_preference text,
-  consistency_self_rating text,
-  life_stability text,
-  deal_breaker text,
+  -- Bloco 10
+  motivations text[], discomfort_response text, difficulty_helper text,
+  missed_session_response text, firm_professional_response text,
+  accompaniment_preference text, correction_preference text,
+  consistency_self_rating text, life_stability text, deal_breaker text,
 
-  -- Bloco 11 — Consentimento (4 obrigatórios pra finalizar)
-  consent_truthful boolean,
-  consent_not_medical boolean,
-  consent_data_use boolean,
-  consent_terms boolean,
+  -- Bloco 11
+  consent_truthful boolean, consent_not_medical boolean,
+  consent_data_use boolean, consent_terms boolean,
 
   submitted_at timestamptz,
   created_at timestamptz default now(),
@@ -429,7 +528,7 @@ create table if not exists public.questionnaire_responses (
 
 
 -- ────────────────────────────────────────────────────────────────────────────
--- SECTION 12 · Profissionais externos do cliente (equipe de saúde)
+-- SECTION 12 · Profissionais externos do cliente
 -- ────────────────────────────────────────────────────────────────────────────
 
 create table if not exists public.student_external_professionals (
@@ -437,18 +536,14 @@ create table if not exists public.student_external_professionals (
   student_id uuid not null references public.students(id) on delete cascade,
 
   role text not null check (role in (
-    'physical_coach',    -- coach físico da academia do cliente
-    'physician',         -- médico
-    'nutritionist',
-    'physiotherapist',
-    'psychologist',
-    'other'
+    'physical_coach', 'physician', 'nutritionist',
+    'physiotherapist', 'psychologist', 'other'
   )),
 
   name text not null,
   contact_phone text,
   contact_email text,
-  organization text,                       -- "Smart Fit Brasília Sul" | "Hospital Sírio"
+  organization text,
   specialty text,
 
   receives_reports boolean default false,
@@ -463,7 +558,7 @@ create index if not exists student_external_professionals_student_idx
 
 
 -- ────────────────────────────────────────────────────────────────────────────
--- SECTION 13 · Precision reports (PDFs gerados, 3 ciclos por aluno)
+-- SECTION 13 · Precision reports (PDFs gerados)
 -- ────────────────────────────────────────────────────────────────────────────
 
 create table if not exists public.precision_reports (
@@ -471,48 +566,42 @@ create table if not exists public.precision_reports (
   student_id uuid not null references public.students(id) on delete cascade,
 
   report_type text not null check (report_type in ('initial','monthly','final')),
-  cycle_number int,                        -- 1 (M1), 2 (M2), 3 (M3=final)
+  cycle_number int,
   total_cycles int default 3,
-  week_number int,                          -- 1, 5, 9, 12
+  week_number int,
 
   period_start date,
   period_end date,
   generated_at timestamptz default now(),
 
-  -- Coach narrative (textos livres do analista — preenchidos via IA draft + edit)
-  anchor_quote text,                       -- quote em destaque
-  anchor_message text,                     -- parágrafo introdutório
-  strategic_reading text,                  -- só inicial
-  goal_calibration text,                   -- só inicial (recalibração honesta)
+  anchor_quote text,
+  anchor_message text,
+  strategic_reading text,
+  goal_calibration text,
   realistic_scenario text,
   ambitious_scenario text,
   bilateral_agreement_student jsonb,
   bilateral_agreement_fabrik jsonb,
 
-  -- Periódicos (mensal + final)
   what_improved jsonb,
   what_needs_attention jsonb,
   student_quotes jsonb,
   numbers_narrative text,
 
-  -- Final exclusivo
-  goals_status jsonb,                      -- [{metric, start, end, target, pct_progress, status}]
+  goals_status jsonb,
   monthly_journey jsonb,
   lessons_learned jsonb,
   next_cycle_proposal text,
   next_cycle_priorities jsonb,
-  closing_message text,                    -- "Recado final"
+  closing_message text,
 
-  -- Próximos passos
   next_steps jsonb,
   top_priorities jsonb,
 
-  -- Assinatura
   analyst_id uuid references auth.users(id),
   analyst_name text,
   analyst_role text default 'Analista de Performance & Lifestyle',
 
-  -- PDF Storage
   pdf_storage_path text,
   pdf_generated_at timestamptz,
 
@@ -535,7 +624,7 @@ create table if not exists public.vo2_reference_ranges (
   sex text not null check (sex in ('M','F')),
   age_min int not null,
   age_max int not null,
-  classification text not null,            -- 'Muito Fraco' | 'Fraco' | 'Regular' | 'Bom' | 'Excelente' | 'Superior'
+  classification text not null,
   vo2_min numeric(5,2) not null,
   vo2_max numeric(5,2) not null,
   source text default 'ACSM 2018'
@@ -562,13 +651,13 @@ create table if not exists public.sit_to_stand_reference_ranges (
   source text default 'Araújo 2012 (EJPC)'
 );
 
--- Seeds (idempotente via NOT EXISTS check)
+-- Seeds idempotentes
 insert into public.sit_to_stand_reference_ranges (age_min, age_max, classification, score_min, score_max, source)
 select * from (values
-  (18, 99, 'Excelente', 8.0, 10.0, 'Araújo 2012 (EJPC)'),
-  (18, 99, 'Bom',       6.0, 7.5,  'Araújo 2012 (EJPC)'),
-  (18, 99, 'Atenção',   3.5, 5.5,  'Araújo 2012 (EJPC)'),
-  (18, 99, 'Alerta',    0.0, 3.0,  'Araújo 2012 (EJPC)')
+  (18, 99, 'Excelente', 8.0::numeric, 10.0::numeric, 'Araújo 2012 (EJPC)'),
+  (18, 99, 'Bom',       6.0::numeric, 7.5::numeric,  'Araújo 2012 (EJPC)'),
+  (18, 99, 'Atenção',   3.5::numeric, 5.5::numeric,  'Araújo 2012 (EJPC)'),
+  (18, 99, 'Alerta',    0.0::numeric, 3.0::numeric,  'Araújo 2012 (EJPC)')
 ) as v(age_min, age_max, classification, score_min, score_max, source)
 where not exists (
   select 1 from public.sit_to_stand_reference_ranges r
@@ -577,10 +666,10 @@ where not exists (
 
 
 -- ────────────────────────────────────────────────────────────────────────────
--- SECTION 15 · RLS — espelha student_reports
+-- SECTION 15 · RLS — TODAS as policies idempotentes via DROP IF EXISTS
 -- ────────────────────────────────────────────────────────────────────────────
 
--- Helper: policy padrão pra tabelas-filhas de assessment (acesso via JOIN)
+-- 15.1 · Tabelas-filhas de assessment (acesso via JOIN)
 do $$
 declare
   child_table text;
@@ -593,20 +682,24 @@ declare
     'cardiovascular_baseline',
     'questionnaire_responses'
   ];
+  policy_name text;
 begin
   foreach child_table in array child_tables loop
     execute format('alter table public.%I enable row level security', child_table);
 
+    policy_name := child_table || '_via_assessment';
+    execute format('drop policy if exists %I on public.%I', policy_name, child_table);
+
     execute format($p$
-      create policy "%1$s_via_assessment"
-        on public.%1$I
+      create policy %I
+        on public.%I
         for all
         to authenticated
         using (
           exists (
             select 1 from public.assessments a
             join public.students s on s.id = a.student_id
-            where a.id = %1$I.assessment_id
+            where a.id = %I.assessment_id
               and (s.trainer_id = auth.uid()
                    or exists (select 1 from public.user_roles ur
                               where ur.user_id = auth.uid() and ur.role = 'admin'))
@@ -616,18 +709,20 @@ begin
           exists (
             select 1 from public.assessments a
             join public.students s on s.id = a.student_id
-            where a.id = %1$I.assessment_id
+            where a.id = %I.assessment_id
               and (s.trainer_id = auth.uid()
                    or exists (select 1 from public.user_roles ur
                               where ur.user_id = auth.uid() and ur.role = 'admin'))
           )
         )
-    $p$, child_table);
+    $p$, policy_name, child_table, child_table, child_table);
   end loop;
 end $$;
 
--- subjective_scores (acesso direto via student_id)
+-- 15.2 · subjective_scores (acesso direto via student_id)
 alter table public.subjective_scores enable row level security;
+
+drop policy if exists "subjective_scores_trainer_own_or_admin" on public.subjective_scores;
 
 create policy "subjective_scores_trainer_own_or_admin"
   on public.subjective_scores
@@ -652,8 +747,10 @@ create policy "subjective_scores_trainer_own_or_admin"
     )
   );
 
--- student_external_professionals
+-- 15.3 · student_external_professionals
 alter table public.student_external_professionals enable row level security;
+
+drop policy if exists "student_external_professionals_trainer_own_or_admin" on public.student_external_professionals;
 
 create policy "student_external_professionals_trainer_own_or_admin"
   on public.student_external_professionals
@@ -678,8 +775,10 @@ create policy "student_external_professionals_trainer_own_or_admin"
     )
   );
 
--- precision_reports
+-- 15.4 · precision_reports
 alter table public.precision_reports enable row level security;
+
+drop policy if exists "precision_reports_trainer_own_or_admin" on public.precision_reports;
 
 create policy "precision_reports_trainer_own_or_admin"
   on public.precision_reports
@@ -704,71 +803,51 @@ create policy "precision_reports_trainer_own_or_admin"
     )
   );
 
--- Tabelas de referência: SELECT público, INSERT/UPDATE só admin
+-- 15.5 · Tabelas de referência (SELECT público, INSERT/UPDATE só admin)
 alter table public.vo2_reference_ranges enable row level security;
 alter table public.handgrip_reference_ranges enable row level security;
 alter table public.sit_to_stand_reference_ranges enable row level security;
 
+drop policy if exists "vo2_reference_ranges_select_authenticated" on public.vo2_reference_ranges;
+drop policy if exists "vo2_reference_ranges_write_admin" on public.vo2_reference_ranges;
+drop policy if exists "handgrip_reference_ranges_select_authenticated" on public.handgrip_reference_ranges;
+drop policy if exists "handgrip_reference_ranges_write_admin" on public.handgrip_reference_ranges;
+drop policy if exists "sit_to_stand_reference_ranges_select_authenticated" on public.sit_to_stand_reference_ranges;
+drop policy if exists "sit_to_stand_reference_ranges_write_admin" on public.sit_to_stand_reference_ranges;
+
 create policy "vo2_reference_ranges_select_authenticated"
-  on public.vo2_reference_ranges
-  for select
-  to authenticated
-  using (true);
+  on public.vo2_reference_ranges for select to authenticated using (true);
 
 create policy "vo2_reference_ranges_write_admin"
-  on public.vo2_reference_ranges
-  for all
-  to authenticated
-  using (
-    exists (select 1 from public.user_roles ur
-            where ur.user_id = auth.uid() and ur.role = 'admin')
-  )
-  with check (
-    exists (select 1 from public.user_roles ur
-            where ur.user_id = auth.uid() and ur.role = 'admin')
-  );
+  on public.vo2_reference_ranges for all to authenticated
+  using (exists (select 1 from public.user_roles ur
+                 where ur.user_id = auth.uid() and ur.role = 'admin'))
+  with check (exists (select 1 from public.user_roles ur
+                      where ur.user_id = auth.uid() and ur.role = 'admin'));
 
 create policy "handgrip_reference_ranges_select_authenticated"
-  on public.handgrip_reference_ranges
-  for select
-  to authenticated
-  using (true);
+  on public.handgrip_reference_ranges for select to authenticated using (true);
 
 create policy "handgrip_reference_ranges_write_admin"
-  on public.handgrip_reference_ranges
-  for all
-  to authenticated
-  using (
-    exists (select 1 from public.user_roles ur
-            where ur.user_id = auth.uid() and ur.role = 'admin')
-  )
-  with check (
-    exists (select 1 from public.user_roles ur
-            where ur.user_id = auth.uid() and ur.role = 'admin')
-  );
+  on public.handgrip_reference_ranges for all to authenticated
+  using (exists (select 1 from public.user_roles ur
+                 where ur.user_id = auth.uid() and ur.role = 'admin'))
+  with check (exists (select 1 from public.user_roles ur
+                      where ur.user_id = auth.uid() and ur.role = 'admin'));
 
 create policy "sit_to_stand_reference_ranges_select_authenticated"
-  on public.sit_to_stand_reference_ranges
-  for select
-  to authenticated
-  using (true);
+  on public.sit_to_stand_reference_ranges for select to authenticated using (true);
 
 create policy "sit_to_stand_reference_ranges_write_admin"
-  on public.sit_to_stand_reference_ranges
-  for all
-  to authenticated
-  using (
-    exists (select 1 from public.user_roles ur
-            where ur.user_id = auth.uid() and ur.role = 'admin')
-  )
-  with check (
-    exists (select 1 from public.user_roles ur
-            where ur.user_id = auth.uid() and ur.role = 'admin')
-  );
+  on public.sit_to_stand_reference_ranges for all to authenticated
+  using (exists (select 1 from public.user_roles ur
+                 where ur.user_id = auth.uid() and ur.role = 'admin'))
+  with check (exists (select 1 from public.user_roles ur
+                      where ur.user_id = auth.uid() and ur.role = 'admin'));
 
 
 -- ────────────────────────────────────────────────────────────────────────────
--- SECTION 16 · Storage buckets (DEXA PDFs + Precision reports PDFs)
+-- SECTION 16 · Storage buckets + policies
 -- ────────────────────────────────────────────────────────────────────────────
 
 insert into storage.buckets (id, name, public)
@@ -779,10 +858,14 @@ insert into storage.buckets (id, name, public)
 values ('precision-reports', 'precision-reports', false)
 on conflict (id) do nothing;
 
--- Policies pros 2 buckets: trainer do aluno + admin
+-- Policies (drop antes pra idempotência)
+drop policy if exists "dexa_pdfs_trainer_own_or_admin_select" on storage.objects;
+drop policy if exists "dexa_pdfs_trainer_own_or_admin_insert" on storage.objects;
+drop policy if exists "precision_reports_trainer_own_or_admin_select" on storage.objects;
+drop policy if exists "precision_reports_trainer_own_or_admin_insert" on storage.objects;
+
 create policy "dexa_pdfs_trainer_own_or_admin_select"
-  on storage.objects for select
-  to authenticated
+  on storage.objects for select to authenticated
   using (
     bucket_id = 'dexa-pdfs'
     and exists (
@@ -793,8 +876,7 @@ create policy "dexa_pdfs_trainer_own_or_admin_select"
   );
 
 create policy "dexa_pdfs_trainer_own_or_admin_insert"
-  on storage.objects for insert
-  to authenticated
+  on storage.objects for insert to authenticated
   with check (
     bucket_id = 'dexa-pdfs'
     and exists (
@@ -805,8 +887,7 @@ create policy "dexa_pdfs_trainer_own_or_admin_insert"
   );
 
 create policy "precision_reports_trainer_own_or_admin_select"
-  on storage.objects for select
-  to authenticated
+  on storage.objects for select to authenticated
   using (
     bucket_id = 'precision-reports'
     and exists (
@@ -817,8 +898,7 @@ create policy "precision_reports_trainer_own_or_admin_select"
   );
 
 create policy "precision_reports_trainer_own_or_admin_insert"
-  on storage.objects for insert
-  to authenticated
+  on storage.objects for insert to authenticated
   with check (
     bucket_id = 'precision-reports'
     and exists (
@@ -830,12 +910,5 @@ create policy "precision_reports_trainer_own_or_admin_insert"
 
 
 -- ────────────────────────────────────────────────────────────────────────────
--- END · Foundation E1
+-- END · Foundation E1 (idempotent)
 -- ────────────────────────────────────────────────────────────────────────────
--- Próximas etapas:
---   E2 — Coach UI (forms registro dos 8 testes)
---   E3 — Questionário Precision 12 (54 perguntas + lógica condicional)
---   E4 — Programa P12 (Coach Console + KPI adesão Oura)
---   E5 — Evidence layer (12 cards clínicos)
---   E6 — PDF Inicial Paciente (6 páginas)
---   E7 — PDF Mensal + Final (5p + 9p + cron jobs)
