@@ -19,7 +19,16 @@ import { z } from "zod";
 // Helpers comuns
 // ---------------------------------------------------------------------------
 
-const localTodayIso = (): string => {
+/**
+ * Data ISO do dia *local* do usuário (não UTC). Necessário porque
+ * `new Date().toISOString().slice(0,10)` retorna a data UTC, que
+ * difere do calendário local após 21h em fuso UTC-3 (Brasil).
+ *
+ * Use SEMPRE este helper pra default de `assessment_date` em forms —
+ * usar `new Date().toISOString()` causa "data não pode estar no
+ * futuro" à noite por divergência com a regra de validação do zod.
+ */
+export const localTodayIso = (): string => {
   const date = new Date();
   date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
   return date.toISOString().slice(0, 10);

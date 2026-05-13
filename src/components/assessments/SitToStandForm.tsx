@@ -47,6 +47,7 @@ import { useCreateAssessment } from "@/hooks/useAssessments";
 import {
   assessmentBaseSchema,
   emptySupports,
+  localTodayIso,
   sitToStandSchema,
   sitToStandSupportsSchema,
 } from "@/utils/assessmentValidation";
@@ -110,7 +111,7 @@ export const SitToStandForm = ({
     resolver: zodResolver(formSchema),
     defaultValues: {
       student_id: studentId,
-      assessment_date: new Date().toISOString().slice(0, 10),
+      assessment_date: localTodayIso(),
       age_years: defaults?.age_years ?? null,
       weight_kg: defaults?.weight_kg ?? null,
       height_cm: defaults?.height_cm ?? null,
