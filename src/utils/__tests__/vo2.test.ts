@@ -81,7 +81,8 @@ describe("classifyRecovery (Cole 1999 NEJM + ACSM Guidelines)", () => {
     expect(classifyRecovery(20)).toBe("Muito Boa"); // limite inferior
     expect(classifyRecovery(19)).toBe("Moderada"); // limite superior
     expect(classifyRecovery(15)).toBe("Moderada");
-    expect(classifyRecovery(12)).toBe("Moderada"); // limite inferior
+    expect(classifyRecovery(13)).toBe("Moderada"); // limite inferior Moderada
+    expect(classifyRecovery(12)).toBe("Baixa"); // cutoff clínico Cole 1999 (≤12 anormal)
     expect(classifyRecovery(11)).toBe("Baixa");
     expect(classifyRecovery(5)).toBe("Baixa");
     expect(classifyRecovery(0)).toBe("Baixa");

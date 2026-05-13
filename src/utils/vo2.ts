@@ -75,15 +75,15 @@ export function calcPercentFcMax(
  * Classificação da queda da FC em 1 minuto de recuperação pós-teste (HRR).
  *
  * Ponto de corte clínico de Cole 1999 NEJM: HRR ≤ 12 bpm em 1 min é
- * preditor independente de mortalidade. Acima disso, faixas operacionais
- * derivadas de ACSM Guidelines + protocolo Fabrik pra orientar o coach
- * na progressão do programa:
+ * preditor independente de mortalidade. Por isso 12 cai em "Baixa"
+ * (zona crítica). Acima disso, faixas operacionais derivadas de ACSM
+ * Guidelines + protocolo Fabrik pra orientar o coach na progressão:
  *
  *  • ≥ 30 bpm → "Excelente"   (manter progressão atual)
  *  • 20–29 bpm → "Muito Boa"  (boa resposta autonômica)
- *  • 12–19 bpm → "Moderada"   (observar evolução nas próximas 4 semanas)
- *  • < 12 bpm  → "Baixa"      (investigar condicionamento/fatores
- *                              limitantes — flag clínico Cole 1999)
+ *  • 13–19 bpm → "Moderada"   (observar evolução nas próximas 4 semanas)
+ *  • ≤ 12 bpm  → "Baixa"      (cutoff anormal Cole 1999 — investigar
+ *                              condicionamento/fatores limitantes)
  *
  * @param dropBpm Queda da FC em 1 min (FC pico − FC após 1 min).
  * @returns Classificação textual.
@@ -92,7 +92,7 @@ export function classifyRecovery(dropBpm: number): RecoveryClassification {
   if (!Number.isFinite(dropBpm)) return "Indeterminada";
   if (dropBpm >= 30) return "Excelente";
   if (dropBpm >= 20) return "Muito Boa";
-  if (dropBpm >= 12) return "Moderada";
+  if (dropBpm > 12) return "Moderada";
   return "Baixa";
 }
 
