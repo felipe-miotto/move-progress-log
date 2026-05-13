@@ -422,8 +422,8 @@ describe("precision12QuestionnaireSchema — arrays rejeitam código inválido",
   });
 });
 
-describe("precision12QuestionnaireSchema — pain status condicional", () => {
-  it("pain_status=daily sem pain_movements/pain_location rejeita", () => {
+describe("precision12QuestionnaireSchema — pain status condicional (movements E location)", () => {
+  it("pain_status=daily sem nenhum dos dois (movements/location) rejeita", () => {
     const result = precision12QuestionnaireSchema.safeParse(
       validInput({
         pain_status: "daily",
@@ -432,34 +432,111 @@ describe("precision12QuestionnaireSchema — pain status condicional", () => {
       }),
     );
     expect(result.success).toBe(false);
+    if (!result.success) {
+      const paths = result.error.issues.map((i) => i.path.join("."));
+      expect(paths).toContain("pain_movements");
+      expect(paths).toContain("pain_location");
+    }
   });
 
-  it("pain_status=daily + pain_movements preenchido aceita", () => {
+  it("pain_status=daily só com movements (sem location) rejeita", () => {
     const result = precision12QuestionnaireSchema.safeParse(
       validInput({
         pain_status: "daily",
         pain_movements: ["squat_sit_stand"],
+        pain_location: undefined,
       }),
     );
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const paths = result.error.issues.map((i) => i.path.join("."));
+      expect(paths).toContain("pain_location");
+    }
   });
 
-  it("pain_status=daily + pain_location preenchido aceita", () => {
+  it("pain_status=daily só com location (sem movements) rejeita", () => {
     const result = precision12QuestionnaireSchema.safeParse(
       validInput({
-        pain_status: "during_training",
+        pain_status: "daily",
+        pain_movements: undefined,
+        pain_location: "Joelho direito ao agachar",
+      }),
+    );
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const paths = result.error.issues.map((i) => i.path.join("."));
+      expect(paths).toContain("pain_movements");
+    }
+  });
+
+  it("pain_status=daily com AMBOS movements + location aceita", () => {
+    const result = precision12QuestionnaireSchema.safeParse(
+      validInput({
+        pain_status: "daily",
+        pain_movements: ["squat_sit_stand"],
         pain_location: "Joelho direito ao agachar",
       }),
     );
     expect(result.success).toBe(true);
   });
 
-  it("pain_status=none não exige nada", () => {
+  it("pain_status=during_training com AMBOS aceita", () => {
+    const result = precision12QuestionnaireSchema.safeParse(
+      validInput({
+        pain_status: "during_training",
+        pain_movements: ["push", "pull"],
+        pain_location: "Ombro esquerdo em exercícios overhead",
+      }),
+    );
+    expect(result.success).toBe(true);
+  });
+
+  it("pain_status=none não exige nenhum dos dois", () => {
     expect(
       precision12QuestionnaireSchema.safeParse(
         validInput({ pain_status: "none" }),
       ).success,
     ).toBe(true);
+  });
+});
+
+describe("precision12QuestionnaireSchema — `none` exclusivo em arrays multi", () => {
+  it("external_training_resources=['none'] aceita", () => {
+    expect(
+      precision12QuestionnaireSchema.safeParse(
+        validInput({ external_training_resources: ["none"] }),
+      ).success,
+    ).toBe(true);
+  });
+
+  it("external_training_resources=['none','outdoor'] rejeita", () => {
+    const result = precision12QuestionnaireSchema.safeParse(
+      validInput({ external_training_resources: ["none", "outdoor"] }),
+    );
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const paths = result.error.issues.map((i) => i.path.join("."));
+      expect(paths).toContain("external_training_resources");
+    }
+  });
+
+  it("recovery_strategies=['none'] aceita", () => {
+    expect(
+      precision12QuestionnaireSchema.safeParse(
+        validInput({ recovery_strategies: ["none"] }),
+      ).success,
+    ).toBe(true);
+  });
+
+  it("recovery_strategies=['none','sauna'] rejeita", () => {
+    const result = precision12QuestionnaireSchema.safeParse(
+      validInput({ recovery_strategies: ["none", "sauna"] }),
+    );
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const paths = result.error.issues.map((i) => i.path.join("."));
+      expect(paths).toContain("recovery_strategies");
+    }
   });
 });
 

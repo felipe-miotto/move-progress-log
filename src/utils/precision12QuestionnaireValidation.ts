@@ -365,18 +365,27 @@ export function buildPrecision12QuestionnaireSchema(
       });
     }
 
-    // Condicional 1 — pain_status → pain_movements/pain_location
+    // Condicional 1 — pain_status ≠ none → pain_movements (≥1) E pain_location (texto não vazio)
+    // Conforme spec docs/precision12_questionnaire_v1.md (Tela 5.2 e 5.3 são DEPENDENTES
+    // quando pain_status != none, exigindo as duas informações para o coach poder agir).
     if (
       (PAIN_STATUS_REQUIRES_DETAILS as readonly string[]).includes(data.pain_status)
     ) {
       const hasMovements =
         Array.isArray(data.pain_movements) && data.pain_movements.length > 0;
       const hasLocation = !!data.pain_location && data.pain_location.length > 0;
-      if (!hasMovements && !hasLocation) {
+      if (!hasMovements) {
         refinement.addIssue({
           code: "custom",
           path: ["pain_movements"],
-          message: "Informe pelo menos os movimentos ou o local da dor",
+          message: "Selecione pelo menos um movimento que causa dor",
+        });
+      }
+      if (!hasLocation) {
+        refinement.addIssue({
+          code: "custom",
+          path: ["pain_location"],
+          message: "Descreva o local da dor",
         });
       }
     }
@@ -405,6 +414,33 @@ export function buildPrecision12QuestionnaireSchema(
         code: "custom",
         path: ["wearable_brand"],
         message: "Informe qual dispositivo",
+      });
+    }
+
+    // Condicional 5 — `none` exclusivo em external_training_resources
+    // Se aluno marcou "Nenhum", não faz sentido marcar outras opções junto.
+    if (
+      Array.isArray(data.external_training_resources) &&
+      data.external_training_resources.includes("none") &&
+      data.external_training_resources.length > 1
+    ) {
+      refinement.addIssue({
+        code: "custom",
+        path: ["external_training_resources"],
+        message: "Se selecionar 'Nenhum', não marque outras opções",
+      });
+    }
+
+    // Condicional 6 — `none` exclusivo em recovery_strategies
+    if (
+      Array.isArray(data.recovery_strategies) &&
+      data.recovery_strategies.includes("none") &&
+      data.recovery_strategies.length > 1
+    ) {
+      refinement.addIssue({
+        code: "custom",
+        path: ["recovery_strategies"],
+        message: "Se selecionar 'Nenhuma', não marque outras opções",
       });
     }
   });

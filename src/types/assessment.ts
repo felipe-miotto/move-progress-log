@@ -386,9 +386,12 @@ export interface QuestionnaireResponses {
   // Bloco 5
   session_duration: string | null;
   weekly_frequency: number | null;
+  training_available_days: string[] | null;
   training_period: string | null;
   frequent_traveler: boolean | null;
+  external_training_resources: string[] | null;
   routine_description: string | null;
+  primary_adherence_barrier: string | null;
   // Bloco 6
   pain_status: string | null;
   pain_movements: string[] | null;
@@ -407,6 +410,9 @@ export interface QuestionnaireResponses {
   // Bloco 9
   has_medical_condition: boolean | null;
   medical_condition_details: string | null;
+  uses_medications: boolean | null;
+  medications_continuous: string | null;
+  injury_surgery_history: string | null;
   recovery_strategies: string[] | null;
   alcohol: string | null;
   tobacco: string | null;

@@ -12,9 +12,9 @@
  *   - Mudar code = bump questionnaire_version + migration de dados.
  *   - Append-only: adicionar nova opção a um enum existente é forward-compat.
  *
- * Não importar este arquivo em código que pode rodar no servidor sem React
- * (edge functions). Lá use os enums via cópia local — esses constants vivem
- * só no bundle do front-end.
+ * Edge functions devem validar com schema equivalente em
+ * `supabase/functions/_shared` ou outro módulo versionado.
+ * Não manter cópias divergentes sem teste de paridade.
  */
 
 import type { Database } from "@/integrations/supabase/types";

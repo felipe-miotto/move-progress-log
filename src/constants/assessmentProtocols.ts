@@ -148,7 +148,7 @@ export const ASSESSMENT_TYPE_METADATA = {
   questionnaire_precision12: {
     label: "Questionário Precision 12",
     category: "Anamnese",
-    short: "54 perguntas em 11 blocos",
+    short: "Questionário em 8 telas",
     application: "self_administered",
   },
 } as const satisfies Record<
