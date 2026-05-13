@@ -99,9 +99,25 @@ export interface Assessment {
   id: string;
   student_id: string;
   trainer_id: string | null;
+  /**
+   * LEGACY — espelha a coluna `professional_id` da tabela `assessments`
+   * herdada do módulo funcional anterior. Coexiste com `trainer_id`
+   * (canônico). Tornado nullable pela migration de hardening pré-E2
+   * (2026-05-13). Código novo do Precision 12 deve escrever apenas
+   * `trainer_id`; este campo fica disponível só pra leitura/compat.
+   */
+  professional_id: string | null;
   assessment_type: AssessmentType;
   assessment_date: string; // ISO date
   status: AssessmentStatus;
+  /**
+   * LEGACY — timestamps herdados do schema antigo, separados de
+   * `assessment_date` (a data do encontro presencial). Quase sempre
+   * preenchidos via DEFAULT, mantidos como compat. UI nova usa
+   * `assessment_date` + `status` pra fluxo.
+   */
+  started_at: string | null;
+  completed_at: string | null;
   age_years: number | null;
   weight_kg: number | null;
   height_cm: number | null;

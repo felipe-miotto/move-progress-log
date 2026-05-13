@@ -72,7 +72,7 @@ describe("calcPercentFcMax", () => {
   });
 });
 
-describe("classifyRecovery (Araújo 2012)", () => {
+describe("classifyRecovery (Cole 1999 NEJM + ACSM Guidelines)", () => {
   it("classifica nas 4 faixas oficiais", () => {
     expect(classifyRecovery(35)).toBe("Excelente"); // ≥ 30
     expect(classifyRecovery(30)).toBe("Excelente"); // limite inferior

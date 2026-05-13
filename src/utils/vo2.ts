@@ -9,9 +9,19 @@
  *    — FCmáx prevista = 208 − 0.7 × idade
  *  • ACSM Metabolic Calculations 2018
  *    — VO₂ bike = (10.8 × watts ÷ peso_kg) + 7
- *  • Araújo et al. 2012 (European Journal of Preventive Cardiology)
- *    — Recuperação da FC em 1 min: ≥30 Excelente · 20-29 Muito Boa ·
- *      12-19 Moderada · <12 Baixa
+ *  • Cole et al. 1999 (New England Journal of Medicine 341:1351-1357)
+ *    — Heart-rate recovery (HRR) imediatamente após exercício como
+ *      preditor de mortalidade. Estabeleceu HRR ≤ 12 bpm em 1 min como
+ *      ponto de corte anormal (risco aumentado de morte por qualquer
+ *      causa em 6 anos).
+ *  • ACSM Guidelines for Exercise Testing and Prescription, 10th ed.
+ *    — Faixas operacionais derivadas pra classificação clínica em
+ *      4 categorias (≥30 Excelente · 20-29 Muito Boa · 12-19 Moderada
+ *      · <12 Baixa) usadas como protocolo Fabrik.
+ *
+ * NOTA: Araújo et al. 2012 (European Journal of Preventive Cardiology)
+ * é fonte do Sit-to-Stand (SRT), NÃO do HRR. Citação incorreta foi
+ * corrigida no hardening pré-E2 após auditoria externa Codex.
  */
 
 /**
@@ -62,13 +72,18 @@ export function calcPercentFcMax(
 }
 
 /**
- * Classificação da queda da FC em 1 minuto de recuperação pós-teste.
+ * Classificação da queda da FC em 1 minuto de recuperação pós-teste (HRR).
  *
- * Faixas Araújo 2012:
- *  • ≥ 30 bpm → "Excelente"   (manter progressão)
+ * Ponto de corte clínico de Cole 1999 NEJM: HRR ≤ 12 bpm em 1 min é
+ * preditor independente de mortalidade. Acima disso, faixas operacionais
+ * derivadas de ACSM Guidelines + protocolo Fabrik pra orientar o coach
+ * na progressão do programa:
+ *
+ *  • ≥ 30 bpm → "Excelente"   (manter progressão atual)
  *  • 20–29 bpm → "Muito Boa"  (boa resposta autonômica)
- *  • 12–19 bpm → "Moderada"   (observar evolução)
- *  • < 12 bpm  → "Baixa"      (investigar condicionamento/fatores limitantes)
+ *  • 12–19 bpm → "Moderada"   (observar evolução nas próximas 4 semanas)
+ *  • < 12 bpm  → "Baixa"      (investigar condicionamento/fatores
+ *                              limitantes — flag clínico Cole 1999)
  *
  * @param dropBpm Queda da FC em 1 min (FC pico − FC após 1 min).
  * @returns Classificação textual.
