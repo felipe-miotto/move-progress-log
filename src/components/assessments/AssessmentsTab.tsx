@@ -4,15 +4,13 @@
  * Lista todas as avaliações do aluno, agrupadas/filtráveis por
  * categoria, com botão "Nova avaliação" abrindo o wizard.
  *
- * Detalhe drill-down (clicando numa linha) abre placeholder/snippet
- * por enquanto. Detail page completa vem em E6 (PDF Inicial) / E7
- * que reusam o mesmo hook useAssessment(id).
+ * Detalhe drill-down abre um painel read-only com os dados salvos.
  */
 
 import { useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Plus, Stethoscope } from "lucide-react";
+import { ChevronRight, Plus, Stethoscope } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,6 +22,7 @@ import { useAssessmentsByStudent } from "@/hooks/useAssessments";
 import type { Assessment, AssessmentType } from "@/types/assessment";
 
 import { CreateAssessmentWizard } from "./CreateAssessmentWizard";
+import { AssessmentDetailSheet } from "./AssessmentDetailSheet";
 
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -59,6 +58,7 @@ type CategoryFilter = (typeof ALL_CATEGORIES)[number];
 export const AssessmentsTab = ({ studentId, studentDefaults }: AssessmentsTabProps) => {
   const { data: assessments, isLoading } = useAssessmentsByStudent(studentId);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [selectedAssessmentId, setSelectedAssessmentId] = useState<string | null>(null);
   const [filter, setFilter] = useState<CategoryFilter>("all");
 
   const filtered = useMemo(() => {
@@ -181,31 +181,37 @@ export const AssessmentsTab = ({ studentId, studentDefaults }: AssessmentsTabPro
                   const meta =
                     ASSESSMENT_TYPE_METADATA[a.assessment_type as AssessmentType];
                   return (
-                    <Card
+                    <button
                       key={a.id}
-                      className="flex items-center justify-between gap-3 p-3"
+                      type="button"
+                      className="block w-full rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      onClick={() => setSelectedAssessmentId(a.id)}
+                      aria-label={`Abrir detalhes de ${meta?.label ?? a.assessment_type}`}
                     >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-sm truncate">
-                            {meta?.label ?? a.assessment_type}
-                          </span>
-                          <Badge variant="outline" className="text-[10px]">
-                            {meta?.category ?? "?"}
-                          </Badge>
+                      <Card className="flex cursor-pointer items-center justify-between gap-3 p-3 transition-colors hover:bg-muted/30">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm truncate">
+                              {meta?.label ?? a.assessment_type}
+                            </span>
+                            <Badge variant="outline" className="text-[10px]">
+                              {meta?.category ?? "?"}
+                            </Badge>
+                          </div>
+                          {a.notes && (
+                            <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                              {a.notes}
+                            </p>
+                          )}
                         </div>
-                        {a.notes && (
-                          <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                            {a.notes}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 text-xs">
-                        <Badge variant={STATUS_VARIANTS[a.status] ?? "outline"}>
-                          {STATUS_LABELS[a.status] ?? a.status}
-                        </Badge>
-                      </div>
-                    </Card>
+                        <div className="flex items-center gap-2 text-xs">
+                          <Badge variant={STATUS_VARIANTS[a.status] ?? "outline"}>
+                            {STATUS_LABELS[a.status] ?? a.status}
+                          </Badge>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </Card>
+                    </button>
                   );
                 })}
               </div>
@@ -219,6 +225,13 @@ export const AssessmentsTab = ({ studentId, studentDefaults }: AssessmentsTabPro
         onOpenChange={setWizardOpen}
         studentId={studentId}
         defaults={studentDefaults}
+      />
+      <AssessmentDetailSheet
+        assessmentId={selectedAssessmentId}
+        open={selectedAssessmentId !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedAssessmentId(null);
+        }}
       />
     </div>
   );

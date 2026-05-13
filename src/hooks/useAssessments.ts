@@ -28,6 +28,7 @@ import type {
   CardiovascularBaseline,
   DexaResults,
   HandgripResults,
+  QuestionnaireResponses,
   SitToStandResults,
   SubjectiveScores,
   Vo2AssessmentDetails,
@@ -77,6 +78,7 @@ export interface AssessmentWithChild {
   handgrip?: HandgripResults | null;
   dexa?: DexaResults | null;
   sit_to_stand?: SitToStandResults | null;
+  questionnaire?: QuestionnaireResponses | null;
   cardiovascular?: CardiovascularBaseline | null;
   subjective?: SubjectiveScores | null;
 }
@@ -179,6 +181,14 @@ export const useAssessment = (id: string | null) => {
           .maybeSingle();
         if (childError) throw childError;
         result.sit_to_stand = (data as unknown as SitToStandResults) ?? null;
+      } else if (type === "questionnaire_precision12") {
+        const { data, error: childError } = await supabase
+          .from("questionnaire_responses")
+          .select("*")
+          .eq("assessment_id", id)
+          .maybeSingle();
+        if (childError) throw childError;
+        result.questionnaire = (data as QuestionnaireResponses) ?? null;
       }
 
       const [{ data: cv, error: cvError }, { data: subj, error: subjError }] =
