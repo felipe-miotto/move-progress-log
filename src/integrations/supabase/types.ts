@@ -375,7 +375,7 @@ export type Database = {
           height_cm: number | null
           id: string
           notes: string | null
-          professional_id: string
+          professional_id: string | null
           sex: string | null
           started_at: string | null
           status: string
@@ -393,7 +393,7 @@ export type Database = {
           height_cm?: number | null
           id?: string
           notes?: string | null
-          professional_id: string
+          professional_id?: string | null
           sex?: string | null
           started_at?: string | null
           status?: string
@@ -411,7 +411,7 @@ export type Database = {
           height_cm?: number | null
           id?: string
           notes?: string | null
-          professional_id?: string
+          professional_id?: string | null
           sex?: string | null
           started_at?: string | null
           status?: string
