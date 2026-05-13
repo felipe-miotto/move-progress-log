@@ -288,25 +288,25 @@ describe("precision12QuestionnaireSchema — consentimento", () => {
   it("rejeita se algum dos 4 consents for false", () => {
     expect(
       precision12QuestionnaireSchema.safeParse(
-        validInput({ consent_truthful: false }),
+        validInput({ consent_truthful: false as unknown as true }),
       ).success,
     ).toBe(false);
 
     expect(
       precision12QuestionnaireSchema.safeParse(
-        validInput({ consent_not_medical: false }),
+        validInput({ consent_not_medical: false as unknown as true }),
       ).success,
     ).toBe(false);
 
     expect(
       precision12QuestionnaireSchema.safeParse(
-        validInput({ consent_data_use: false }),
+        validInput({ consent_data_use: false as unknown as true }),
       ).success,
     ).toBe(false);
 
     expect(
       precision12QuestionnaireSchema.safeParse(
-        validInput({ consent_terms: false }),
+        validInput({ consent_terms: false as unknown as true }),
       ).success,
     ).toBe(false);
   });

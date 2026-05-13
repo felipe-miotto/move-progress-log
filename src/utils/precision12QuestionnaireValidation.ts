@@ -96,7 +96,7 @@ const codeEnum = <T extends readonly [string, ...string[]]>(
   codes: T,
   msg = "Opção inválida",
 ) =>
-  z.enum(codes, { message: msg } as z.core.RawCreateParams);
+  z.enum(codes, { message: msg } as { message: string });
 
 /**
  * Array de codes únicos (rejeita duplicatas explicitamente).

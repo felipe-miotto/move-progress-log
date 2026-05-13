@@ -1529,6 +1529,60 @@ export type Database = {
           },
         ]
       }
+      precision12_questionnaire_links: {
+        Row: {
+          assessment_id: string
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          revoked_at: string | null
+          student_id: string
+          token_hash: string
+          trainer_id: string
+          used_at: string | null
+        }
+        Insert: {
+          assessment_id: string
+          created_at?: string
+          created_by?: string | null
+          expires_at: string
+          id?: string
+          revoked_at?: string | null
+          student_id: string
+          token_hash: string
+          trainer_id: string
+          used_at?: string | null
+        }
+        Update: {
+          assessment_id?: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          revoked_at?: string | null
+          student_id?: string
+          token_hash?: string
+          trainer_id?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "precision12_questionnaire_links_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "precision12_questionnaire_links_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       prescription_assignments: {
         Row: {
           created_at: string

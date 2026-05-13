@@ -321,7 +321,10 @@ export type PainStatusCode = (typeof PAIN_STATUS_CODES)[number];
  * (Pra usar no schema condicional do zod.)
  */
 export const PAIN_STATUS_REQUIRES_DETAILS = PAIN_STATUS_OPTIONS.filter(
-  (opt) => opt.meta?.requiresDetails === true,
+  (opt) =>
+    opt.meta != null &&
+    "requiresDetails" in opt.meta &&
+    opt.meta.requiresDetails === true,
 ).map((opt) => opt.code) as readonly PainStatusCode[];
 
 export const PAIN_MOVEMENT_OPTIONS = [
