@@ -129,6 +129,7 @@ export const NAV_LABELS = {
   tabSessions: "Sessões",
   tabExercises: "Exercícios",
   tabPrescriptions: "Prescrições",
+  tabAssessments: "Avaliações",
   tabOura: "Oura - Histórico",
   
   // Stats cards (Dashboard KPIs — operacionais)
