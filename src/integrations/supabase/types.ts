@@ -367,37 +367,58 @@ export type Database = {
       }
       assessments: {
         Row: {
+          age_years: number | null
+          assessment_date: string
+          assessment_type: string
           completed_at: string | null
           created_at: string
+          height_cm: number | null
           id: string
           notes: string | null
           professional_id: string
+          sex: string | null
           started_at: string | null
-          status: Database["public"]["Enums"]["assessment_status"]
+          status: string
           student_id: string
+          trainer_id: string | null
           updated_at: string
+          weight_kg: number | null
         }
         Insert: {
+          age_years?: number | null
+          assessment_date?: string
+          assessment_type: string
           completed_at?: string | null
           created_at?: string
+          height_cm?: number | null
           id?: string
           notes?: string | null
           professional_id: string
+          sex?: string | null
           started_at?: string | null
-          status?: Database["public"]["Enums"]["assessment_status"]
+          status?: string
           student_id: string
+          trainer_id?: string | null
           updated_at?: string
+          weight_kg?: number | null
         }
         Update: {
+          age_years?: number | null
+          assessment_date?: string
+          assessment_type?: string
           completed_at?: string | null
           created_at?: string
+          height_cm?: number | null
           id?: string
           notes?: string | null
           professional_id?: string
+          sex?: string | null
           started_at?: string | null
-          status?: Database["public"]["Enums"]["assessment_status"]
+          status?: string
           student_id?: string
+          trainer_id?: string | null
           updated_at?: string
+          weight_kg?: number | null
         }
         Relationships: [
           {
@@ -456,6 +477,133 @@ export type Database = {
           when_to_use?: string[] | null
         }
         Relationships: []
+      }
+      cardiovascular_baseline: {
+        Row: {
+          assessment_id: string
+          classification: string | null
+          diastolic_mmhg: number | null
+          medication_details: string | null
+          on_medication: boolean | null
+          reference_doctor_contact: string | null
+          reference_doctor_name: string | null
+          resting_hr_bpm: number | null
+          systolic_mmhg: number | null
+        }
+        Insert: {
+          assessment_id: string
+          classification?: string | null
+          diastolic_mmhg?: number | null
+          medication_details?: string | null
+          on_medication?: boolean | null
+          reference_doctor_contact?: string | null
+          reference_doctor_name?: string | null
+          resting_hr_bpm?: number | null
+          systolic_mmhg?: number | null
+        }
+        Update: {
+          assessment_id?: string
+          classification?: string | null
+          diastolic_mmhg?: number | null
+          medication_details?: string | null
+          on_medication?: boolean | null
+          reference_doctor_contact?: string | null
+          reference_doctor_name?: string | null
+          resting_hr_bpm?: number | null
+          systolic_mmhg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cardiovascular_baseline_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: true
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dexa_results: {
+        Row: {
+          android_gynoid_ratio: number | null
+          appendicular_lean_mass_kg: number | null
+          assessment_id: string
+          bmr_harris_benedict_kcal: number | null
+          bmr_mifflin_stjeor_kcal: number | null
+          bone_density_z_score: number | null
+          bone_mass_kg: number | null
+          conclusion_text: string | null
+          extraction_confidence: number | null
+          extraction_method: string | null
+          fat_mass_kg: number | null
+          fat_pct: number | null
+          fat_percentile: number | null
+          fmi: number | null
+          imma_baumgartner: number | null
+          lean_mass_kg: number | null
+          raw_extracted_json: Json | null
+          regional_distribution: Json | null
+          scan_pdf_storage_path: string | null
+          scan_pdf_url: string | null
+          total_mass_kg: number | null
+          visceral_fat_g: number | null
+        }
+        Insert: {
+          android_gynoid_ratio?: number | null
+          appendicular_lean_mass_kg?: number | null
+          assessment_id: string
+          bmr_harris_benedict_kcal?: number | null
+          bmr_mifflin_stjeor_kcal?: number | null
+          bone_density_z_score?: number | null
+          bone_mass_kg?: number | null
+          conclusion_text?: string | null
+          extraction_confidence?: number | null
+          extraction_method?: string | null
+          fat_mass_kg?: number | null
+          fat_pct?: number | null
+          fat_percentile?: number | null
+          fmi?: number | null
+          imma_baumgartner?: number | null
+          lean_mass_kg?: number | null
+          raw_extracted_json?: Json | null
+          regional_distribution?: Json | null
+          scan_pdf_storage_path?: string | null
+          scan_pdf_url?: string | null
+          total_mass_kg?: number | null
+          visceral_fat_g?: number | null
+        }
+        Update: {
+          android_gynoid_ratio?: number | null
+          appendicular_lean_mass_kg?: number | null
+          assessment_id?: string
+          bmr_harris_benedict_kcal?: number | null
+          bmr_mifflin_stjeor_kcal?: number | null
+          bone_density_z_score?: number | null
+          bone_mass_kg?: number | null
+          conclusion_text?: string | null
+          extraction_confidence?: number | null
+          extraction_method?: string | null
+          fat_mass_kg?: number | null
+          fat_pct?: number | null
+          fat_percentile?: number | null
+          fmi?: number | null
+          imma_baumgartner?: number | null
+          lean_mass_kg?: number | null
+          raw_extracted_json?: Json | null
+          regional_distribution?: Json | null
+          scan_pdf_storage_path?: string | null
+          scan_pdf_url?: string | null
+          total_mass_kg?: number | null
+          visceral_fat_g?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dexa_results_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: true
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       equipment_inventory: {
         Row: {
@@ -827,6 +975,80 @@ export type Database = {
           },
         ]
       }
+      handgrip_reference_ranges: {
+        Row: {
+          age_max: number
+          age_min: number
+          classification: string
+          id: string
+          kg_max: number
+          kg_min: number
+          sex: string
+          source: string | null
+        }
+        Insert: {
+          age_max: number
+          age_min: number
+          classification: string
+          id?: string
+          kg_max: number
+          kg_min: number
+          sex: string
+          source?: string | null
+        }
+        Update: {
+          age_max?: number
+          age_min?: number
+          classification?: string
+          id?: string
+          kg_max?: number
+          kg_min?: number
+          sex?: string
+          source?: string | null
+        }
+        Relationships: []
+      }
+      handgrip_results: {
+        Row: {
+          assessment_id: string
+          best_kg: number | null
+          classification: string | null
+          dominant_hand: string | null
+          left_kg: number | null
+          left_kg_attempts: number[] | null
+          right_kg: number | null
+          right_kg_attempts: number[] | null
+        }
+        Insert: {
+          assessment_id: string
+          best_kg?: number | null
+          classification?: string | null
+          dominant_hand?: string | null
+          left_kg?: number | null
+          left_kg_attempts?: number[] | null
+          right_kg?: number | null
+          right_kg_attempts?: number[] | null
+        }
+        Update: {
+          assessment_id?: string
+          best_kg?: number | null
+          classification?: string | null
+          dominant_hand?: string | null
+          left_kg?: number | null
+          left_kg_attempts?: number[] | null
+          right_kg?: number | null
+          right_kg_attempts?: number[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "handgrip_results_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: true
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       oura_acute_metrics: {
         Row: {
           created_at: string
@@ -1185,6 +1407,128 @@ export type Database = {
           },
         ]
       }
+      precision_reports: {
+        Row: {
+          ambitious_scenario: string | null
+          analyst_id: string | null
+          analyst_name: string | null
+          analyst_role: string | null
+          anchor_message: string | null
+          anchor_quote: string | null
+          bilateral_agreement_fabrik: Json | null
+          bilateral_agreement_student: Json | null
+          closing_message: string | null
+          cycle_number: number | null
+          generated_at: string | null
+          goal_calibration: string | null
+          goals_status: Json | null
+          id: string
+          lessons_learned: Json | null
+          monthly_journey: Json | null
+          next_cycle_priorities: Json | null
+          next_cycle_proposal: string | null
+          next_steps: Json | null
+          numbers_narrative: string | null
+          pdf_generated_at: string | null
+          pdf_storage_path: string | null
+          period_end: string | null
+          period_start: string | null
+          realistic_scenario: string | null
+          report_type: string
+          status: string | null
+          strategic_reading: string | null
+          student_id: string
+          student_quotes: Json | null
+          top_priorities: Json | null
+          total_cycles: number | null
+          week_number: number | null
+          what_improved: Json | null
+          what_needs_attention: Json | null
+        }
+        Insert: {
+          ambitious_scenario?: string | null
+          analyst_id?: string | null
+          analyst_name?: string | null
+          analyst_role?: string | null
+          anchor_message?: string | null
+          anchor_quote?: string | null
+          bilateral_agreement_fabrik?: Json | null
+          bilateral_agreement_student?: Json | null
+          closing_message?: string | null
+          cycle_number?: number | null
+          generated_at?: string | null
+          goal_calibration?: string | null
+          goals_status?: Json | null
+          id?: string
+          lessons_learned?: Json | null
+          monthly_journey?: Json | null
+          next_cycle_priorities?: Json | null
+          next_cycle_proposal?: string | null
+          next_steps?: Json | null
+          numbers_narrative?: string | null
+          pdf_generated_at?: string | null
+          pdf_storage_path?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          realistic_scenario?: string | null
+          report_type: string
+          status?: string | null
+          strategic_reading?: string | null
+          student_id: string
+          student_quotes?: Json | null
+          top_priorities?: Json | null
+          total_cycles?: number | null
+          week_number?: number | null
+          what_improved?: Json | null
+          what_needs_attention?: Json | null
+        }
+        Update: {
+          ambitious_scenario?: string | null
+          analyst_id?: string | null
+          analyst_name?: string | null
+          analyst_role?: string | null
+          anchor_message?: string | null
+          anchor_quote?: string | null
+          bilateral_agreement_fabrik?: Json | null
+          bilateral_agreement_student?: Json | null
+          closing_message?: string | null
+          cycle_number?: number | null
+          generated_at?: string | null
+          goal_calibration?: string | null
+          goals_status?: Json | null
+          id?: string
+          lessons_learned?: Json | null
+          monthly_journey?: Json | null
+          next_cycle_priorities?: Json | null
+          next_cycle_proposal?: string | null
+          next_steps?: Json | null
+          numbers_narrative?: string | null
+          pdf_generated_at?: string | null
+          pdf_storage_path?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          realistic_scenario?: string | null
+          report_type?: string
+          status?: string | null
+          strategic_reading?: string | null
+          student_id?: string
+          student_quotes?: Json | null
+          top_priorities?: Json | null
+          total_cycles?: number | null
+          week_number?: number | null
+          what_improved?: Json | null
+          what_needs_attention?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "precision_reports_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       prescription_assignments: {
         Row: {
           created_at: string
@@ -1488,6 +1832,212 @@ export type Database = {
           },
         ]
       }
+      questionnaire_responses: {
+        Row: {
+          accompaniment_preference: string | null
+          alcohol: string | null
+          assessment_id: string
+          biggest_difficulty: string[] | null
+          birthdate: string | null
+          body_satisfaction: number | null
+          caffeine_doses: string | null
+          consent_data_use: boolean | null
+          consent_not_medical: boolean | null
+          consent_terms: boolean | null
+          consent_truthful: boolean | null
+          consistency_self_rating: string | null
+          correction_preference: string | null
+          created_at: string | null
+          deal_breaker: string | null
+          difficulty_helper: string | null
+          discomfort_response: string | null
+          email: string | null
+          energy_level: number | null
+          exercise_history: string | null
+          firm_professional_response: string | null
+          fitness_self_rating: number | null
+          frequent_traveler: boolean | null
+          full_name: string | null
+          gender: string | null
+          goal_details: string | null
+          goals: string[] | null
+          has_medical_condition: boolean | null
+          life_stability: string | null
+          medical_condition_details: string | null
+          missed_session_response: string | null
+          motivations: string[] | null
+          pain_location: string | null
+          pain_movements: string[] | null
+          pain_status: string | null
+          parq_blocked: boolean | null
+          parq_q10_chest_pain_recent: boolean | null
+          parq_q11_loss_consciousness_or_dizziness_fall: boolean | null
+          parq_q12_bone_joint: boolean | null
+          parq_q13_blood_pressure_meds: boolean | null
+          parq_q14_other_health_reason: boolean | null
+          parq_q8_heart_condition: boolean | null
+          parq_q9_chest_pain_exercise: boolean | null
+          phone: string | null
+          previous_attempts: string | null
+          profession: string | null
+          questionnaire_version: string
+          recovery_quality: string | null
+          recovery_strategies: string[] | null
+          routine: string | null
+          routine_description: string | null
+          session_duration: string | null
+          share_data: boolean | null
+          sleep_hours: string | null
+          sleep_quality: number | null
+          stress_level: number | null
+          submitted_at: string | null
+          tobacco: string | null
+          training_period: string | null
+          updated_at: string | null
+          uses_wearable: boolean | null
+          wearable_brand: string | null
+          weekly_frequency: number | null
+        }
+        Insert: {
+          accompaniment_preference?: string | null
+          alcohol?: string | null
+          assessment_id: string
+          biggest_difficulty?: string[] | null
+          birthdate?: string | null
+          body_satisfaction?: number | null
+          caffeine_doses?: string | null
+          consent_data_use?: boolean | null
+          consent_not_medical?: boolean | null
+          consent_terms?: boolean | null
+          consent_truthful?: boolean | null
+          consistency_self_rating?: string | null
+          correction_preference?: string | null
+          created_at?: string | null
+          deal_breaker?: string | null
+          difficulty_helper?: string | null
+          discomfort_response?: string | null
+          email?: string | null
+          energy_level?: number | null
+          exercise_history?: string | null
+          firm_professional_response?: string | null
+          fitness_self_rating?: number | null
+          frequent_traveler?: boolean | null
+          full_name?: string | null
+          gender?: string | null
+          goal_details?: string | null
+          goals?: string[] | null
+          has_medical_condition?: boolean | null
+          life_stability?: string | null
+          medical_condition_details?: string | null
+          missed_session_response?: string | null
+          motivations?: string[] | null
+          pain_location?: string | null
+          pain_movements?: string[] | null
+          pain_status?: string | null
+          parq_blocked?: boolean | null
+          parq_q10_chest_pain_recent?: boolean | null
+          parq_q11_loss_consciousness_or_dizziness_fall?: boolean | null
+          parq_q12_bone_joint?: boolean | null
+          parq_q13_blood_pressure_meds?: boolean | null
+          parq_q14_other_health_reason?: boolean | null
+          parq_q8_heart_condition?: boolean | null
+          parq_q9_chest_pain_exercise?: boolean | null
+          phone?: string | null
+          previous_attempts?: string | null
+          profession?: string | null
+          questionnaire_version?: string
+          recovery_quality?: string | null
+          recovery_strategies?: string[] | null
+          routine?: string | null
+          routine_description?: string | null
+          session_duration?: string | null
+          share_data?: boolean | null
+          sleep_hours?: string | null
+          sleep_quality?: number | null
+          stress_level?: number | null
+          submitted_at?: string | null
+          tobacco?: string | null
+          training_period?: string | null
+          updated_at?: string | null
+          uses_wearable?: boolean | null
+          wearable_brand?: string | null
+          weekly_frequency?: number | null
+        }
+        Update: {
+          accompaniment_preference?: string | null
+          alcohol?: string | null
+          assessment_id?: string
+          biggest_difficulty?: string[] | null
+          birthdate?: string | null
+          body_satisfaction?: number | null
+          caffeine_doses?: string | null
+          consent_data_use?: boolean | null
+          consent_not_medical?: boolean | null
+          consent_terms?: boolean | null
+          consent_truthful?: boolean | null
+          consistency_self_rating?: string | null
+          correction_preference?: string | null
+          created_at?: string | null
+          deal_breaker?: string | null
+          difficulty_helper?: string | null
+          discomfort_response?: string | null
+          email?: string | null
+          energy_level?: number | null
+          exercise_history?: string | null
+          firm_professional_response?: string | null
+          fitness_self_rating?: number | null
+          frequent_traveler?: boolean | null
+          full_name?: string | null
+          gender?: string | null
+          goal_details?: string | null
+          goals?: string[] | null
+          has_medical_condition?: boolean | null
+          life_stability?: string | null
+          medical_condition_details?: string | null
+          missed_session_response?: string | null
+          motivations?: string[] | null
+          pain_location?: string | null
+          pain_movements?: string[] | null
+          pain_status?: string | null
+          parq_blocked?: boolean | null
+          parq_q10_chest_pain_recent?: boolean | null
+          parq_q11_loss_consciousness_or_dizziness_fall?: boolean | null
+          parq_q12_bone_joint?: boolean | null
+          parq_q13_blood_pressure_meds?: boolean | null
+          parq_q14_other_health_reason?: boolean | null
+          parq_q8_heart_condition?: boolean | null
+          parq_q9_chest_pain_exercise?: boolean | null
+          phone?: string | null
+          previous_attempts?: string | null
+          profession?: string | null
+          questionnaire_version?: string
+          recovery_quality?: string | null
+          recovery_strategies?: string[] | null
+          routine?: string | null
+          routine_description?: string | null
+          session_duration?: string | null
+          share_data?: boolean | null
+          sleep_hours?: string | null
+          sleep_quality?: number | null
+          stress_level?: number | null
+          submitted_at?: string | null
+          tobacco?: string | null
+          training_period?: string | null
+          updated_at?: string | null
+          uses_wearable?: boolean | null
+          wearable_brand?: string | null
+          weekly_frequency?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "questionnaire_responses_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: true
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rate_limit_attempts: {
         Row: {
           action: string
@@ -1777,6 +2327,136 @@ export type Database = {
         }
         Relationships: []
       }
+      sit_to_stand_reference_ranges: {
+        Row: {
+          age_max: number
+          age_min: number
+          classification: string
+          id: string
+          score_max: number
+          score_min: number
+          source: string | null
+        }
+        Insert: {
+          age_max: number
+          age_min: number
+          classification: string
+          id?: string
+          score_max: number
+          score_min: number
+          source?: string | null
+        }
+        Update: {
+          age_max?: number
+          age_min?: number
+          classification?: string
+          id?: string
+          score_max?: number
+          score_min?: number
+          source?: string | null
+        }
+        Relationships: []
+      }
+      sit_to_stand_results: {
+        Row: {
+          assessment_id: string
+          classification: string | null
+          notes: string | null
+          rise_instabilities: number | null
+          rise_score: number | null
+          rise_supports: Json | null
+          sit_instabilities: number | null
+          sit_score: number | null
+          sit_supports: Json | null
+          total_score: number | null
+        }
+        Insert: {
+          assessment_id: string
+          classification?: string | null
+          notes?: string | null
+          rise_instabilities?: number | null
+          rise_score?: number | null
+          rise_supports?: Json | null
+          sit_instabilities?: number | null
+          sit_score?: number | null
+          sit_supports?: Json | null
+          total_score?: number | null
+        }
+        Update: {
+          assessment_id?: string
+          classification?: string | null
+          notes?: string | null
+          rise_instabilities?: number | null
+          rise_score?: number | null
+          rise_supports?: Json | null
+          sit_instabilities?: number | null
+          sit_score?: number | null
+          sit_supports?: Json | null
+          total_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sit_to_stand_results_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: true
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_external_professionals: {
+        Row: {
+          added_at: string | null
+          contact_email: string | null
+          contact_phone: string | null
+          id: string
+          name: string
+          notes: string | null
+          organization: string | null
+          receives_reports: boolean | null
+          report_version_preference: string | null
+          role: string
+          specialty: string | null
+          student_id: string
+        }
+        Insert: {
+          added_at?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          organization?: string | null
+          receives_reports?: boolean | null
+          report_version_preference?: string | null
+          role: string
+          specialty?: string | null
+          student_id: string
+        }
+        Update: {
+          added_at?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          organization?: string | null
+          receives_reports?: boolean | null
+          report_version_preference?: string | null
+          role?: string
+          specialty?: string | null
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_external_professionals_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_invites: {
         Row: {
           created_at: string | null
@@ -1983,6 +2663,7 @@ export type Database = {
           created_at: string
           fitness_level: string | null
           height_cm: number | null
+          home_gym_name: string | null
           id: string
           injury_history: string | null
           limitations: string | null
@@ -1990,6 +2671,11 @@ export type Database = {
           name: string
           objectives: string[] | null
           preferences: string | null
+          program_ends_at: string | null
+          program_started_at: string | null
+          program_tier: string
+          sex: string | null
+          student_type: string
           trainer_id: string
           updated_at: string
           weekly_sessions_proposed: number | null
@@ -2001,6 +2687,7 @@ export type Database = {
           created_at?: string
           fitness_level?: string | null
           height_cm?: number | null
+          home_gym_name?: string | null
           id?: string
           injury_history?: string | null
           limitations?: string | null
@@ -2008,6 +2695,11 @@ export type Database = {
           name: string
           objectives?: string[] | null
           preferences?: string | null
+          program_ends_at?: string | null
+          program_started_at?: string | null
+          program_tier?: string
+          sex?: string | null
+          student_type?: string
           trainer_id: string
           updated_at?: string
           weekly_sessions_proposed?: number | null
@@ -2019,6 +2711,7 @@ export type Database = {
           created_at?: string
           fitness_level?: string | null
           height_cm?: number | null
+          home_gym_name?: string | null
           id?: string
           injury_history?: string | null
           limitations?: string | null
@@ -2026,12 +2719,77 @@ export type Database = {
           name?: string
           objectives?: string[] | null
           preferences?: string | null
+          program_ends_at?: string | null
+          program_started_at?: string | null
+          program_tier?: string
+          sex?: string | null
+          student_type?: string
           trainer_id?: string
           updated_at?: string
           weekly_sessions_proposed?: number | null
           weight_kg?: number | null
         }
         Relationships: []
+      }
+      subjective_scores: {
+        Row: {
+          assessment_id: string | null
+          created_at: string | null
+          energy_score: number | null
+          id: string
+          mood_score: number | null
+          notes: string | null
+          recorded_at: string
+          recovery_score: number | null
+          sleep_score: number | null
+          stress_score: number | null
+          student_id: string
+          wellbeing_score: number | null
+        }
+        Insert: {
+          assessment_id?: string | null
+          created_at?: string | null
+          energy_score?: number | null
+          id?: string
+          mood_score?: number | null
+          notes?: string | null
+          recorded_at?: string
+          recovery_score?: number | null
+          sleep_score?: number | null
+          stress_score?: number | null
+          student_id: string
+          wellbeing_score?: number | null
+        }
+        Update: {
+          assessment_id?: string | null
+          created_at?: string | null
+          energy_score?: number | null
+          id?: string
+          mood_score?: number | null
+          notes?: string | null
+          recorded_at?: string
+          recovery_score?: number | null
+          sleep_score?: number | null
+          stress_score?: number | null
+          student_id?: string
+          wellbeing_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subjective_scores_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subjective_scores_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       trainer_access_permissions: {
         Row: {
@@ -2102,6 +2860,151 @@ export type Database = {
         }
         Relationships: []
       }
+      vo2_assessment_details: {
+        Row: {
+          abort_reason: string | null
+          assessment_id: string
+          fc_max_predicted: number | null
+          fc_peak: number | null
+          final_incline_pct: number | null
+          final_speed_kmh: number | null
+          last_valid_load: number | null
+          last_valid_watts: number | null
+          protocol_name: string | null
+          recovery_classification: string | null
+          recovery_drop_1min: number | null
+          total_time_min: number | null
+          vo2_classification: string | null
+          vo2_final: number | null
+        }
+        Insert: {
+          abort_reason?: string | null
+          assessment_id: string
+          fc_max_predicted?: number | null
+          fc_peak?: number | null
+          final_incline_pct?: number | null
+          final_speed_kmh?: number | null
+          last_valid_load?: number | null
+          last_valid_watts?: number | null
+          protocol_name?: string | null
+          recovery_classification?: string | null
+          recovery_drop_1min?: number | null
+          total_time_min?: number | null
+          vo2_classification?: string | null
+          vo2_final?: number | null
+        }
+        Update: {
+          abort_reason?: string | null
+          assessment_id?: string
+          fc_max_predicted?: number | null
+          fc_peak?: number | null
+          final_incline_pct?: number | null
+          final_speed_kmh?: number | null
+          last_valid_load?: number | null
+          last_valid_watts?: number | null
+          protocol_name?: string | null
+          recovery_classification?: string | null
+          recovery_drop_1min?: number | null
+          total_time_min?: number | null
+          vo2_classification?: string | null
+          vo2_final?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vo2_assessment_details_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: true
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vo2_bike_stages: {
+        Row: {
+          assessment_id: string
+          hr_final: number | null
+          id: string
+          load_value: number | null
+          notes: string | null
+          phase: string | null
+          pse: number | null
+          rpm_target: string | null
+          stage_order: number
+          time_label: string | null
+          vo2_estimated: number | null
+          watts_observed: number | null
+        }
+        Insert: {
+          assessment_id: string
+          hr_final?: number | null
+          id?: string
+          load_value?: number | null
+          notes?: string | null
+          phase?: string | null
+          pse?: number | null
+          rpm_target?: string | null
+          stage_order: number
+          time_label?: string | null
+          vo2_estimated?: number | null
+          watts_observed?: number | null
+        }
+        Update: {
+          assessment_id?: string
+          hr_final?: number | null
+          id?: string
+          load_value?: number | null
+          notes?: string | null
+          phase?: string | null
+          pse?: number | null
+          rpm_target?: string | null
+          stage_order?: number
+          time_label?: string | null
+          vo2_estimated?: number | null
+          watts_observed?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vo2_bike_stages_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vo2_reference_ranges: {
+        Row: {
+          age_max: number
+          age_min: number
+          classification: string
+          id: string
+          sex: string
+          source: string | null
+          vo2_max: number
+          vo2_min: number
+        }
+        Insert: {
+          age_max: number
+          age_min: number
+          classification: string
+          id?: string
+          sex: string
+          source?: string | null
+          vo2_max: number
+          vo2_min: number
+        }
+        Update: {
+          age_max?: number
+          age_min?: number
+          classification?: string
+          id?: string
+          sex?: string
+          source?: string | null
+          vo2_max?: number
+          vo2_min?: number
+        }
+        Relationships: []
+      }
       workout_prescriptions: {
         Row: {
           created_at: string
@@ -2153,6 +3056,7 @@ export type Database = {
           date: string
           id: string
           is_finalized: boolean | null
+          modality: string | null
           prescription_id: string | null
           room_name: string | null
           session_type: string
@@ -2168,6 +3072,7 @@ export type Database = {
           date: string
           id?: string
           is_finalized?: boolean | null
+          modality?: string | null
           prescription_id?: string | null
           room_name?: string | null
           session_type: string
@@ -2183,6 +3088,7 @@ export type Database = {
           date?: string
           id?: string
           is_finalized?: boolean | null
+          modality?: string | null
           prescription_id?: string | null
           room_name?: string | null
           session_type?: string
@@ -2280,6 +3186,7 @@ export type Database = {
           date: string
           id: string
           is_finalized: boolean | null
+          modality: string | null
           prescription_id: string | null
           room_name: string | null
           session_type: string
@@ -2310,6 +3217,7 @@ export type Database = {
           date: string
           id: string
           is_finalized: boolean | null
+          modality: string | null
           prescription_id: string | null
           room_name: string | null
           session_type: string
