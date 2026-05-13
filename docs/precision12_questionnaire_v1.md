@@ -11,10 +11,24 @@
 ## 1. Resumo executivo
 
 - **Fonte original**: PDF `Questionário de Entrada — Fabrik Precision 12 - Google Formulários.pdf` (54 perguntas em 11 blocos).
-- **Versão final (este doc)**: **48 perguntas em 8 telas**, com 4 perguntas novas pedidas em revisão de produto.
-- **Schema destino**: tabela `public.questionnaire_responses` (criada em PR #113, ajustada em PRs #114-#118). Todos os campos referenciados aqui já existem **ou** são adicionados pela migration mínima descrita na Seção 9.
-- **Decisões clínicas aplicadas**: M/F binário, PAR-Q soft block (aluno completa, status do parent vira `blocked`), Q18 captura nível ACSM + atividade últimos 30 dias.
+- **Versão final (este doc)**: **60 itens em 8 telas**, distribuídos em **54 perguntas sempre visíveis + 6 perguntas condicionais**, gerando **63 campos persistidos** + 1 campo generated (`parq_blocked`) + 5 campos auto (`assessment_id`, `questionnaire_version`, `submitted_at`, `created_at`, `updated_at`).
+- **Schema destino**: tabela `public.questionnaire_responses` (criada em PR #113, ajustada em PRs #114-#118). A maior parte dos campos já existe; a Seção 9 lista os **6 campos novos** que requerem migration aditiva mínima.
+- **Decisões clínicas aplicadas**: M/F binário, PAR-Q soft block (aluno completa, status do parent vira `blocked`), Q18 captura nível de experiência de treino + atividade últimos 30 dias (triagem inspirada em pré-participação ACSM, mas **não é classificação clínica formal**).
 - **IA-ready**: toda resposta fechada salva como **código estável** em inglês snake_case, não como label PT. Labels visíveis vivem em `src/constants/precision12Questionnaire.ts` (front-end), facilmente intercambiáveis sem migration de dados.
+
+### Contagem detalhada
+
+| Categoria | Total |
+|---|---|
+| Itens visíveis ao aluno (sempre exibidos) | 54 |
+| Itens visíveis ao aluno (condicionais) | 6 |
+| **Total de perguntas no fluxo** | **60** |
+| Campos persistidos no banco | 63 |
+| Campos generated (`parq_blocked`) | 1 |
+| Campos auto (id, version, timestamps) | 5 |
+| **Campos novos requeridos por migration** | **6** |
+
+A diferença entre **60 itens visíveis** e **63 campos persistidos** vem da Tela 8 (consentimento): 1 pergunta visível agrupa 4 checkboxes obrigatórios, cada um persistido em coluna separada.
 
 ---
 
@@ -23,32 +37,38 @@
 | # | Decisão | Origem | Impacto |
 |---|---|---|---|
 | D1 | Sexo apenas `M` / `F` (não há "Outro" no form) | Alex 2026-05-13 | `gender` CHECK preservado |
-| D2 | Q18 = uma pergunta única que devolve `acsm_level` + `active_last_30_days` | Alex 2026-05-13 | derivação client-side a partir de `exercise_history` (6 códigos) |
+| D2 | Q18 = uma pergunta única que devolve `training_experience_level` + `active_last_30_days` | Alex 2026-05-13 (correção: removido nome "ACSM" para não confundir com classificação clínica formal) | derivação client-side a partir de `exercise_history` (6 códigos), inspirada em triagem de experiência/atividade |
 | D3 | PAR-Q **soft block** | Alex 2026-05-13 | aluno completa o form; status do `assessment` vira `blocked` se qualquer parq_q*=true |
 | D4 | PAR-Q positivo → `assessment.status = 'blocked'`. PAR-Q negativo + form completo → `status = 'completed'`. | Alex 2026-05-13 | edge function `submit-precision12-questionnaire` aplica regra |
-| D5 | Adicionar: lesão/cirurgia/restrição relevante | Alex 2026-05-13 | campo novo `injury_surgery_history text` (migration) |
-| D6 | Adicionar: dias viáveis de treino | Alex 2026-05-13 | reusa `weekly_frequency` (já existe int 1-7) com label refraseado |
+| D5 | Adicionar: lesão/cirurgia/restrição relevante (**sem limite temporal** — mesmo antiga, se ainda influenciar treino) | Alex 2026-05-13 (correção) | campo `injury_surgery_history text` (migration) |
+| D6 | Adicionar: **dias viáveis** de treino (quais dias da semana) — distinto de `weekly_frequency` (quantidade) | Alex 2026-05-13 (correção: campo novo, não reuso) | campo novo `training_available_days text[]` (migration) |
 | D7 | Adicionar: recursos fora da Fabrik | Alex 2026-05-13 | campo novo `external_training_resources text[]` (migration) |
 | D8 | Adicionar: barreira principal de adesão | Alex 2026-05-13 | campo novo `primary_adherence_barrier text` (migration) |
-| D9 | Pergunta de medicamentos contínuos: explícita | Alex 2026-05-13 | campo novo `medications_continuous text` (migration) |
+| D9 | Pergunta de medicamentos: **boolean explícito + texto condicional** | Alex 2026-05-13 (correção: persistir flag boolean além do texto) | campos novos `uses_medications boolean` + `medications_continuous text` (migration) |
 | D10 | Caminho de entrega = link mágico (padrão Oura) | PR #116 | edge function bypassa RLS via service role |
+| D11 | `birthdate` obrigatório no form **somente se** `students.birth_date IS NULL`; senão pré-preenchido e oculto | Alex 2026-05-13 (correção) | edge function valida invariante; UI esconde campo se já existe |
+| D12 | Whoop persiste como `'whoop'` (não `'other'`); `wearable_brand` enum: `oura` / `whoop` / `other` (reservado pra wearables futuros) | Alex 2026-05-13 (correção) | aplicado em Tela 7.2 |
 
 ---
 
 ## 3. Mapeamento 11 blocos PDF → 8 telas condensadas
 
-| Tela | Título exibido ao aluno | Blocos PDF cobertos | # perguntas | Tempo estimado |
-|---|---|---|---|---|
-| 1 | Boas-vindas + Identificação | 1 | 7 | ~1 min |
-| 2 | Triagem de segurança (PAR-Q) | 2 | 7 | ~1 min |
-| 3 | Objetivos e histórico | 3 + 4 | 6 (5 originais + 1 nova Q18 reformulada) | ~2 min |
-| 4 | Disponibilidade e recursos | 5 + nova | 7 (5 originais + 2 novas) | ~2 min |
-| 5 | Saúde, dor e medicação | 6 + 9 + novas | 11 (10 originais + 1 nova) | ~3 min |
-| 6 | Sono, recuperação e estresse | 7 | 5 | ~1 min |
-| 7 | Wearable + perfil comportamental | 8 + 10 + nova | 14 (13 originais + 1 nova) | ~3 min |
-| 8 | Consentimento | 11 | 1 (com 4 checks obrigatórios) | ~30 s |
+| Tela | Título exibido ao aluno | Blocos PDF cobertos | Itens (sempre + cond.) | Campos persistidos | Tempo estimado |
+|---|---|---|---|---|---|
+| 1 | Boas-vindas + Identificação | 1 | 7 + 0 = **7** | 7 | ~1 min |
+| 2 | Triagem de segurança (PAR-Q) | 2 | 7 + 0 = **7** | 7 (+ 1 generated) | ~1 min |
+| 3 | Objetivos e histórico | 3 + 4 | 6 + 0 = **6** | 6 | ~2 min |
+| 4 | Disponibilidade e recursos | 5 + novas (D6, D7, D8) | 8 + 0 = **8** | 8 | ~2 min |
+| 5 | Saúde, dor e medicação | 6 + 9 + novas (D5, D9) | 9 + 4 = **13** | 13 | ~3 min |
+| 6 | Sono, recuperação e estresse | 7 | 5 + 0 = **5** | 5 | ~1 min |
+| 7 | Wearable + perfil comportamental | 8 + 10 | 11 + 2 = **13** | 13 | ~3 min |
+| 8 | Consentimento | 11 | 1 + 0 = **1** | 4 (sub-checks) | ~30 s |
+| **Total** | — | — | **54 + 6 = 60** | **63** + 1 generated | **~13 min** |
 
-**Total**: 48 perguntas únicas (vs 54 originais — 6 condensadas, 0 removidas, 4 novas adicionadas). **Tempo médio**: ~13 minutos.
+**Mudanças vs PDF original**:
+- **0 perguntas removidas** (todas as 54 originais preservadas)
+- **6 perguntas convertidas em condicionais explícitas** (5.2, 5.3, 5.6, 5.8, 7.2, 7.3)
+- **6 perguntas/campos novos** adicionados conforme D5-D9 e correções: `training_available_days`, `external_training_resources`, `primary_adherence_barrier`, `uses_medications`, `medications_continuous`, `injury_surgery_history`
 
 ---
 
@@ -68,7 +88,7 @@
 | 1.1 | "Nome completo" | text | ✓ | — | `full_name` | citado no PDF inicial; dedup com `students.name` |
 | 1.2 | "E-mail" | text | ✓ | — | `email` | confirmação cadastro + envio PDF inicial |
 | 1.3 | "Telefone / WhatsApp" | text | ✓ | — | `phone` | canal de comunicação coach-aluno |
-| 1.4 | "Data de nascimento" | date | ◯ | — (dd/mm/aaaa) | `birthdate` | derivar idade pra ranges clínicos (Tanaka, ACSM) |
+| 1.4 | "Data de nascimento" | date | ✓ se ausente em `students.birth_date`; pré-preenchido e oculto caso contrário (D11) | — (dd/mm/aaaa) | `birthdate` | derivar idade pra ranges clínicos (Tanaka, ACSM) |
 | 1.5 | "Sexo biológico" | radio | ✓ | Masculino → `M` · Feminino → `F` | `gender` | lookups Mathiowetz/ACSM/handgrip/VO₂ |
 | 1.6 | "Profissão" | text | ◯ | — | `profession` | contexto qualitativo (rotina, estresse) |
 | 1.7 | "Como é sua rotina principal hoje?" | radio | ✓ | Trabalho majoritariamente sentado → `sedentary_work` · Trabalho com muita locomoção → `active_work` · Rotina mista → `mixed_routine` · Turnos variáveis → `variable_shifts` · Outro → `other` | `routine` | usado pra dimensionar dose inicial de treino |
@@ -96,8 +116,8 @@
 | 3.1 | "Quais são seus principais objetivos com este programa? (selecione até 2)" | checkbox (max 2) | ✓ | Reduzir gordura corporal → `reduce_body_fat` · Ganhar massa muscular → `gain_muscle` · Melhorar performance física → `improve_performance` · Melhorar mobilidade/flexibilidade → `improve_mobility` · Reduzir dores/desconfortos → `reduce_pain` · Melhorar saúde geral/longevidade → `improve_health_longevity` · Melhorar energia e recuperação → `improve_energy_recovery` · Outro → `other` | `goals` (text[]) | objetivos no PDF inicial + coach review |
 | 3.2 | "Descreva com mais detalhes o que você quer alcançar" | textarea | ◯ | — | `goal_details` | contexto qualitativo |
 | 3.3 | "Você já tentou alcançar esse objetivo antes? Se sim, o que funcionou ou não funcionou." | textarea | ◯ | — | `previous_attempts` | calibração coach (evitar erros passados) |
-| **3.4** | **"Como você descreve sua prática de exercícios HOJE?"** (Q18 reformulada — D2) | radio | ✓ | Nunca treinei com regularidade → `never_regular` · Já treinei, mas estou parado(a) há mais de 1 mês → `paused_over_1_month` · Estou voltando — treinando há menos de 1 mês → `returning_under_1_month` · Treino regularmente há 1 a 6 meses → `regular_1_to_6_months` · Treino regularmente há 6 meses a 2 anos → `regular_6_months_to_2_years` · Treino regularmente há mais de 2 anos → `regular_over_2_years` | `exercise_history` | **dupla derivação**: `acsm_level` (sedentary/transition/beginner/intermediate/advanced) + `active_last_30_days` (boolean) — ver Seção 7.1 |
-| 3.5 | "Como você avalia seu condicionamento físico atual?" | likert 1-5 | ✓ | 1 = Muito baixo … 5 = Muito alto | `fitness_self_rating` | benchmark vs ACSM derivado + Oura HRV |
+| **3.4** | **"Como você descreve sua prática de exercícios HOJE?"** (Q18 reformulada — D2) | radio | ✓ | Nunca treinei com regularidade → `never_regular` · Já treinei, mas estou parado(a) há mais de 1 mês → `paused_over_1_month` · Estou voltando — treinando há menos de 1 mês → `returning_under_1_month` · Treino regularmente há 1 a 6 meses → `regular_1_to_6_months` · Treino regularmente há 6 meses a 2 anos → `regular_6_months_to_2_years` · Treino regularmente há mais de 2 anos → `regular_over_2_years` | `exercise_history` | **dupla derivação**: `training_experience_level` (sedentary/transition/beginner/intermediate/advanced) + `active_last_30_days` (boolean) — ver Seção 7.1 |
+| 3.5 | "Como você avalia seu condicionamento físico atual?" | likert 1-5 | ✓ | 1 = Muito baixo … 5 = Muito alto | `fitness_self_rating` | benchmark subjetivo vs experiência declarada + Oura HRV |
 | 3.6 | "Como você avalia sua satisfação com seu corpo?" | likert 1-5 | ✓ | 1 = Muito insatisfeito … 5 = Muito satisfeito | `body_satisfaction` | calibração wording PDF (motivação intrínseca vs extrínseca) |
 
 ### Tela 4 — Disponibilidade e recursos
@@ -105,12 +125,13 @@
 | # | Texto exato | Tipo | Obr | Opções | Campo banco | Derivação IA |
 |---|---|---|---|---|---|---|
 | 4.1 | "Quanto tempo real você tem disponível para treinar por sessão?" | radio | ✓ | Menos de 30 min → `under_30` · 30 a 45 min → `30_to_45` · 45 a 60 min → `45_to_60` · Mais de 60 min → `over_60` | `session_duration` | dimensiona volume da prescrição |
-| 4.2 | "Quantas vezes por semana você consegue treinar de forma realista?" (D6) | radio | ✓ | 1 / 2 / 3 / 4 / 5 / 6 / 7 | `weekly_frequency` (int) | frequência base da prescrição |
-| 4.3 | "Em qual período do dia você tende a treinar?" | radio | ✓ | Manhã → `morning` · Tarde → `afternoon` · Noite → `evening` · Varia muito → `variable` | `training_period` | input pra cronotipo + dose Oura |
-| 4.4 | "Você viaja com frequência ou tem rotina instável?" | radio | ✓ | Sim/Não | `frequent_traveler` (boolean) | planejamento de protocolos portáteis |
-| **4.5** | **"Além da Fabrik, quais recursos de treino você tem disponíveis?"** (nova — D7) | checkbox | ◯ | Academia perto de casa → `gym_near_home` · Academia perto do trabalho → `gym_near_work` · Equipamento em casa (peso livre) → `home_free_weights` · Equipamento em casa (cardio) → `home_cardio` · Espaços ao ar livre → `outdoor` · Aplicativo de treino guiado → `guided_app` · Personal trainer particular → `external_trainer` · Nenhum → `none` · Outro → `other` | `external_training_resources` (text[], **novo**) | adapta protocolo pra contexto real do aluno |
-| 4.6 | "Descreva sua rotina atual de trabalho, família e horários" | textarea | ◯ | — | `routine_description` | contexto qualitativo |
-| **4.7** | **"Qual é a maior barreira que pode te tirar do programa?"** (nova — D8) | radio | ✓ | Falta de tempo → `time` · Falta de energia/cansaço → `energy_fatigue` · Falta de motivação → `motivation` · Dor ou desconforto → `pain_discomfort` · Falta de resultados visíveis → `lack_of_results` · Custo financeiro → `financial_cost` · Outro → `other` | `primary_adherence_barrier` (text, **novo**) | flag preventivo de churn no Coach Console (E4) |
+| 4.2 | "Quantas vezes por semana você consegue treinar de forma realista?" | radio | ✓ | 1 / 2 / 3 / 4 / 5 / 6 / 7 | `weekly_frequency` (int) | frequência base da prescrição (quantidade) |
+| **4.3** | **"Quais dias da semana você tem disponíveis para treinar?"** (nova — D6) | checkbox | ✓ (≥ 1) | Segunda → `monday` · Terça → `tuesday` · Quarta → `wednesday` · Quinta → `thursday` · Sexta → `friday` · Sábado → `saturday` · Domingo → `sunday` | `training_available_days` (text[], **novo**) | planejamento operacional real (distinto de 4.2 que é só quantidade) |
+| 4.4 | "Em qual período do dia você tende a treinar?" | radio | ✓ | Manhã → `morning` · Tarde → `afternoon` · Noite → `evening` · Varia muito → `variable` | `training_period` | input pra cronotipo + dose Oura |
+| 4.5 | "Você viaja com frequência ou tem rotina instável?" | radio | ✓ | Sim/Não | `frequent_traveler` (boolean) | planejamento de protocolos portáteis |
+| **4.6** | **"Além da Fabrik, quais recursos de treino você tem disponíveis?"** (nova — D7) | checkbox | ◯ | Academia perto de casa → `gym_near_home` · Academia perto do trabalho → `gym_near_work` · Equipamento em casa (peso livre) → `home_free_weights` · Equipamento em casa (cardio) → `home_cardio` · Espaços ao ar livre → `outdoor` · Aplicativo de treino guiado → `guided_app` · Personal trainer particular → `external_trainer` · Nenhum → `none` · Outro → `other` | `external_training_resources` (text[], **novo**) | adapta protocolo pra contexto real do aluno |
+| 4.7 | "Descreva sua rotina atual de trabalho, família e horários" | textarea | ◯ | — | `routine_description` | contexto qualitativo |
+| **4.8** | **"Qual é a maior barreira que pode te tirar do programa?"** (nova — D8) | radio | ✓ | Falta de tempo → `time` · Falta de energia/cansaço → `energy_fatigue` · Falta de motivação → `motivation` · Dor ou desconforto → `pain_discomfort` · Falta de resultados visíveis → `lack_of_results` · Custo financeiro → `financial_cost` · Outro → `other` | `primary_adherence_barrier` (text, **novo**) | flag preventivo de churn no Coach Console (E4) |
 
 ### Tela 5 — Saúde, dor e medicação
 
@@ -122,9 +143,9 @@
 | 5.4 | "Qual é sua maior dificuldade hoje em relação ao exercício?" | checkbox | ◯ | Falta de tempo → `time` · Falta de orientação personalizada → `lack_of_guidance` · Falta de motivação → `motivation` · Dor ou desconforto → `pain_discomfort` · Falta de resultados → `lack_of_results` · Outro → `other` | `biggest_difficulty` (text[]) | calibração coach (diferente de 4.7: aqui é diagnóstico passado, lá é risco futuro) |
 | 5.5 | "Você possui alguma doença, condição de saúde relevante ou recomendação médica que possa influenciar sua prática de exercícios?" | radio | ✓ | Sim/Não | `has_medical_condition` | sinaliza necessidade de pré-aprovação médica |
 | 5.6 | ⤷ "Se sim, descreva brevemente (condição e/ou restrição indicada pelo médico)" | textarea | ⤷ (se 5.5 = Sim) | — | `medical_condition_details` | contexto clínico pro coach |
-| **5.7** | **"Você faz uso contínuo de algum medicamento?"** (nova — D9) | radio | ✓ | Sim/Não | (derivado) `medications_continuous IS NOT NULL` | flag pra coach (interação medicamento × exercício) |
+| **5.7** | **"Você faz uso contínuo de algum medicamento?"** (nova — D9) | radio | ✓ | Sim/Não | `uses_medications` (boolean, **novo**) | flag explícito pra Coach Console / IA (interação medicamento × exercício) |
 | **5.8** | ⤷ **"Se sim, liste os medicamentos"** (nova — D9) | textarea | ⤷ (se 5.7 = Sim) | — | `medications_continuous` (text, **novo**) | input pro PDF técnico (versão médico) |
-| **5.9** | **"Você teve lesão, cirurgia ou restrição clínica relevante nos últimos 12 meses?"** (nova — D5) | textarea | ◯ | — (texto livre — se "Não" / "Nenhuma" / vazio = sem lesão) | `injury_surgery_history` (text, **novo**) | trigger pra revisão clínica adicional do coach |
+| **5.9** | **"Você já teve lesão, cirurgia ou restrição relevante, mesmo antiga, que ainda possa influenciar seu treino?"** (nova — D5, **sem limite temporal**) | textarea | ◯ | — (texto livre — se vazio / "Não" / "Nenhuma" = sem histórico relevante) | `injury_surgery_history` (text, **novo**) | trigger pra revisão clínica adicional do coach |
 | 5.10 | "Você pratica alguma estratégia de recuperação?" | checkbox | ◯ | Sauna → `sauna` · Imersão em gelo → `cold_plunge` · Exercícios de respiração → `breathing` · Meditação/mindfulness → `meditation` · Liberação miofascial → `myofascial_release` · Massagem → `massage` · Nenhuma → `none` · Outra → `other` | `recovery_strategies` (text[]) | identifica base do paciente; PDF inicial pode reforçar estratégias |
 | 5.11 | "Consumo de álcool" | radio | ◯ | Nunca → `never` · Ocasionalmente → `occasional` · Frequentemente → `frequent` | `alcohol` | risco metabólico/recuperação |
 | 5.12 | "Tabaco / vape" | radio | ◯ | Não uso → `none` · Cigarro → `cigarette` · Vape → `vape` · Ambos → `both` | `tobacco` | risco cardiovascular |
@@ -147,7 +168,7 @@
 | # | Texto exato | Tipo | Obr | Opções | Campo banco | Derivação IA |
 |---|---|---|---|---|---|---|
 | 7.1 | "Você utiliza algum dispositivo de monitoramento hoje?" | radio | ✓ | Sim/Não | `uses_wearable` (boolean) | gate pra 7.2/7.3 |
-| 7.2 | ⤷ "Qual dispositivo você utiliza?" | radio | ⤷ (se 7.1 = Sim) | Oura Ring → `oura` · Whoop → `whoop` · Outro → `other` | `wearable_brand` | Precision 12 só integra Oura no MVP; Whoop → fica como `other` registrado |
+| 7.2 | ⤷ "Qual dispositivo você utiliza?" | radio | ⤷ (se 7.1 = Sim) | Oura Ring → `oura` · Whoop → `whoop` · Outro → `other` | `wearable_brand` | Persistência fiel (D12): Oura → `'oura'`, Whoop → `'whoop'`. UI Oura connect só dispara se `wearable_brand = 'oura'`; Whoop é registrado pra contexto (integração futura), `other` reservado pra wearables fora desses 2. |
 | 7.3 | ⤷ "Você está disposto(a) a compartilhar esses dados com a Fabrik?" | radio | ⤷ (se 7.1 = Sim) | Sim/Não | `share_data` (boolean) | gate pra trigger do convite Oura connect |
 | 7.4 | "O que mais te motiva a treinar? (selecione até 2)" | checkbox (max 2) | ✓ | Saúde e longevidade → `health_longevity` · Performance e superação → `performance` · Estética → `aesthetics` · Controle do estresse / clareza mental → `mental_clarity` · Disciplina e rotina → `discipline_routine` | `motivations` (text[]) | wording do PDF inicial é calibrado por isso |
 | 7.5 | "Quando o desconforto físico aumenta durante o treino, você tende a:" | radio | ✓ | Evitar ao máximo → `avoid` · Aguentar se tiver um bom motivo → `endure_with_reason` · Gostar do desafio e buscar isso → `seek_challenge` | `discomfort_response` | input pra dose de intensidade |
@@ -173,8 +194,10 @@
    - SET `submitted_at = now()`
    - UPDATE `assessments` SET `status =` `'blocked'` (se `parq_blocked = true`) ou `'completed'` (caso contrário)
 3. Renderizar tela final:
-   - Se PAR-Q positivo: "⚠️ Identificamos uma resposta que requer avaliação prévia. Entre em contato com seu médico e, após liberação, retorne para concluir seu cadastro. A equipe Fabrik está à disposição."
-   - Se PAR-Q negativo: "✅ Suas respostas foram registradas. O coach Fabrik vai conferir e dar próximos passos."
+   - **Se PAR-Q positivo** (`parq_blocked = true`):
+     > "⚠️ Suas respostas indicam necessidade de revisão prévia antes de liberar ou ajustar o programa. A equipe Fabrik vai avaliar e orientar o próximo passo. Este questionário não substitui avaliação médica."
+   - **Se PAR-Q negativo**:
+     > "✅ Suas respostas foram registradas. O coach Fabrik vai conferir e dar próximos passos."
 
 ---
 
@@ -203,6 +226,9 @@ EXERCISE_HISTORY = [
 
 // Tela 4
 SESSION_DURATION = ["under_30", "30_to_45", "45_to_60", "over_60"] as const;
+TRAINING_AVAILABLE_DAYS = [
+  "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+] as const;
 TRAINING_PERIOD = ["morning", "afternoon", "evening", "variable"] as const;
 EXTERNAL_TRAINING_RESOURCES = [
   "gym_near_home", "gym_near_work", "home_free_weights", "home_cardio",
@@ -223,6 +249,7 @@ BIGGEST_DIFFICULTY = [
   "time", "lack_of_guidance", "motivation", "pain_discomfort",
   "lack_of_results", "other",
 ] as const;
+USES_MEDICATIONS = [true, false] as const;
 RECOVERY_STRATEGIES = [
   "sauna", "cold_plunge", "breathing", "meditation",
   "myofascial_release", "massage", "none", "other",
@@ -268,15 +295,17 @@ LIFE_STABILITY = ["stable_organized", "busy_controlled", "chaotic", "in_transiti
 
 ## 6. Lógica condicional
 
-Resumo das 6 dependências (todas implementadas client-side via watch do form):
+Resumo das **6 dependências** (todas implementadas client-side via watch do form, mais 1 não-condicional listada pra completude):
 
 | Pergunta gatilho | Valor que dispara | Perguntas dependentes |
 |---|---|---|
 | 5.1 (`pain_status`) | qualquer ≠ `none` | 5.2 `pain_movements` + 5.3 `pain_location` |
 | 5.5 (`has_medical_condition`) | `true` | 5.6 `medical_condition_details` |
 | 5.7 (`uses_medications`) | `true` | 5.8 `medications_continuous` |
-| 5.9 (`injury_surgery_history`) | (texto livre, sem condicional) | — |
 | 7.1 (`uses_wearable`) | `true` | 7.2 `wearable_brand` + 7.3 `share_data` |
+| — (5.9 sem gatilho) | textarea opcional sempre visível, sem condicional | — |
+
+**Total: 6 perguntas condicionais** (5.2, 5.3, 5.6, 5.8, 7.2, 7.3). Confere com a contagem da Seção 3.
 
 **PAR-Q (Tela 2)**: nenhuma condicional. Todas as 7 sempre aparecem. `parq_blocked` é calculado server-side via generated column.
 
@@ -284,17 +313,17 @@ Resumo das 6 dependências (todas implementadas client-side via watch do form):
 
 ## 7. Derivações para IA (client-side, não persistidas)
 
-### 7.1 ACSM level + active_last_30_days a partir de `exercise_history`
+### 7.1 Training experience level + active_last_30_days a partir de `exercise_history`
 
 ```ts
-type AcsmLevel =
+type TrainingExperienceLevel =
   | "sedentary"
   | "transition"          // voltando há <1 mês
   | "active_beginner"     // 1-6 meses regular
   | "active_intermediate" // 6m-2 anos regular
   | "active_advanced";    // >2 anos regular
 
-const HISTORY_TO_ACSM: Record<typeof EXERCISE_HISTORY[number], AcsmLevel> = {
+const HISTORY_TO_TRAINING_EXPERIENCE: Record<typeof EXERCISE_HISTORY[number], TrainingExperienceLevel> = {
   never_regular:              "sedentary",
   paused_over_1_month:        "sedentary",
   returning_under_1_month:    "transition",
@@ -314,6 +343,8 @@ const ACTIVE_LAST_30_DAYS: Record<typeof EXERCISE_HISTORY[number], boolean> = {
 ```
 
 **Não persistir** essas derivações no banco — elas são funções puras de `exercise_history`. Coach Console (E4) e PDF inicial (E6) recomputam em runtime.
+
+**Nota clínica**: esta derivação é uma classificação operacional Fabrik de experiência/atividade recente. Ela é inspirada em triagem pré-participação, mas **não deve ser apresentada como classificação clínica ACSM formal**.
 
 ### 7.2 PAR-Q derivado
 
@@ -357,10 +388,10 @@ Combinado com `firm_professional_response` (Tela 7.8) ajusta direção do tom (m
 | Q19 (auto-rating fitness) | Tela 3 (3.5) | mapeamento 1:1 |
 | Q20 (satisfação corpo) | Tela 3 (3.6) | mapeamento 1:1 |
 | Q21 (tempo sessão) | Tela 4 (4.1) | mapeamento 1:1 |
-| Q22 (freq semanal) | Tela 4 (4.2) | mapeamento 1:1 (D6 confirma reuso de `weekly_frequency`) |
-| Q23 (período treino) | Tela 4 (4.3) | mapeamento 1:1 |
-| Q24 (viajante) | Tela 4 (4.4) | mapeamento 1:1 |
-| Q25 (rotina trabalho/família) | Tela 4 (4.6) | mapeamento 1:1 |
+| Q22 (freq semanal) | Tela 4 (4.2) | mapeamento 1:1 (`weekly_frequency` = quantidade de dias) |
+| Q23 (período treino) | Tela 4 (4.4) | mapeamento 1:1 |
+| Q24 (viajante) | Tela 4 (4.5) | mapeamento 1:1 |
+| Q25 (rotina trabalho/família) | Tela 4 (4.7) | mapeamento 1:1 |
 | Q26 (dor atual) | Tela 5 (5.1) | mapeamento 1:1 |
 | Q27 (movimentos dor) | Tela 5 (5.2) | mapeamento 1:1 |
 | Q28 (local dor) | Tela 5 (5.3) | mapeamento 1:1 |
@@ -373,18 +404,20 @@ Combinado com `firm_professional_response` (Tela 7.8) ajusta direção do tom (m
 | Q44-Q53 (perfil comportamental) | Tela 7 (7.4-7.13) | mapeamento 1:1 |
 | Q54 (consentimento) | Tela 8 (8.1) | mapeamento 1:1 |
 
-**Conclusão**: nenhuma pergunta do PDF foi removida. Todas as 54 originais aparecem na spec final como 48 perguntas únicas — a redução vem de **agrupar enums condicionais** em 1 pergunta (ex: Q26/Q27/Q28 viraram bloco `pain_*` com lógica condicional explícita).
+**Conclusão**: nenhuma pergunta do PDF foi removida. Todas as 54 originais aparecem na spec final. A condensação é visual e estrutural: 11 blocos do PDF viram 8 telas, mas os sinais importantes continuam separados em campos estruturados.
 
 ### 8.2 Novas perguntas (Alex pediu)
 
 | # | Pergunta | Justificativa | Campo |
 |---|---|---|---|
-| 4.5 | "Recursos de treino fora da Fabrik" | D7 — adapta protocolo a contexto real | `external_training_resources` (text[], novo) |
-| 4.7 | "Maior barreira de adesão" | D8 — flag preventivo de churn no Coach Console | `primary_adherence_barrier` (text, novo) |
-| 5.7 + 5.8 | "Uso contínuo de medicamentos" | D9 — explícito (não derivar de 5.5) | `medications_continuous` (text, novo) |
-| 5.9 | "Lesão/cirurgia/restrição últimos 12 meses" | D5 — trigger de revisão clínica | `injury_surgery_history` (text, novo) |
+| 4.3 | "Dias disponíveis para treinar" | D6 — planejamento operacional real | `training_available_days` (text[], novo) |
+| 4.6 | "Recursos de treino fora da Fabrik" | D7 — adapta protocolo a contexto real | `external_training_resources` (text[], novo) |
+| 4.8 | "Maior barreira de adesão" | D8 — flag preventivo de churn no Coach Console | `primary_adherence_barrier` (text, novo) |
+| 5.7 | "Uso contínuo de medicamentos?" | D9 — flag explícito para IA/coach | `uses_medications` (boolean, novo) |
+| 5.8 | "Liste os medicamentos" | D9 — detalhe textual condicional | `medications_continuous` (text, novo) |
+| 5.9 | "Lesão/cirurgia/restrição relevante, mesmo antiga" | D5 — trigger de revisão clínica | `injury_surgery_history` (text, novo) |
 
-Total: **4 perguntas novas**, **4 campos novos** no schema.
+Total: **6 perguntas/campos novos** no schema.
 
 ---
 
@@ -394,8 +427,10 @@ Total: **4 perguntas novas**, **4 campos novos** no schema.
 
 | Campo | Tipo | Nullable | Padrão | Vem de |
 |---|---|---|---|---|
-| `external_training_resources` | `text[]` | sim | `null` | Tela 4.5 |
-| `primary_adherence_barrier` | `text` | sim | `null` | Tela 4.7 |
+| `training_available_days` | `text[]` | sim | `null` | Tela 4.3 |
+| `external_training_resources` | `text[]` | sim | `null` | Tela 4.6 |
+| `primary_adherence_barrier` | `text` | sim | `null` | Tela 4.8 |
+| `uses_medications` | `boolean` | sim | `null` | Tela 5.7 |
 | `medications_continuous` | `text` | sim | `null` | Tela 5.8 |
 | `injury_surgery_history` | `text` | sim | `null` | Tela 5.9 |
 
@@ -409,9 +444,9 @@ Todos **NULLABLE** porque o schema já tem dados legacy (3 questionários backfi
 
 2. **Compliance ground-truth (Section 9.6 memory)**: a fonte canônica do schema é `types.ts` regenerado pelo Lovable. Implementar contra `types.ts` desatualizado força regressão de auditoria.
 
-3. **Custo da migration**: ~30 linhas SQL, idempotente, zero risco (apenas `ADD COLUMN IF NOT EXISTS`).
+3. **Custo da migration**: baixo risco e idempotente (apenas `ADD COLUMN IF NOT EXISTS` + comments), mas exige regenerar `src/integrations/supabase/types.ts` e smoke após aplicação.
 
-4. **Bloqueia Etapa 3+ se não fizer**: edge function `submit-precision12-questionnaire` precisa dos 4 campos pra INSERT.
+4. **Bloqueia Etapa 3+ se não fizer**: edge function `submit-precision12-questionnaire` precisa dos 6 campos pra INSERT sem cast hack.
 
 **Proposta de timing**: Etapa 2 do E3 será a migration + regeneração types.ts. Etapas 3+ implementam edge functions + UI.
 
@@ -422,10 +457,16 @@ Todos **NULLABLE** porque o schema já tem dados legacy (3 questionários backfi
 -- supabase/migrations/<timestamp>_precision12_questionnaire_v1_fields.sql
 
 alter table public.questionnaire_responses
+  add column if not exists training_available_days text[];
+
+alter table public.questionnaire_responses
   add column if not exists external_training_resources text[];
 
 alter table public.questionnaire_responses
   add column if not exists primary_adherence_barrier text;
+
+alter table public.questionnaire_responses
+  add column if not exists uses_medications boolean;
 
 alter table public.questionnaire_responses
   add column if not exists medications_continuous text;
@@ -433,10 +474,12 @@ alter table public.questionnaire_responses
 alter table public.questionnaire_responses
   add column if not exists injury_surgery_history text;
 
+comment on column public.questionnaire_responses.training_available_days is 'Dias da semana disponíveis para treinar. Codes em precision12Questionnaire.TRAINING_AVAILABLE_DAYS.';
 comment on column public.questionnaire_responses.external_training_resources is 'Recursos de treino fora da Fabrik (academia, equipamento em casa, etc). Codes em precision12Questionnaire.EXTERNAL_TRAINING_RESOURCES.';
 comment on column public.questionnaire_responses.primary_adherence_barrier is 'Maior risco de tirar o aluno do programa. Codes em precision12Questionnaire.PRIMARY_ADHERENCE_BARRIER.';
+comment on column public.questionnaire_responses.uses_medications is 'Flag explícito de uso contínuo de medicamentos. Campo textual medications_continuous é obrigatório na UI quando true.';
 comment on column public.questionnaire_responses.medications_continuous is 'Medicamentos de uso continuo (texto livre, opcional). Existe independente de has_medical_condition.';
-comment on column public.questionnaire_responses.injury_surgery_history is 'Lesão / cirurgia / restrição clínica nos últimos 12 meses (texto livre, opcional).';
+comment on column public.questionnaire_responses.injury_surgery_history is 'Lesão / cirurgia / restrição clínica relevante, mesmo antiga, que ainda possa influenciar treino (texto livre, opcional).';
 ```
 
 ---
@@ -483,7 +526,7 @@ Próximas etapas planejadas (não executar agora — só listadas para clareza):
 | E3.5 | Edge function `submit-precision12-questionnaire` (valida token, escreve via service role, atualiza status do assessment) | ~3 h |
 | E3.6 | Página pública `/precision-questionnaire/[token]` com 8 telas + progresso + rascunho | ~5 h |
 | E3.7 | Wizard E2 atualizado: card "Questionário Precision 12" passa de disabled → "Gerar link" | ~1 h |
-| E3.8 | Detail Sheet renderiza respostas vinculadas (já parcialmente em PR #123 — adicionar layout legível das 48 respostas) | ~2 h |
+| E3.8 | Detail Sheet renderiza respostas vinculadas (já parcialmente em PR #123 — adicionar layout legível das 60 respostas/itens do fluxo) | ~2 h |
 | E3.9 | Testes + audit Codex + smoke | ~2 h |
 
 **Total estimado E3 completo**: ~17 horas (~1.5 dia útil).
@@ -506,4 +549,4 @@ Próximas etapas planejadas (não executar agora — só listadas para clareza):
 
 **GO.**
 
-Esta etapa entrega especificação congelada do questionário Precision 12 v1. Próxima etapa (E3.2) implementa a migration aditiva dos 4 campos novos identificados.
+Esta etapa entrega especificação congelada do questionário Precision 12 v1. Próxima etapa (E3.2) implementa a migration aditiva dos 6 campos novos identificados.
