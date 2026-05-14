@@ -102,20 +102,36 @@ export const QuestionnaireLinkPanel = ({
   }, [open]);
 
   const callCreate = async () => {
+    // Reissue: captura o assessmentId ANTES de trocar o estado pra "generating".
+    // Enviar assessment_id faz a edge function reusar o assessment existente e
+    // revogar o link ativo anterior. Sem isso, cada "Gerar novo link" cria um
+    // assessment órfão e o link antigo continua válido (bug E3.7.1).
+    const reissueAssessmentId =
+      state.kind === "generated" ? state.assessmentId : null;
+
     setState({ kind: "generating" });
     setCopied(false);
     try {
+      const body: {
+        student_id: string;
+        frontend_origin: string;
+        assessment_id?: string;
+      } = {
+        student_id: studentId,
+        // frontend_origin é opcional; edge usa PUBLIC_APP_URL se setado,
+        // senão valida origin do request — passar window.location.origin
+        // ajuda em previews lovable
+        frontend_origin: window.location.origin,
+      };
+
+      // Só no reissue: edge reusa o assessment e revoga o link anterior.
+      if (reissueAssessmentId) {
+        body.assessment_id = reissueAssessmentId;
+      }
+
       const { data, error } = await supabase.functions.invoke<CreateLinkResponse>(
         "create-precision12-questionnaire-link",
-        {
-          body: {
-            student_id: studentId,
-            // frontend_origin é opcional; edge usa PUBLIC_APP_URL se setado,
-            // senão valida origin do request — passar window.location.origin
-            // ajuda em previews lovable
-            frontend_origin: window.location.origin,
-          },
-        },
+        { body },
       );
 
       if (error || !data) {
