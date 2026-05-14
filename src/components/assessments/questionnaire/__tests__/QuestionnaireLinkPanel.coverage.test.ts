@@ -67,11 +67,18 @@ describe("E3.7 QuestionnaireLinkPanel — sanity", () => {
     expect(panelSource).toContain('"create-precision12-questionnaire-link"');
   });
 
-  it("não envia assessment_id no body (delega criação à edge)", () => {
-    // body deve conter student_id + frontend_origin; assessment_id é
-    // resolvido pela edge function (cria ou reusa).
+  it("envia assessment_id no body apenas no reissue (E3.7.1)", () => {
+    // 1ª geração: body só com student_id + frontend_origin — edge cria o
+    // assessment. Reissue (state.kind === "generated"): inclui assessment_id
+    // pra edge reusar o assessment e revogar o link anterior. Sem isso, cada
+    // "Gerar novo link" cria um assessment órfão e o link antigo segue válido.
     expect(panelSource).toContain("student_id: studentId");
-    expect(panelSource).not.toMatch(/body:\s*\{[^}]*assessment_id/s);
+    // Captura o assessmentId do estado generated antes de chamar a edge.
+    expect(panelSource).toMatch(
+      /state\.kind === "generated"\s*\?\s*state\.assessmentId\s*:\s*null/,
+    );
+    // assessment_id só é anexado ao body quando há reissue.
+    expect(panelSource).toContain("body.assessment_id = reissueAssessmentId");
   });
 
   it("invalida cache da lista de assessments após gerar", () => {
