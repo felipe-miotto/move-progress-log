@@ -38,6 +38,7 @@ const StudentOnboardingPage = lazy(() => import("./pages/StudentOnboardingPage")
 const OnboardingSuccessPage = lazy(() => import("./pages/OnboardingSuccessPage"));
 const OuraErrorPage = lazy(() => import("./pages/OuraErrorPage"));
 const OuraConnectPage = lazy(() => import("./pages/OuraConnectPage"));
+const PrecisionQuestionnairePage = lazy(() => import("./pages/PrecisionQuestionnairePage"));
 const LegalPage = lazy(() => import("./pages/LegalPage"));
 const AIBuilderPage = lazy(() => import("./features/ai-builder/AIBuilderPage"));
 const AthleteInsightsDashboard = lazy(() => import("./pages/AthleteInsightsDashboard"));
@@ -78,6 +79,7 @@ const App = () => {
                   <Route path={ROUTES.onboardingSuccess} element={<OnboardingSuccessPage />} />
                   <Route path={ROUTES.ouraError} element={<OuraErrorPage />} />
                   <Route path="/oura-connect/:token" element={<OuraConnectPage />} />
+                  <Route path="/precision-questionnaire/:token" element={<PrecisionQuestionnairePage />} />
                   <Route path={ROUTES.terms} element={<LegalPage variant="terms" />} />
                   <Route path={ROUTES.privacy} element={<LegalPage variant="privacy" />} />
                   <Route path={ROUTES.ouraConsent} element={<LegalPage variant="ouraConsent" />} />

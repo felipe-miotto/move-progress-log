@@ -19,6 +19,7 @@ export const ROUTES = {
   onboardingSuccess: "/onboarding/success",
   ouraError: "/onboarding/oura-error",
   ouraConnect: (token: string) => `/oura-connect/${token}`,
+  precisionQuestionnaire: (token: string) => `/precision-questionnaire/${token}`,
   terms: "/termos",
   privacy: "/privacidade",
   ouraConsent: "/oura-consentimento",
