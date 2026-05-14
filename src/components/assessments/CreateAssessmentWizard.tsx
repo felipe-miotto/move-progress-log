@@ -6,9 +6,10 @@
  *      VO₂ / Força / Composição / Funcional / Anamnese)
  *   2. Renderiza o form específico do tipo escolhido
  *
- * `questionnaire_precision12` aparece na lista mas com aviso "via link
- * mágico" — gera o link em vez de abrir form local. Edge function de E3
- * vai prover o gerador. Por enquanto, item desabilitado.
+ * `questionnaire_precision12` (Anamnese) NÃO abre form local — abre
+ * `QuestionnaireLinkPanel` que gera link mágico via edge function
+ * `create-precision12-questionnaire-link`. O aluno responde em
+ * `/precision-questionnaire/:token` (página pública, E3.6).
  *
  * O wizard não monta TODOS os forms na árvore — só renderiza o
  * selecionado (lazy via switch). Isso evita resetar inputs ao mudar
@@ -24,7 +25,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 import { ASSESSMENT_TYPE_METADATA } from "@/constants/assessmentProtocols";
@@ -35,6 +35,7 @@ import { HandgripForm } from "./HandgripForm";
 import { SitToStandForm } from "./SitToStandForm";
 import { Vo2BikeForm } from "./Vo2BikeForm";
 import { Vo2TreadmillForm } from "./Vo2TreadmillForm";
+import { QuestionnaireLinkPanel } from "./questionnaire/QuestionnaireLinkPanel";
 
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -112,9 +113,16 @@ export const CreateAssessmentWizard = ({
       case "sit_to_stand":
         return <SitToStandForm {...commonProps} />;
       case "questionnaire_precision12":
-        // Fallback: não deveria chegar aqui (item desabilitado no step 1)
-        setSelectedType(null);
-        return null;
+        // Não usa Form local — abre QuestionnaireLinkPanel que gera link
+        // mágico via edge function. Aluno responde em /precision-questionnaire/:token.
+        return (
+          <QuestionnaireLinkPanel
+            open
+            onOpenChange={handleClose}
+            studentId={studentId}
+            onCreated={handleCreated}
+          />
+        );
     }
   }
 
@@ -143,26 +151,16 @@ export const CreateAssessmentWizard = ({
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {types.map((type) => {
                     const meta = ASSESSMENT_TYPE_METADATA[type];
-                    const isQuestionnaire = type === "questionnaire_precision12";
-
                     return (
                       <Button
                         key={type}
                         type="button"
                         variant="outline"
-                        disabled={isQuestionnaire}
                         onClick={() => setSelectedType(type)}
                         className="h-auto flex-col items-start gap-1 px-3 py-2 text-left whitespace-normal"
                         aria-label={`Iniciar ${meta.label}`}
                       >
-                        <div className="flex w-full items-center justify-between gap-2">
-                          <span className="font-semibold text-sm">{meta.label}</span>
-                          {isQuestionnaire && (
-                            <Badge variant="secondary" className="text-[10px]">
-                              link mágico (E3)
-                            </Badge>
-                          )}
-                        </div>
+                        <span className="font-semibold text-sm">{meta.label}</span>
                         <p className="text-xs text-muted-foreground">{meta.short}</p>
                       </Button>
                     );
