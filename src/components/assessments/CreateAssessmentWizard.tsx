@@ -115,12 +115,15 @@ export const CreateAssessmentWizard = ({
       case "questionnaire_precision12":
         // Não usa Form local — abre QuestionnaireLinkPanel que gera link
         // mágico via edge function. Aluno responde em /precision-questionnaire/:token.
+        // IMPORTANTE: NÃO usar handleCreated aqui — fecharia o painel antes do
+        // coach conseguir copiar/visualizar o link. Apenas notifica o parent
+        // (invalida queries) e mantém o painel aberto até o coach fechar.
         return (
           <QuestionnaireLinkPanel
             open
             onOpenChange={handleClose}
             studentId={studentId}
-            onCreated={handleCreated}
+            onCreated={(id) => onCreated?.(id)}
           />
         );
     }
