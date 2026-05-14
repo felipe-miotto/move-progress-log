@@ -3406,6 +3406,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      submit_precision12_questionnaire_response: {
+        Args: { p_payload: Json; p_token_hash: string }
+        Returns: Json
+      }
       update_prescription_with_exercises: {
         Args: {
           p_exercises: Json

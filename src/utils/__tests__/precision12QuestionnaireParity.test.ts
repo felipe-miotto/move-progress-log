@@ -13,9 +13,13 @@
  * este teste. Mudanças válidas exigem update síncrono em ambos.
  */
 
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readFileSync } from "fs";
+import { dirname, resolve } from "path";
+import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 import {
   ACCOMPANIMENT_PREFERENCE_CODES,
