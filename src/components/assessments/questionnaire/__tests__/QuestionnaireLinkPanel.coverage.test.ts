@@ -113,3 +113,25 @@ describe("E3.7 QuestionnaireLinkPanel — sanity", () => {
     expect(panelSource).toContain("navigator.clipboard.writeText");
   });
 });
+
+// ────────────────────────────────────────────────────────────────────────────
+// Sanity da edge function create-precision12-questionnaire-link
+// ────────────────────────────────────────────────────────────────────────────
+
+const createLinkEdgePath = resolve(
+  __dirname,
+  "../../../../../supabase/functions/create-precision12-questionnaire-link/index.ts",
+);
+const createLinkEdgeSource = readFileSync(createLinkEdgePath, "utf-8");
+
+describe("create-precision12-questionnaire-link — reissue guard", () => {
+  it("reissue só permite assessment 'in_progress' (não blocked/completed/aborted)", () => {
+    // Regressão: 'blocked'/'completed' já têm questionnaire_responses (submit
+    // finalizado) — um link novo abriria mas o submit falharia depois como
+    // already_submitted. Só 'in_progress' é reemissível.
+    expect(createLinkEdgeSource).toMatch(
+      /REISSUABLE_STATUSES\s*=\s*new Set\(\["in_progress"\]\)/,
+    );
+    expect(createLinkEdgeSource).not.toContain('"in_progress", "blocked"');
+  });
+});

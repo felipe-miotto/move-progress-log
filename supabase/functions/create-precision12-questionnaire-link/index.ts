@@ -7,7 +7,7 @@
  *   1. Autentica caller (coach/trainer ou admin).
  *   2. Valida ownership do student (coach dono ou admin).
  *   3. Se `assessment_id` fornecido: valida que pertence ao student,
- *      assessment_type = `questionnaire_precision12`, status compatível.
+ *      assessment_type = `questionnaire_precision12`, status `in_progress`.
  *   4. Se não: cria parent `assessments` row com
  *      assessment_type='questionnaire_precision12', status='in_progress'.
  *   5. Gera token aleatório forte (32 bytes base64url). Persiste apenas
@@ -50,8 +50,14 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 const ASSESSMENT_TYPE = "questionnaire_precision12" as const;
 
-/** Status do assessment em que aceitamos (re)gerar link. */
-const REISSUABLE_STATUSES = new Set(["in_progress", "blocked"]);
+/**
+ * Status do assessment em que aceitamos (re)gerar link. Apenas `in_progress`:
+ * `blocked` e `completed` já têm `questionnaire_responses` (submit finalizado),
+ * então um link novo abriria mas o submit falharia depois como
+ * `already_submitted`; `aborted` não reabre. Reissue só faz sentido enquanto
+ * o questionário ainda não foi respondido.
+ */
+const REISSUABLE_STATUSES = new Set(["in_progress"]);
 
 // ────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -254,7 +260,7 @@ Deno.serve(async (req) => {
       if (!REISSUABLE_STATUSES.has(assessment.status)) {
         return jsonResponse(
           {
-            error: `Não é possível gerar link: status atual é '${assessment.status}'. Apenas 'in_progress' ou 'blocked' permitem reemissão.`,
+            error: `Não é possível gerar link: status atual é '${assessment.status}'. Apenas avaliações 'in_progress' permitem reemissão.`,
           },
           400,
         );
