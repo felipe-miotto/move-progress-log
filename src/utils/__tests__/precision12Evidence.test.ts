@@ -21,6 +21,7 @@ import {
   EVIDENCE_DOMAINS,
   EVIDENCE_DOMAIN_DISCLAIMER_KEYWORDS,
   EVIDENCE_PROHIBITED_TERMS,
+  EVIDENCE_SOURCE_CATALOG,
   PARQ_BLOCKED_COACH_ACTION_KEYWORDS,
   getClaimsByDomain,
   getEvidenceClaim,
@@ -262,6 +263,31 @@ describe("EVIDENCE_CATALOG", () => {
     }
   });
 
+  it("toda claim publicada tem >= 2 fontes robustas", () => {
+    for (const claim of EVIDENCE_CATALOG) {
+      expect(
+        claim.sources.length,
+        `${claim.domain}/${claim.classification} precisa de pelo menos 2 fontes`,
+      ).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it("nenhuma claim publicada usa URL genérica de homepage como fonte", () => {
+    const forbiddenUrls = new Set([
+      "https://www.acsm.org/",
+      "https://example.com",
+    ]);
+
+    for (const claim of EVIDENCE_CATALOG) {
+      for (const source of claim.sources) {
+        expect(
+          forbiddenUrls.has(source.url),
+          `${claim.domain}/${claim.classification} usa fonte genérica: ${source.url}`,
+        ).toBe(false);
+      }
+    }
+  });
+
   it("toda claim tem disclaimer não vazio", () => {
     for (const claim of EVIDENCE_CATALOG) {
       expect(claim.disclaimer.trim().length).toBeGreaterThan(0);
@@ -423,4 +449,108 @@ describe("E5.1 cobertura mínima — domínios obrigatórios", () => {
       expect(getClaimsByDomain(domain).length).toBeGreaterThan(0);
     });
   }
+});
+
+// ── 10. Catálogo de fontes — robustez bibliográfica ─────────────────────────
+
+describe("EVIDENCE_SOURCE_CATALOG — referências robustas por teste", () => {
+  const sourceEntries = Object.entries(EVIDENCE_SOURCE_CATALOG);
+
+  it("catálogo de fontes canônicas não está vazio", () => {
+    expect(sourceEntries.length).toBeGreaterThanOrEqual(20);
+  });
+
+  it("toda fonte canônica tem título, citação, URL pública e população/contexto", () => {
+    for (const [sourceId, source] of sourceEntries) {
+      expect(source.title, sourceId).toMatch(/\S/);
+      expect(source.citation, sourceId).toMatch(/\S/);
+      expect(source.population, sourceId).toMatch(/\S/);
+      expect(source.url, sourceId).toMatch(/^https?:\/\//);
+    }
+  });
+
+  it("nenhuma fonte canônica aponta para homepage genérica", () => {
+    const genericUrls = new Set([
+      "https://www.acsm.org/",
+      "https://example.com",
+    ]);
+
+    for (const [sourceId, source] of sourceEntries) {
+      expect(genericUrls.has(source.url), sourceId).toBe(false);
+    }
+  });
+
+  it("VO₂ combina referência populacional, desfecho real e diretriz de prescrição", () => {
+    const titles = getClaimsByDomain("vo2_max")
+      .flatMap((claim) => claim.sources.map((source) => source.title))
+      .join(" | ");
+
+    expect(titles).toContain("FRIEND");
+    expect(titles).toContain("All-Cause Mortality");
+    expect(titles).toContain("Quantity and Quality of Exercise");
+  });
+
+  it("FC recovery combina Cole, Nishime e Vivekananthan", () => {
+    const citations = getClaimsByDomain("fc_recovery_1min")
+      .flatMap((claim) => claim.sources.map((source) => source.citation))
+      .join(" | ");
+
+    expect(citations).toContain("Cole");
+    expect(citations).toContain("Nishime");
+    expect(citations).toContain("Vivekananthan");
+  });
+
+  it("handgrip combina norma populacional, desfecho e consenso clínico", () => {
+    const citations = getClaimsByDomain("handgrip")
+      .flatMap((claim) => claim.sources.map((source) => source.citation))
+      .join(" | ");
+
+    expect(citations).toContain("Mathiowetz");
+    expect(citations).toContain("Dodds");
+    expect(citations).toContain("Leong");
+  });
+
+  it("sit-to-stand combina estudo de mortalidade e scores de referência", () => {
+    const titles = getClaimsByDomain("sit_to_stand")
+      .flatMap((claim) => claim.sources.map((source) => source.title))
+      .join(" | ");
+
+    expect(titles).toContain("predictor of all-cause mortality");
+    expect(titles).toContain("Sex- and age-reference scores");
+  });
+
+  it("DEXA combina NHANES, composição corporal e posição ISCD", () => {
+    const citations = getClaimsByDomain("dexa")
+      .flatMap((claim) => claim.sources.map((source) => source.citation))
+      .join(" | ");
+
+    expect(citations).toContain("Kelly");
+    expect(citations).toContain("Gallagher");
+    expect(citations).toContain("Baumgartner");
+    expect(citations).toContain("International Society for Clinical Densitometry");
+  });
+
+  it("PAR-Q usa Warburton/Jamnik/Bredin e ACSM, não fonte genérica/mal nomeada", () => {
+    const citations = getClaimsByDomain("questionnaire_parq")
+      .flatMap((claim) => claim.sources.map((source) => source.citation))
+      .join(" | ");
+
+    expect(citations).toContain("Warburton");
+    expect(citations).toContain("Bredin");
+    expect(citations).toContain("Thompson");
+    expect(JSON.stringify(EVIDENCE_SOURCE_CATALOG)).not.toContain(
+      "PARQ_SHEPHARD_2015",
+    );
+  });
+
+  it("sono/estresse/energia/adesão tem uma fonte por construto", () => {
+    const citations = getClaimsByDomain("sleep_stress_energy_adherence")
+      .flatMap((claim) => claim.sources.map((source) => source.citation))
+      .join(" | ");
+
+    expect(citations).toContain("Watson");
+    expect(citations).toContain("Cohen");
+    expect(citations).toContain("Ryan");
+    expect(citations).toContain("Eynon");
+  });
 });

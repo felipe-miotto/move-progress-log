@@ -373,61 +373,191 @@ const ALL_PRINCIPLES_OK: EvidencePrinciples = {
   multidimensional: true,
 };
 
-const VO2_ACSM_2018: EvidenceSource = {
-  title:
-    "ACSM's Guidelines for Exercise Testing and Prescription, 10th edition",
-  citation: "American College of Sports Medicine, 2018",
-  url: "https://www.acsm.org/",
-  population: "Diretriz prática consolidada (referência multi-coorte)",
-};
+/**
+ * Catálogo canônico de fontes usadas pelas claims. Cada claim publicada deve
+ * combinar pelo menos uma fonte de referência/classificação com uma fonte de
+ * associação com desfecho real quando o domínio permitir.
+ */
+export const EVIDENCE_SOURCE_CATALOG = {
+  VO2_FRIEND_2022: {
+    title:
+      "Updated Reference Standards for Cardiorespiratory Fitness Measured with Cardiopulmonary Exercise Testing: Data from FRIEND",
+    citation: "Kaminsky LA et al., 2022, Mayo Clinic Proceedings",
+    url: "https://pubmed.ncbi.nlm.nih.gov/34809986/",
+    population:
+      "FRIEND Registry; percentis de VO₂pico por sexo, década e modalidade (esteira/bike)",
+  },
+  VO2_KODAMA_2009: {
+    title:
+      "Cardiorespiratory Fitness as a Quantitative Predictor of All-Cause Mortality and Cardiovascular Events",
+    citation: "Kodama S et al., 2009, JAMA",
+    url: "https://jamanetwork.com/journals/jama/fullarticle/1108396",
+    population:
+      "Meta-análise de coortes prospectivas; desfechos de mortalidade e eventos cardiovasculares",
+  },
+  EXERCISE_ACSM_GARBER_2011: {
+    title:
+      "Quantity and Quality of Exercise for Developing and Maintaining Cardiorespiratory, Musculoskeletal, and Neuromotor Fitness",
+    citation: "Garber CE et al., 2011, Medicine & Science in Sports & Exercise",
+    url: "https://pubmed.ncbi.nlm.nih.gov/21694556/",
+    population: "ACSM Position Stand para prescrição de exercício em adultos",
+  },
+  FC_RECOVERY_COLE_1999: {
+    title:
+      "Heart-rate recovery immediately after exercise as a predictor of mortality",
+    citation: "Cole CR et al., 1999, New England Journal of Medicine",
+    url: "https://pubmed.ncbi.nlm.nih.gov/10536127/",
+    population: "n=2.428 adultos, follow-up 6 anos",
+  },
+  FC_RECOVERY_NISHIME_2000: {
+    title:
+      "Heart Rate Recovery and Treadmill Exercise Score as Predictors of Mortality in Patients Referred for Exercise ECG",
+    citation: "Nishime EO et al., 2000, JAMA",
+    url: "https://jamanetwork.com/journals/jama/fullarticle/193090",
+    population: "coorte clínica; mortalidade e teste ergométrico",
+  },
+  FC_RECOVERY_VIVEKANANTHAN_2003: {
+    title:
+      "Heart rate recovery after exercise is a predictor of mortality, independent of angiographic severity of coronary disease",
+    citation: "Vivekananthan DP et al., 2003, Journal of the American College of Cardiology",
+    url: "https://pubmed.ncbi.nlm.nih.gov/12957428/",
+    population: "n=2.935 pacientes com angiografia; follow-up 6 anos",
+  },
+  HANDGRIP_MATHIOWETZ_1985: {
+    title: "Grip and pinch strength: normative data for adults",
+    citation: "Mathiowetz V et al., 1985, Archives of Physical Medicine and Rehabilitation",
+    url: "https://pubmed.ncbi.nlm.nih.gov/3970660/",
+    population: "638 adultos; normas por sexo, idade e mão",
+  },
+  HANDGRIP_DODDS_2014: {
+    title:
+      "Grip Strength across the Life Course: Normative Data from Twelve British Studies",
+    citation: "Dodds RM et al., 2014, PLOS ONE",
+    url: "https://journals.plos.org/plosone/doi?id=10.1371/journal.pone.0113637",
+    population: "12 estudos populacionais britânicos; idades 4 a 90+ anos",
+  },
+  HANDGRIP_LEONG_2015: {
+    title:
+      "Prognostic value of grip strength: findings from the Prospective Urban Rural Epidemiology (PURE) study",
+    citation: "Leong DP et al., 2015, The Lancet",
+    url: "https://pubmed.ncbi.nlm.nih.gov/25982160/",
+    population: "n=139.691 adultos, 17 países, 4 anos de seguimento",
+  },
+  HANDGRIP_EWGSOP2_2019: {
+    title: "Sarcopenia: revised European consensus on definition and diagnosis",
+    citation: "Cruz-Jentoft AJ et al., 2019, Age and Ageing",
+    url: "https://pubmed.ncbi.nlm.nih.gov/30312372/",
+    population: "Consenso europeu; força muscular como marcador central",
+  },
+  SIT_TO_STAND_ARAUJO_2012: {
+    title:
+      "Ability to sit and rise from the floor as a predictor of all-cause mortality",
+    citation:
+      "Brito LBB et al., 2012/2014, European Journal of Preventive Cardiology",
+    url: "https://journals.sagepub.com/doi/abs/10.1177/2047487312471759",
+    population: "n=2.002 adultos 51-80 anos, 6,3 anos de seguimento",
+  },
+  SIT_TO_STAND_ARAUJO_2020: {
+    title:
+      "Sitting-rising test: Sex- and age-reference scores derived from 6141 adults",
+    citation: "Araújo CGS et al., 2020, European Journal of Preventive Cardiology",
+    url: "https://journals.sagepub.com/doi/10.1177/2047487319847004",
+    population: "n=6.141 adultos; scores de referência por sexo e idade",
+  },
+  DEXA_KELLY_2009: {
+    title:
+      "Dual Energy X-Ray Absorptiometry Body Composition Reference Values from NHANES",
+    citation: "Kelly TL et al., 2009, PLOS ONE",
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC2737140/",
+    population: "NHANES 1999-2004; referência populacional por DXA",
+  },
+  DEXA_GALLAGHER_2000: {
+    title:
+      "Healthy percentage body fat ranges: an approach for developing guidelines based on body mass index",
+    citation: "Gallagher D et al., 2000, American Journal of Clinical Nutrition",
+    url: "https://www.sciencedirect.com/science/article/pii/S0002916523067606",
+    population: "faixas de % gordura por sexo/idade derivadas de referência BMI",
+  },
+  DEXA_BAUMGARTNER_1998: {
+    title: "Epidemiology of sarcopenia among the elderly in New Mexico",
+    citation: "Baumgartner RN et al., 1998, American Journal of Epidemiology",
+    url: "https://pubmed.ncbi.nlm.nih.gov/9554417/",
+    population: "cortes de massa muscular apendicular relativa à altura",
+  },
+  DEXA_ISCD_2013: {
+    title:
+      "The Official Positions of the International Society for Clinical Densitometry: acquisition of DXA body composition and repeatability",
+    citation: "International Society for Clinical Densitometry, 2013, Journal of Clinical Densitometry",
+    url: "https://pubmed.ncbi.nlm.nih.gov/24183641/",
+    population: "posicionamento oficial sobre aquisição/análise de composição por DXA",
+  },
+  PARQ_WARBURTON_2011: {
+    title:
+      "International launch of the PAR-Q+ and ePARmed-X+: The Physical Activity Readiness Questionnaire for Everyone",
+    citation: "Warburton DER, Jamnik VK, Bredin SSD, Gledhill N et al., 2011, Health & Fitness Journal of Canada",
+    url: "https://hfjc.library.ubc.ca/index.php/HFJC/article/download/103/66/323",
+    population: "instrumento internacional de triagem pré-participação",
+  },
+  PARQ_ACSM_THOMPSON_2013: {
+    title:
+      "ACSM's new preparticipation health screening recommendations from ACSM's Guidelines for Exercise Testing and Prescription",
+    citation: "Thompson PD et al., 2013, Current Sports Medicine Reports",
+    url: "https://pubmed.ncbi.nlm.nih.gov/23851406/",
+    population: "guideline ACSM para triagem pré-exercício",
+  },
+  SLEEP_AASM_SRS_2015: {
+    title:
+      "Recommended Amount of Sleep for a Healthy Adult: A Joint Consensus Statement of the AASM and Sleep Research Society",
+    citation: "Watson NF et al., 2015, Journal of Clinical Sleep Medicine",
+    url: "https://pubmed.ncbi.nlm.nih.gov/25979105/",
+    population: "consenso AASM/SRS para duração de sono em adultos",
+  },
+  STRESS_COHEN_1983: {
+    title: "A Global Measure of Perceived Stress",
+    citation: "Cohen S, Kamarck T, Mermelstein R, 1983, Journal of Health and Social Behavior",
+    url: "https://www.cmu.edu/dietrich/psychology/stress-immunity-disease-lab/publications/scalesmeasurements/pdfs/globalmeas83.pdf",
+    population: "desenvolvimento/validação da Perceived Stress Scale",
+  },
+  ENERGY_RYAN_1997: {
+    title:
+      "On energy, personality, and health: subjective vitality as a dynamic reflection of well-being",
+    citation: "Ryan RM, Frederick C, 1997, Journal of Personality",
+    url: "https://pubmed.ncbi.nlm.nih.gov/9327588/",
+    population: "seis estudos sobre vitalidade subjetiva, energia e bem-estar",
+  },
+  ADHERENCE_EYNON_2019: {
+    title:
+      "Assessing the psychosocial factors associated with adherence to exercise referral schemes: A systematic review",
+    citation: "Eynon M et al., 2019, Scandinavian Journal of Medicine & Science in Sports",
+    url: "https://pubmed.ncbi.nlm.nih.gov/30742334/",
+    population: "revisão sistemática; 24 estudos de adesão em programas de exercício",
+  },
+} as const satisfies Record<string, EvidenceSource>;
 
-const SIT_TO_STAND_ARAUJO_2012: EvidenceSource = {
-  title:
-    "Ability to sit and rise from the floor as a predictor of all-cause mortality",
-  citation:
-    "Araújo CG et al., 2012, European Journal of Preventive Cardiology",
-  url: "https://pubmed.ncbi.nlm.nih.gov/23242910/",
-  population: "n=2.002 adultos 51-80 anos, 6,3 anos de seguimento",
-};
-
-const HANDGRIP_LEONG_2015: EvidenceSource = {
-  title:
-    "Prognostic value of grip strength: findings from the Prospective Urban Rural Epidemiology (PURE) study",
-  citation: "Leong DP et al., 2015, The Lancet",
-  url: "https://pubmed.ncbi.nlm.nih.gov/25982160/",
-  population: "n=139.691 adultos, 17 países, 4 anos de seguimento",
-};
-
-const FC_RECOVERY_COLE_1999: EvidenceSource = {
-  title: "Heart-rate recovery immediately after exercise as a predictor of mortality",
-  citation: "Cole CR et al., 1999, New England Journal of Medicine",
-  url: "https://pubmed.ncbi.nlm.nih.gov/10536127/",
-  population: "n=2.428 adultos, follow-up 6 anos",
-};
-
-const DEXA_KELLY_2009: EvidenceSource = {
-  title:
-    "Dual energy X-Ray absorptiometry body composition reference values from NHANES",
-  citation: "Kelly TL et al., 2009, PLoS ONE",
-  url: "https://pubmed.ncbi.nlm.nih.gov/19649265/",
-  population: "n>20.000 adultos US (NHANES)",
-};
-
-const PARQ_SHEPHARD_2015: EvidenceSource = {
-  title:
-    "Physical Activity Readiness Questionnaire (PAR-Q+) and Electronic PARmed-X+",
-  citation: "Warburton DER, Bredin SSD et al., 2015, Health & Fitness Journal of Canada",
-  url: "https://hfjc.library.ubc.ca/index.php/HFJC/article/view/192",
-  population: "Diretriz internacional consolidada (validação multi-coorte)",
-};
-
-const ADHERENCE_BAILEY_2019: EvidenceSource = {
-  title:
-    "Sleep, recovery and barriers in adults starting structured exercise: a scoping review",
-  citation: "Bailey RR et al., 2019, BMC Public Health",
-  url: "https://pubmed.ncbi.nlm.nih.gov/31477085/",
-  population: "Revisão de escopo, múltiplas coortes",
-};
+const {
+  VO2_FRIEND_2022,
+  VO2_KODAMA_2009,
+  EXERCISE_ACSM_GARBER_2011,
+  FC_RECOVERY_COLE_1999,
+  FC_RECOVERY_NISHIME_2000,
+  FC_RECOVERY_VIVEKANANTHAN_2003,
+  HANDGRIP_MATHIOWETZ_1985,
+  HANDGRIP_DODDS_2014,
+  HANDGRIP_LEONG_2015,
+  HANDGRIP_EWGSOP2_2019,
+  SIT_TO_STAND_ARAUJO_2012,
+  SIT_TO_STAND_ARAUJO_2020,
+  DEXA_KELLY_2009,
+  DEXA_GALLAGHER_2000,
+  DEXA_BAUMGARTNER_1998,
+  DEXA_ISCD_2013,
+  PARQ_WARBURTON_2011,
+  PARQ_ACSM_THOMPSON_2013,
+  SLEEP_AASM_SRS_2015,
+  STRESS_COHEN_1983,
+  ENERGY_RYAN_1997,
+  ADHERENCE_EYNON_2019,
+} = EVIDENCE_SOURCE_CATALOG;
 
 /** Catálogo inicial. Ordem é apenas pra leitura humana; não é semântica. */
 export const EVIDENCE_CATALOG: readonly EvidenceClaim[] = [
@@ -440,11 +570,11 @@ export const EVIDENCE_CATALOG: readonly EvidenceClaim[] = [
     interpretation:
       "VO₂ máx na faixa Fraco pode estar associado a maior risco cardiometabólico e menor capacidade aeróbica funcional, considerando a idade/sexo do aluno.",
     evidenceSummary:
-      "Coortes consolidadas (ACSM 2018, baseadas em grandes amostras populacionais) mostram associação inversa entre VO₂ máx e mortalidade por todas as causas, com magnitude maior do que tabagismo e hipertensão.",
+      "FRIEND fornece referência contemporânea de VO₂pico por sexo/idade/modalidade; a meta-análise de Kodama et al. mostra associação inversa entre aptidão cardiorrespiratória e mortalidade/eventos cardiovasculares.",
     coachAction:
       "Considerar progressão estruturada em condicionamento aeróbico (zona 2 + alguns intervalados) e reavaliar em 12 semanas. Decisão de carga deve integrar o contexto do aluno e eventual acompanhamento clínico paralelo.",
     riskLanguageLevel: "watchful",
-    sources: [VO2_ACSM_2018],
+    sources: [VO2_FRIEND_2022, VO2_KODAMA_2009, EXERCISE_ACSM_GARBER_2011],
     disclaimer:
       "Faixas de referência são populacionais; o resultado individual deve ser integrado ao contexto de treino e ao acompanhamento clínico do aluno.",
     principles: ALL_PRINCIPLES_OK,
@@ -457,11 +587,11 @@ export const EVIDENCE_CATALOG: readonly EvidenceClaim[] = [
     interpretation:
       "VO₂ máx na faixa Bom sugere capacidade aeróbica adequada para a idade/sexo do aluno e está associado a menor risco cardiometabólico em coortes grandes.",
     evidenceSummary:
-      "Maior aptidão cardiorrespiratória sugere associação com menor mortalidade por todas as causas, conforme tabelas populacionais (ACSM 2018).",
+      "FRIEND contextualiza percentis de VO₂pico; evidência epidemiológica em meta-análise mostra que maior aptidão cardiorrespiratória se associa a menor mortalidade e menor risco cardiovascular.",
     coachAction:
       "Manter rotina aeróbica; pode-se trabalhar progressão de performance (limiares, economia de corrida/bike). Integrar com objetivos do aluno e contexto de treino.",
     riskLanguageLevel: "reassuring",
-    sources: [VO2_ACSM_2018],
+    sources: [VO2_FRIEND_2022, VO2_KODAMA_2009, EXERCISE_ACSM_GARBER_2011],
     disclaimer:
       "Mesmo com resultado favorável, manter acompanhamento periódico e reler dentro do contexto multidimensional do treino e do estilo de vida.",
     principles: ALL_PRINCIPLES_OK,
@@ -476,11 +606,15 @@ export const EVIDENCE_CATALOG: readonly EvidenceClaim[] = [
     interpretation:
       "Redução de FC ≤ 12 bpm no primeiro minuto após esforço pode estar associada a menor capacidade de recuperação autonômica e merece acompanhamento.",
     evidenceSummary:
-      "Cole et al. 1999 (NEJM) reportam associação entre recuperação reduzida de FC pós-exercício e maior mortalidade ao longo de 6 anos em coorte de 2.428 adultos.",
+      "Cole et al. e Nishime et al. mostram associação entre recuperação reduzida de FC no primeiro minuto e mortalidade; Vivekananthan et al. reforça a associação mesmo considerando gravidade angiográfica.",
     coachAction:
       "Reavaliar em sessões subsequentes para verificar consistência; integrar com hidratação, sono e contexto de carga recente antes de tirar conclusão.",
     riskLanguageLevel: "watchful",
-    sources: [FC_RECOVERY_COLE_1999],
+    sources: [
+      FC_RECOVERY_COLE_1999,
+      FC_RECOVERY_NISHIME_2000,
+      FC_RECOVERY_VIVEKANANTHAN_2003,
+    ],
     disclaimer:
       "Métrica isolada não fecha quadro — manter acompanhamento integrado com outras variáveis e com contexto clínico/treino.",
     principles: ALL_PRINCIPLES_OK,
@@ -495,11 +629,16 @@ export const EVIDENCE_CATALOG: readonly EvidenceClaim[] = [
     interpretation:
       "Handgrip na faixa Baixo para idade/sexo pode estar associado a maior risco cardiometabólico e funcional global. É marcador modificável.",
     evidenceSummary:
-      "PURE study (Leong et al. 2015, Lancet) sugere associação inversa entre força de preensão manual e mortalidade total + eventos cardiovasculares em 17 países.",
+      "Mathiowetz e Dodds fornecem dados normativos por idade/sexo; PURE sugere associação inversa entre força de preensão manual e mortalidade/eventos cardiovasculares em 17 países.",
     coachAction:
       "Inserir trabalho de força global e acompanhamento de adesão; reavaliar handgrip em 8-12 semanas. Discutir nutrição (proteína adequada) com profissional habilitado se relevante ao caso.",
     riskLanguageLevel: "watchful",
-    sources: [HANDGRIP_LEONG_2015],
+    sources: [
+      HANDGRIP_MATHIOWETZ_1985,
+      HANDGRIP_DODDS_2014,
+      HANDGRIP_LEONG_2015,
+      HANDGRIP_EWGSOP2_2019,
+    ],
     disclaimer:
       "Resultado deve ser interpretado em conjunto com outras métricas e com o acompanhamento de treino, não isolado.",
     principles: ALL_PRINCIPLES_OK,
@@ -512,11 +651,15 @@ export const EVIDENCE_CATALOG: readonly EvidenceClaim[] = [
     interpretation:
       "Handgrip na faixa Médio sugere força preservada para a referência populacional, sem sinais imediatos de alerta isolado.",
     evidenceSummary:
-      "Faixas medianas em coortes grandes (PURE 2015) estão associadas a perfis de risco mais favoráveis que extremos inferiores.",
+      "Dados normativos de Mathiowetz/Dodds contextualizam faixas médias por idade/sexo; PURE associa maior handgrip a perfil de risco mais favorável que extremos inferiores.",
     coachAction:
       "Manter rotina de força e reavaliar periodicamente. Integrar com objetivos individuais do aluno no treino.",
     riskLanguageLevel: "informational",
-    sources: [HANDGRIP_LEONG_2015],
+    sources: [
+      HANDGRIP_MATHIOWETZ_1985,
+      HANDGRIP_DODDS_2014,
+      HANDGRIP_LEONG_2015,
+    ],
     disclaimer:
       "Métrica pontual; manter acompanhamento periódico de treino e contexto integral.",
     principles: ALL_PRINCIPLES_OK,
@@ -531,11 +674,11 @@ export const EVIDENCE_CATALOG: readonly EvidenceClaim[] = [
     interpretation:
       "Score baixo (0–3) sugere perda combinada em força, mobilidade e equilíbrio. Indica necessidade de acompanhamento próximo, não diagnóstico.",
     evidenceSummary:
-      "Araújo et al. 2012 (Eur J Prev Cardiol) reportam associação entre score baixo e maior risco de mortalidade total em 6 anos de seguimento (n=2.002).",
+      "Brito/Araújo et al. reportam associação entre score baixo e maior mortalidade total; Araújo et al. 2020 fornece scores de referência por sexo e idade.",
     coachAction:
       "Trabalhar mobilidade de quadril/tornozelo, força de membros inferiores, core e equilíbrio. Reavaliar em 12 semanas; score é modificável mesmo após os 70 anos.",
     riskLanguageLevel: "watchful",
-    sources: [SIT_TO_STAND_ARAUJO_2012],
+    sources: [SIT_TO_STAND_ARAUJO_2012, SIT_TO_STAND_ARAUJO_2020],
     disclaimer:
       "Score deve ser integrado ao histórico do aluno e ao acompanhamento clínico/treino, não usado isoladamente.",
     principles: ALL_PRINCIPLES_OK,
@@ -548,11 +691,11 @@ export const EVIDENCE_CATALOG: readonly EvidenceClaim[] = [
     interpretation:
       "Score 8–10 sugere capacidade neuromuscular integrada preservada para a faixa etária, associada a perfis de risco mais favoráveis em estudos populacionais.",
     evidenceSummary:
-      "Araújo et al. 2012/2025 mostram associação entre score alto e maior expectativa de vida saudável em coortes grandes.",
+      "A coorte de Brito/Araújo associa scores mais altos a perfis de sobrevida mais favoráveis; a publicação de referência por sexo/idade ajuda a contextualizar o resultado individual.",
     coachAction:
       "Manter rotina e progressão funcional periódica. Continuar acompanhamento integral.",
     riskLanguageLevel: "reassuring",
-    sources: [SIT_TO_STAND_ARAUJO_2012],
+    sources: [SIT_TO_STAND_ARAUJO_2012, SIT_TO_STAND_ARAUJO_2020],
     disclaimer:
       "Resultado favorável; manter reavaliação periódica e acompanhamento do contexto integral do aluno.",
     principles: ALL_PRINCIPLES_OK,
@@ -567,11 +710,11 @@ export const EVIDENCE_CATALOG: readonly EvidenceClaim[] = [
     interpretation:
       "% de gordura corporal acima da referência para idade/sexo pode estar associada a maior risco cardiometabólico. Métrica é modificável com ajustes de treino + estilo de vida.",
     evidenceSummary:
-      "NHANES (Kelly 2009) consolidou tabelas de referência de composição corporal por DEXA em adultos.",
+      "NHANES/Kelly fornece valores de referência por DXA; Gallagher propõe faixas de % gordura por idade/sexo; ISCD orienta aquisição/análise e repetibilidade de medidas por DXA.",
     coachAction:
       "Integrar com VO₂, força, adesão e contexto nutricional; ajustar treino e, se aplicável, encaminhar a profissional de nutrição. Reavaliar DEXA em 4–6 meses.",
     riskLanguageLevel: "watchful",
-    sources: [DEXA_KELLY_2009],
+    sources: [DEXA_KELLY_2009, DEXA_GALLAGHER_2000, DEXA_ISCD_2013],
     disclaimer:
       "Este app interpreta o laudo DEXA para acompanhamento de performance e composição; NÃO substitui o laudo médico da clínica parceira nem avaliação clínica especializada.",
     principles: ALL_PRINCIPLES_OK,
@@ -584,11 +727,11 @@ export const EVIDENCE_CATALOG: readonly EvidenceClaim[] = [
     interpretation:
       "Massa magra apendicular relativa à altura abaixo dos cortes populacionais pode estar associada a maior risco funcional e de eventos adversos ao longo do tempo. Indicador modificável com treino de força + nutrição adequada.",
     evidenceSummary:
-      "Tabelas de referência NHANES (Kelly 2009) e cortes Baumgartner consolidam faixas de massa magra apendicular associadas a sinais funcionais.",
+      "NHANES/Kelly contextualiza massa magra por DXA; Baumgartner descreve ALM/altura² como índice populacional; ISCD orienta interpretação técnica e repetibilidade de DXA.",
     coachAction:
       "Estruturar protocolo de força progressiva e acompanhar adesão. Considerar encaminhamento para nutrição clínica se ingestão proteica/calórica for fator. Reavaliar em 4–6 meses.",
     riskLanguageLevel: "actionable",
-    sources: [DEXA_KELLY_2009],
+    sources: [DEXA_KELLY_2009, DEXA_BAUMGARTNER_1998, DEXA_ISCD_2013],
     disclaimer:
       "Este app interpreta o laudo DEXA para acompanhamento de performance e composição; NÃO substitui o laudo médico da clínica parceira nem avaliação clínica especializada.",
     principles: ALL_PRINCIPLES_OK,
@@ -603,11 +746,11 @@ export const EVIDENCE_CATALOG: readonly EvidenceClaim[] = [
     interpretation:
       "Aluno respondeu pelo menos uma pergunta do PAR-Q de forma que sugere necessidade de revisão clínica antes de liberar treino intenso.",
     evidenceSummary:
-      "PAR-Q+ é instrumento de triagem internacionalmente consolidado (Warburton & Bredin 2015) para identificar pessoas que devem ser avaliadas por profissional habilitado antes de iniciar atividade física vigorosa.",
+      "PAR-Q+ foi lançado como ferramenta internacional de triagem pré-participação; recomendações ACSM reforçam triagem pré-exercício baseada em risco e encaminhamento quando apropriado.",
     coachAction:
       "Revisar respostas do questionário com o aluno, encaminhar para acompanhamento clínico antes de prescrever treino vigoroso, e manter linhas de comunicação abertas com o profissional de saúde.",
     riskLanguageLevel: "actionable",
-    sources: [PARQ_SHEPHARD_2015],
+    sources: [PARQ_WARBURTON_2011, PARQ_ACSM_THOMPSON_2013],
     disclaimer:
       "PAR-Q é triagem operacional; NÃO substitui avaliação clínica nem laudo médico. Bloqueio significa apenas pausa precaucional para revisão profissional.",
     principles: ALL_PRINCIPLES_OK,
@@ -620,11 +763,11 @@ export const EVIDENCE_CATALOG: readonly EvidenceClaim[] = [
     interpretation:
       "Respostas do PAR-Q não acionaram critérios de pausa precaucional; treino pode prosseguir conforme planejamento, integrando contexto do aluno.",
     evidenceSummary:
-      "PAR-Q+ (Warburton & Bredin 2015) é triagem para identificar quem precisa de avaliação prévia; respostas negativas reduzem (não eliminam) a necessidade de avaliação clínica formal.",
+      "PAR-Q+ é triagem operacional para identificar necessidade de revisão prévia; recomendações ACSM apoiam triagem pré-exercício sem prometer eliminação completa de risco.",
     coachAction:
       "Prosseguir com a programação. Manter reavaliação periódica do questionário em ciclos do programa.",
     riskLanguageLevel: "reassuring",
-    sources: [PARQ_SHEPHARD_2015],
+    sources: [PARQ_WARBURTON_2011, PARQ_ACSM_THOMPSON_2013],
     disclaimer:
       "PAR-Q é triagem operacional; NÃO substitui avaliação clínica. Manter atenção a eventuais mudanças de saúde durante o ciclo.",
     principles: ALL_PRINCIPLES_OK,
@@ -639,11 +782,16 @@ export const EVIDENCE_CATALOG: readonly EvidenceClaim[] = [
     interpretation:
       "Combinação de sono ruim, estresse alto, baixa energia e/ou barreiras autorrelatadas pode estar associada a menor adesão ao programa. Não indica diagnóstico — sinaliza necessidade de acompanhamento próximo.",
     evidenceSummary:
-      "Revisões de adesão a programas de exercício sugerem que sono, estresse percebido e barreiras autorrelatadas estão associados a abandono precoce em coortes diversas (Bailey 2019).",
+      "AASM/SRS contextualiza sono em adultos; Cohen fundamenta estresse percebido; Ryan/Frederick valida vitalidade subjetiva; Eynon et al. revisa fatores psicossociais associados à adesão em programas de exercício.",
     coachAction:
       "Conversar com o aluno sobre barreiras específicas, ajustar carga e frequência do plano, e considerar encaminhamento a profissional de saúde mental se houver indício pertinente. Reavaliar no próximo questionário do ciclo.",
     riskLanguageLevel: "watchful",
-    sources: [ADHERENCE_BAILEY_2019],
+    sources: [
+      SLEEP_AASM_SRS_2015,
+      STRESS_COHEN_1983,
+      ENERGY_RYAN_1997,
+      ADHERENCE_EYNON_2019,
+    ],
     disclaimer:
       "Risco de adesão é sinal operacional, não diagnóstico clínico — sempre integrar ao contexto integral do aluno e ao acompanhamento profissional adequado.",
     principles: ALL_PRINCIPLES_OK,
