@@ -7,10 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Brain, BarChart2, FileText, Send, Loader2 } from 'lucide-react';
+import { Brain, BarChart2, FileText, Send, Loader2, ClipboardList } from 'lucide-react';
 import { Label } from '@/components/ui/label';
+import { Precision12Console } from '@/components/precision12/Precision12Console';
 
-type Tab = 'coach' | 'analyst' | 'report';
+type Tab = 'coach' | 'analyst' | 'report' | 'precision12';
 
 export default function CoachConsole() {
   const [tab, setTab]             = useState<Tab>('coach');
@@ -70,9 +71,10 @@ export default function CoachConsole() {
   });
 
   const tabs: { id: Tab; label: string; icon: typeof Brain; color: string }[] = [
-    { id: 'coach',   label: 'AI Coach',    icon: Brain,    color: 'text-purple-500' },
-    { id: 'analyst', label: 'Analista',    icon: BarChart2, color: 'text-blue-500' },
-    { id: 'report',  label: 'Relatório',   icon: FileText,  color: 'text-green-500' },
+    { id: 'coach',       label: 'AI Coach',     icon: Brain,         color: 'text-purple-500' },
+    { id: 'analyst',     label: 'Analista',     icon: BarChart2,     color: 'text-blue-500' },
+    { id: 'report',      label: 'Relatório',    icon: FileText,      color: 'text-green-500' },
+    { id: 'precision12', label: 'Precision 12', icon: ClipboardList, color: 'text-rose-500' },
   ];
 
   const Output = ({ text, error }: { text: string; error?: Error | null }) => (
@@ -160,6 +162,8 @@ export default function CoachConsole() {
             </CardContent>
           </Card>
         )}
+
+        {tab === 'precision12' && <Precision12Console />}
       </div>
     </PageLayout>
   );
