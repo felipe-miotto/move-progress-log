@@ -14,6 +14,7 @@ import {
   DEFAULT_PRECISION12_FILTERS,
   PRECISION12_ASSESSMENTS_TAB,
   buildPrecision12StudentDeepLink,
+  canReissueQuestionnaireLink,
   categoryOf,
   countHiddenSmokeStudents,
   deriveActionQueue,
@@ -790,5 +791,89 @@ describe("buildPrecision12StudentDeepLink", () => {
     const url1 = buildPrecision12StudentDeepLink("s1", "a1");
     const url2 = buildPrecision12StudentDeepLink("s1", "a1");
     expect(url1).toBe(url2);
+  });
+});
+
+// ── 7. canReissueQuestionnaireLink (E4.4) ─────────────────────────────────────
+
+describe("canReissueQuestionnaireLink", () => {
+  function reissuableItem(overrides: Partial<ActionQueueItem> = {}): ActionQueueItem {
+    return {
+      priority: 2,
+      alertType: "questionnaire_pending",
+      studentId: "s1",
+      studentName: "Aluno Teste",
+      assessmentId: "a1",
+      assessmentType: "questionnaire_precision12",
+      status: "in_progress",
+      assessmentDate: "2026-05-01",
+      ...overrides,
+    };
+  }
+
+  it("true pra questionnaire_pending + in_progress + assessmentId presente", () => {
+    expect(canReissueQuestionnaireLink(reissuableItem())).toBe(true);
+  });
+
+  it("false pra parq_blocked (mesmo com assessmentId e tipo certos)", () => {
+    expect(
+      canReissueQuestionnaireLink(
+        reissuableItem({ alertType: "parq_blocked", status: "blocked" }),
+      ),
+    ).toBe(false);
+  });
+
+  it("false pra assessment_incomplete (não é questionário)", () => {
+    expect(
+      canReissueQuestionnaireLink(
+        reissuableItem({
+          alertType: "assessment_incomplete",
+          assessmentType: "dexa",
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("false pra adherence_risk (status completed)", () => {
+    expect(
+      canReissueQuestionnaireLink(
+        reissuableItem({ alertType: "adherence_risk", status: "completed" }),
+      ),
+    ).toBe(false);
+  });
+
+  it("false pra student_no_assessment (sem assessmentId)", () => {
+    expect(
+      canReissueQuestionnaireLink(
+        reissuableItem({
+          alertType: "student_no_assessment",
+          assessmentId: null,
+          assessmentType: null,
+          status: null,
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("false quando status não é in_progress (blocked, completed, aborted)", () => {
+    for (const status of ["blocked", "completed", "aborted"] as const) {
+      expect(
+        canReissueQuestionnaireLink(reissuableItem({ status })),
+      ).toBe(false);
+    }
+  });
+
+  it("false quando assessmentId é null (defensivo)", () => {
+    expect(
+      canReissueQuestionnaireLink(reissuableItem({ assessmentId: null })),
+    ).toBe(false);
+  });
+
+  it("false quando assessmentType não é questionnaire_precision12", () => {
+    expect(
+      canReissueQuestionnaireLink(
+        reissuableItem({ assessmentType: "handgrip" }),
+      ),
+    ).toBe(false);
   });
 });

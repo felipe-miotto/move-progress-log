@@ -615,3 +615,36 @@ export function buildPrecision12StudentDeepLink(
   if (assessmentId) params.set("assessmentId", assessmentId);
   return `/alunos/${studentId}?${params.toString()}`;
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// 7. Elegibilidade pra reissue de link de questionário (E4.4)
+//
+// Espelha o invariante server-side da edge function
+// `create-precision12-questionnaire-link`: `REISSUABLE_STATUSES =
+// {"in_progress"}` (PR #136). Quem é elegível no client:
+//
+//   - alertType === "questionnaire_pending"          (sinal da fila)
+//   - assessmentType === "questionnaire_precision12" (tipo certo)
+//   - status === "in_progress"                       (server topa)
+//   - assessmentId !== null                          (precisa pra reusar)
+//
+// `parq_blocked` (status `blocked`), `completed` e `aborted` ficam de fora —
+// o edge function recusa, e a UI também deve recusar pra não acender botão
+// que dá erro. Itens `student_no_assessment` também não, pois não há
+// assessment pra reemitir.
+// ────────────────────────────────────────────────────────────────────────────
+
+const QUESTIONNAIRE_ASSESSMENT_TYPE: AssessmentType = "questionnaire_precision12";
+
+/**
+ * Defesa em profundidade: a edge function já tem o guard correto, mas o
+ * client filtra antes de tentar pra não mostrar uma ação que vai falhar.
+ */
+export function canReissueQuestionnaireLink(item: ActionQueueItem): boolean {
+  return (
+    item.alertType === "questionnaire_pending" &&
+    item.assessmentType === QUESTIONNAIRE_ASSESSMENT_TYPE &&
+    item.status === "in_progress" &&
+    item.assessmentId !== null
+  );
+}

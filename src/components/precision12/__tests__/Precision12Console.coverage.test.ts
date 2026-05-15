@@ -25,6 +25,24 @@ const precision12ConsoleSource = readFileSync(precision12ConsolePath, "utf-8");
 const precision12FiltersPath = resolve(__dirname, "../Precision12Filters.tsx");
 const precision12FiltersSource = readFileSync(precision12FiltersPath, "utf-8");
 
+const precision12ActionQueuePath = resolve(
+  __dirname,
+  "../Precision12ActionQueue.tsx",
+);
+const precision12ActionQueueSource = readFileSync(
+  precision12ActionQueuePath,
+  "utf-8",
+);
+
+const precision12ReissueDialogPath = resolve(
+  __dirname,
+  "../Precision12ReissueLinkDialog.tsx",
+);
+const precision12ReissueDialogSource = readFileSync(
+  precision12ReissueDialogPath,
+  "utf-8",
+);
+
 describe("E4.2 CoachConsole — sanity", () => {
   it("registra a tab 'precision12' no type Tab", () => {
     expect(coachConsoleSource).toMatch(
@@ -157,5 +175,155 @@ describe("E4.3a Precision12Filters — sanity", () => {
     expect(precision12FiltersSource).toContain("onFiltersChange");
     expect(precision12FiltersSource).not.toContain("useMutation");
     expect(precision12FiltersSource).not.toContain("supabase");
+  });
+});
+
+describe("E4.4 Precision12ActionQueue — reissue UI integration", () => {
+  it("importa canReissueQuestionnaireLink + Precision12ReissueLinkDialog", () => {
+    expect(precision12ActionQueueSource).toContain(
+      "canReissueQuestionnaireLink",
+    );
+    expect(precision12ActionQueueSource).toContain(
+      'from "./Precision12ReissueLinkDialog"',
+    );
+  });
+
+  it("renderiza botão Reemitir link condicionado por canReissueQuestionnaireLink", () => {
+    expect(precision12ActionQueueSource).toMatch(
+      /canReissueQuestionnaireLink\(item\)/,
+    );
+    expect(precision12ActionQueueSource).toContain("Reemitir link");
+    // O botão só sai se `canReissue` for true.
+    expect(precision12ActionQueueSource).toMatch(
+      /canReissue\s*&&\s*item\.assessmentId\s*!==\s*null/,
+    );
+  });
+
+  it("o click do botão NÃO chama edge — só abre o dialog (setReissueTarget)", () => {
+    // A mutação só dispara dentro do dialog após confirmação. Aqui o
+    // onClick apenas seta o target, garantindo confirmação intermediária.
+    expect(precision12ActionQueueSource).toMatch(
+      /onClick=\{\s*\(\)\s*=>\s*\n?\s*setReissueTarget\(/,
+    );
+    expect(precision12ActionQueueSource).not.toContain("supabase.functions.invoke");
+    expect(precision12ActionQueueSource).not.toContain(".mutate(");
+  });
+
+  it("o dialog só monta quando há um target — close limpa o target", () => {
+    expect(precision12ActionQueueSource).toMatch(
+      /reissueTarget\s*&&\s*\(\s*\n?\s*<Precision12ReissueLinkDialog/,
+    );
+    expect(precision12ActionQueueSource).toMatch(/if\s*\(!open\)\s*setReissueTarget\(null\)/);
+  });
+
+  it("não introduz mutation direta de tabela (somente via dialog/edge)", () => {
+    expect(precision12ActionQueueSource).not.toMatch(
+      /supabase\.[a-z]+\.(insert|update|delete|upsert)/,
+    );
+    expect(precision12ActionQueueSource).not.toContain("useMutation");
+  });
+});
+
+describe("E4.4 Precision12ReissueLinkDialog — controlled mutation", () => {
+  it("chama exclusivamente a edge function create-precision12-questionnaire-link", () => {
+    expect(precision12ReissueDialogSource).toContain(
+      'supabase.functions.invoke<CreateLinkResponse>(\n        "create-precision12-questionnaire-link"',
+    );
+    // Nenhum acesso direto à tabela.
+    expect(precision12ReissueDialogSource).not.toMatch(
+      /supabase\.from\(/,
+    );
+    expect(precision12ReissueDialogSource).not.toMatch(
+      /supabase\.[a-z]+\.(insert|update|delete|upsert)/,
+    );
+    // Nenhuma RPC.
+    expect(precision12ReissueDialogSource).not.toMatch(/supabase\.rpc\(/);
+  });
+
+  it("envia assessment_id no body (modo reissue) + frontend_origin = window.location.origin", () => {
+    expect(precision12ReissueDialogSource).toContain("assessment_id: assessmentId");
+    expect(precision12ReissueDialogSource).toContain(
+      "frontend_origin: window.location.origin",
+    );
+  });
+
+  it("usa TanStack useMutation e invalida o cache do Coach Console no onSuccess", () => {
+    expect(precision12ReissueDialogSource).toContain("useMutation");
+    expect(precision12ReissueDialogSource).toMatch(
+      /queryKey:\s*\[\s*["']precision12["']\s*,\s*["']coach-console["']\s*\]/,
+    );
+    expect(precision12ReissueDialogSource).toMatch(
+      /queryKey:\s*\[\s*["']assessments["']\s*,\s*["']by-student["']\s*,\s*studentId\s*\]/,
+    );
+  });
+
+  it("exige confirmação explícita antes de chamar a edge (mutation.mutate dentro de handleConfirm)", () => {
+    expect(precision12ReissueDialogSource).toMatch(
+      /const handleConfirm = \(\)\s*=>\s*\{[\s\S]*?mutation\.mutate\(/,
+    );
+    // Microcopy obrigatória.
+    expect(precision12ReissueDialogSource).toContain(
+      "Gerar um novo link revoga o anterior. Deseja continuar?",
+    );
+    // Botão de confirmar tem aria-label específico — não é clique acidental.
+    expect(precision12ReissueDialogSource).toContain(
+      'aria-label="Confirmar reemissão do link"',
+    );
+  });
+
+  it("cancelar / fechar o dialog NÃO dispara a mutação", () => {
+    // handleClose nunca invoca a mutação; só chama onOpenChange(false).
+    expect(precision12ReissueDialogSource).toMatch(
+      /const handleClose = \(\)\s*=>\s*\{[\s\S]*?onOpenChange\(false\)/,
+    );
+    // O único call site de mutation.mutate é handleConfirm, NUNCA handleClose.
+    const mutateCalls = (
+      precision12ReissueDialogSource.match(/mutation\.mutate\(/g) ?? []
+    ).length;
+    expect(mutateCalls).toBe(1);
+  });
+
+  it("traduz erro server-side 'Apenas avaliações in_progress permitem reemissão'", () => {
+    expect(precision12ReissueDialogSource).toContain(
+      "Apenas avaliações 'in_progress' permitem reemissão.",
+    );
+    expect(precision12ReissueDialogSource).toContain(
+      "Este questionário não permite reemissão de link.",
+    );
+  });
+
+  it("não persiste token/invite_url em localStorage/sessionStorage", () => {
+    // Bloqueia chamadas REAIS de storage (comentários explicativos podem
+    // mencionar o nome — o que importa é não haver `setItem`/`getItem`).
+    expect(precision12ReissueDialogSource).not.toMatch(
+      /\blocalStorage\s*\.\s*(setItem|getItem|removeItem)\b/,
+    );
+    expect(precision12ReissueDialogSource).not.toMatch(
+      /\bsessionStorage\s*\.\s*(setItem|getItem|removeItem)\b/,
+    );
+    expect(precision12ReissueDialogSource).not.toMatch(
+      /\b(localStorage|sessionStorage)\s*\[/,
+    );
+  });
+
+  it("não loga invite_url/token em console", () => {
+    expect(precision12ReissueDialogSource).not.toMatch(/console\.(log|info|warn|error|debug)\([^)]*\b(invite|token|invite_url|inviteUrl)\b/);
+    // Defensivo extra: nenhum console.log em geral neste arquivo
+    // (telemetria deveria ir por toast, não console).
+    expect(precision12ReissueDialogSource).not.toMatch(/console\.log\(/);
+  });
+
+  it("não introduz mutation direta de tabela / RPC / migration / edge nova", () => {
+    expect(precision12ReissueDialogSource).not.toMatch(/supabase\.from\(/);
+    expect(precision12ReissueDialogSource).not.toMatch(/supabase\.rpc\(/);
+  });
+
+  it("oferece copiar + abrir em nova aba com noopener/noreferrer", () => {
+    expect(precision12ReissueDialogSource).toContain(
+      'navigator.clipboard.writeText',
+    );
+    expect(precision12ReissueDialogSource).toContain(
+      '"_blank", "noopener,noreferrer"',
+    );
   });
 });
