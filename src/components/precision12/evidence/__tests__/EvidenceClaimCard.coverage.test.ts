@@ -459,3 +459,34 @@ describe("E5.6a / M-7 Precision12EvidencePreview — campos não-mapeados", () =
     expect(previewSource).toContain("campos do questionário");
   });
 });
+
+// ── E5.6c — preview: âncora visual sem reintroduzir CardTitle ───────────────
+
+describe("E5.6c Precision12EvidencePreview — âncora visual no header", () => {
+  // Strip comentários pra não pegar menções históricas a CardTitle / Triagem.
+  const stripComments = (src: string) =>
+    src
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/[^\n]*\n/g, "")
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+  const codeOnly = stripComments(previewSource);
+
+  it("NÃO reintroduz <CardTitle> (mantém remoção do E5.6b/N-5)", () => {
+    expect(codeOnly).not.toMatch(/<CardTitle\b/);
+    expect(codeOnly).not.toMatch(/import\s*\{[^}]*\bCardTitle\b[^}]*\}/);
+  });
+
+  it("adiciona âncora visual discreta 'Triagem operacional' (não-heading)", () => {
+    // <span> estilizado, sem virar h2/h3/h4 etc. — preserva hierarquia
+    // semântica restaurada pelo E5.6b/N-5.
+    expect(codeOnly).toMatch(
+      /<span className="text-xs font-medium text-muted-foreground">\s*Triagem operacional\s*<\/span>/,
+    );
+  });
+
+  it("rotulamento acessível continua via aria-labelledby ao H3 da seção pai", () => {
+    expect(previewSource).toContain(
+      'aria-labelledby="precision12-evidence-preview-heading"',
+    );
+  });
+});

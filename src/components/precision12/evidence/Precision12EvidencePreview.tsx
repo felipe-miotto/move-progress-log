@@ -73,17 +73,22 @@ export function Precision12EvidencePreview({
       aria-labelledby="precision12-evidence-preview-heading"
     >
       {/*
-        E5.6b / N-5 — antes este header tinha <CardTitle> (H3) com o texto
-        "Evidência clínica-operacional · Preview", duplicando o H3 que a
-        seção pai no Console.tsx já renderiza ("Evidência clínica-
-        operacional (preview)"). Resultado: dois H3 adjacentes com mesmo
-        conceito, violando hierarquia semântica. Removido o CardTitle —
-        o Card agora é rotulado por `aria-labelledby` apontando ao H3 da
-        seção (id="precision12-evidence-preview-heading" definido no
-        Precision12Console). Mantém o badge de contagem e a microcopy.
+        E5.6b / N-5 — este header não usa heading próprio (chassi de Card
+        sem CardTitle) pra evitar duplicar o H3 que a seção pai já
+        renderiza no Console. O Card é rotulado por `aria-labelledby`
+        apontando ao H3 da seção (id="precision12-evidence-preview-heading"
+        definido no Precision12Console). Mantém o badge de contagem e a
+        microcopy.
+        E5.6c — adicionada uma âncora visual discreta ("Triagem
+        operacional") à esquerda do badge pra equilibrar o header. NÃO é
+        um heading semântico (é <span>); o rotulamento acessível continua
+        sendo o aria-labelledby acima.
       */}
       <CardHeader className="space-y-2 pb-3">
-        <div className="flex flex-wrap items-baseline justify-end gap-2">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <span className="text-xs font-medium text-muted-foreground">
+            Triagem operacional
+          </span>
           <Badge variant="outline" className="text-[10px]">
             {totalClaims} claim{totalClaims === 1 ? "" : "s"}
           </Badge>
