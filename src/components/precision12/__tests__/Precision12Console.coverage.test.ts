@@ -58,6 +58,16 @@ const revokeEdgePath = resolve(
 );
 const revokeEdgeSource = readFileSync(revokeEdgePath, "utf-8");
 
+// E5.6b — também referenciamos o preview pra validar heading hierarchy.
+const precision12EvidencePreviewPath = resolve(
+  __dirname,
+  "../evidence/Precision12EvidencePreview.tsx",
+);
+const precision12EvidencePreviewSource = readFileSync(
+  precision12EvidencePreviewPath,
+  "utf-8",
+);
+
 describe("E4.2 CoachConsole — sanity", () => {
   it("registra a tab 'precision12' no type Tab", () => {
     expect(coachConsoleSource).toMatch(
@@ -203,11 +213,16 @@ describe("E4.4 Precision12ActionQueue — reissue UI integration", () => {
     );
   });
 
-  it("renderiza botão Reemitir link condicionado por canReissueQuestionnaireLink", () => {
+  it("renderiza botão Gerar novo link condicionado por canReissueQuestionnaireLink (E5.6b/N-1)", () => {
     expect(precision12ActionQueueSource).toMatch(
       /canReissueQuestionnaireLink\(item\)/,
     );
-    expect(precision12ActionQueueSource).toContain("Reemitir link");
+    // E5.6b/N-1: microcopy alinhada ao dialog (era "Reemitir link", agora
+    // "Gerar novo link" — mesma string visível tanto na fila quanto no
+    // título do dialog confirmação).
+    expect(precision12ActionQueueSource).toMatch(
+      />\s*\n\s*Gerar novo link\s*\n\s*</,
+    );
     // O botão só sai se `canReissue` for true.
     expect(precision12ActionQueueSource).toMatch(
       /canReissue\s*&&\s*item\.assessmentId\s*!==\s*null/,
@@ -281,8 +296,10 @@ describe("E4.4 Precision12ReissueLinkDialog — controlled mutation", () => {
       "Gerar um novo link revoga o anterior. Deseja continuar?",
     );
     // Botão de confirmar tem aria-label específico — não é clique acidental.
+    // E5.6b/N-1: aria-label alinhado à microcopy nova ("Gerar novo link"
+    // em vez de "Reemitir link" / "Reemissão").
     expect(precision12ReissueDialogSource).toContain(
-      'aria-label="Confirmar reemissão do link"',
+      'aria-label="Confirmar geração do novo link"',
     );
   });
 
@@ -353,11 +370,15 @@ describe("E4.5 Precision12ActionQueue — revoke UI integration", () => {
     );
   });
 
-  it("renderiza botão Revogar link condicionado por canRevoke + assessmentId", () => {
+  it("renderiza botão Revogar condicionado por canRevoke + assessmentId (E5.6b/F-2)", () => {
     expect(precision12ActionQueueSource).toMatch(
       /canRevokeQuestionnaireLink\(\s*item\s*,\s*activeLinkAssessmentIds\s*,?\s*\)/,
     );
-    expect(precision12ActionQueueSource).toContain("Revogar link");
+    // E5.6b/F-2: label simplificado pra "Revogar" (sem "link") — a coluna
+    // Ações precisa caber em w-[340px] sem quebrar; e visualmente o caráter
+    // destrutivo agora é sinalizado pelas classes (border-destructive/text-
+    // destructive), não pelo texto.
+    expect(precision12ActionQueueSource).toMatch(/>\s*\n\s*Revogar\s*\n\s*</);
     expect(precision12ActionQueueSource).toMatch(
       /canRevoke\s*&&\s*item\.assessmentId\s*!==\s*null/,
     );
@@ -610,5 +631,107 @@ describe("E4.6 Precision12 — DEXA alert wiring", () => {
       /supabase\.[a-z]+\.(insert|update|delete|upsert)/,
     );
     expect(precision12ActionQueueSource).not.toMatch(/supabase\.rpc\(/);
+  });
+});
+
+// ── E5.6b — UI/UX hardening (auditoria pós-E5.6a) ───────────────────────────
+
+describe("E5.6b — fila: F-1 altura estável + F-3 ordem + F-2 destrutivo diferenciado", () => {
+  it("F-1: coluna 'Ações' tem w-[340px] (não 260px) pra comportar os 3 botões sem flex-wrap", () => {
+    // Espaço interno = 340 - 16*2 (padding) = 308px; cabe Abrir + Gerar + Revogar (~308px).
+    expect(precision12ActionQueueSource).toContain('w-[340px] text-right');
+    // Defesa: a referência antiga 260px não pode reaparecer (regressão).
+    expect(precision12ActionQueueSource).not.toContain('w-[260px]');
+  });
+
+  it("F-1: container de ações NÃO usa flex-wrap (era o gerador da altura inconsistente 77→101px)", () => {
+    // Strip comentários JS/JSX antes de matchear — os comentários explicativos
+    // mencionam "flex-wrap" / "sem flex-wrap" no histórico do hardening e
+    // gerariam falsa positiva.
+    const stripComments = (src: string) =>
+      src
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/[^\n]*\n/g, "")
+        .replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+    const codeOnly = stripComments(precision12ActionQueueSource);
+    const actionsBlock = codeOnly.match(
+      /<TableCell className="text-right">[\s\S]*?<\/TableCell>/,
+    )?.[0] ?? "";
+    expect(actionsBlock).toContain("flex items-center justify-end gap-1");
+    expect(actionsBlock).not.toContain("flex-wrap");
+  });
+
+  it("F-3: ordem dos botões = Abrir → Gerar novo link → Revogar (CTA navegacional primeiro)", () => {
+    // Procura ocorrências do TEXTO do botão em contexto JSX (entre > e <).
+    const queueSrc = precision12ActionQueueSource;
+    const abrirJsxIdx = queueSrc.search(/>\s*\n\s*Abrir\s*\n/);
+    const gerarJsxIdx = queueSrc.search(/>\s*\n\s*Gerar novo link\s*\n/);
+    const revogarJsxIdx = queueSrc.search(/>\s*\n\s*Revogar\s*\n/);
+    expect(abrirJsxIdx).toBeGreaterThan(-1);
+    expect(gerarJsxIdx).toBeGreaterThan(abrirJsxIdx);
+    expect(revogarJsxIdx).toBeGreaterThan(gerarJsxIdx);
+  });
+
+  it("F-2: botão Revogar tem classes destrutivas (border-destructive/text-destructive)", () => {
+    // Sem variant=destructive cheio (vermelho gritante), mas com sinalização
+    // visual clara via border + text destrutivos. Mantém peso visual menor
+    // que o dialog de confirmação, que sim usa vermelho cheio.
+    expect(precision12ActionQueueSource).toMatch(
+      /className=["']border-destructive\/40 text-destructive[\s\S]*?["']/,
+    );
+  });
+});
+
+describe("E5.6b — dialog Reissue: N-1 microcopy alinhada + N-2 destrutividade sinalizada", () => {
+  it("N-1: DialogTitle = 'Gerar novo link do questionário' (alinhado com botão da fila)", () => {
+    expect(precision12ReissueDialogSource).toContain(
+      "<DialogTitle>Gerar novo link do questionário</DialogTitle>",
+    );
+    // Defesa: o título antigo 'Reemitir link do questionário' não pode
+    // reaparecer (regressão de microcopy).
+    expect(precision12ReissueDialogSource).not.toContain(
+      "<DialogTitle>Reemitir link do questionário</DialogTitle>",
+    );
+  });
+
+  it("N-2: CTA de confirmação usa variant=destructive (a ação revoga o link anterior)", () => {
+    // O bloco da CTA principal "Gerar novo link" (não as CTAs do
+    // GeneratedLinkView que ficam dentro do success state).
+    const ctaBlock = precision12ReissueDialogSource.match(
+      /aria-label="Confirmar geração do novo link"[\s\S]{0,300}/,
+    )?.[0];
+    expect(ctaBlock).toBeTruthy();
+    // O Button que contém esse aria-label deve ter variant="destructive".
+    // Procura o Button imediatamente antes do aria-label.
+    expect(precision12ReissueDialogSource).toMatch(
+      /variant="destructive"[\s\S]*?aria-label="Confirmar geração do novo link"/,
+    );
+  });
+});
+
+describe("E5.6b — heading hierarchy: N-5 sem H1→H3 órfão + sem H3 duplicado no preview", () => {
+  it("Console adiciona H2 sr-only 'Precision 12 — Coach' (restaura hierarquia WCAG 1.3.1)", () => {
+    expect(precision12ConsoleSource).toMatch(
+      /<h2 className="sr-only">Precision 12 — Coach<\/h2>/,
+    );
+  });
+
+  it("Preview NÃO usa <CardTitle> (que renderiza H3, duplicando o H3 da seção pai)", () => {
+    // Strip comentários — o comentário do hardening menciona "Removido o
+    // CardTitle" e ia gerar falsa positiva.
+    const stripComments = (src: string) =>
+      src
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/[^\n]*\n/g, "")
+        .replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+    const codeOnly = stripComments(precision12EvidencePreviewSource);
+    // Sem JSX <CardTitle e sem import nomeado de CardTitle.
+    expect(codeOnly).not.toMatch(/<CardTitle\b/);
+    expect(codeOnly).not.toMatch(/import\s*\{[^}]*\bCardTitle\b[^}]*\}/);
+    // Em vez disso, o Card é rotulado por aria-labelledby ao H3 da seção
+    // (id="precision12-evidence-preview-heading" definido no Console).
+    expect(precision12EvidencePreviewSource).toContain(
+      'aria-labelledby="precision12-evidence-preview-heading"',
+    );
   });
 });

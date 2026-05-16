@@ -195,7 +195,12 @@ export function Precision12ReissueLinkDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Reemitir link do questionário</DialogTitle>
+          {/*
+            E5.6b / N-1 — título do dialog alinhado à microcopy da fila
+            ("Gerar novo link"). Antes o dialog dizia "Reemitir link" mas
+            a CTA interna já era "Gerar novo link" — divergência confundia.
+          */}
+          <DialogTitle>Gerar novo link do questionário</DialogTitle>
           <DialogDescription>
             Aluno: <span className="font-medium">{studentName}</span>
           </DialogDescription>
@@ -253,11 +258,20 @@ export function Precision12ReissueLinkDialog({
               >
                 Cancelar
               </Button>
+              {/*
+                E5.6b / N-2 — CTA marcada como destructive porque a ação
+                REVOGA o link anterior (texto do próprio aviso admite isso).
+                Antes usava variant=default (bg-primary laranja-coral), o
+                que subestimava o caráter destrutivo. Continua diferenciada
+                visualmente do Revoke pelo texto e pelo ícone (RefreshCw vs
+                Ban).
+              */}
               <Button
                 type="button"
+                variant="destructive"
                 onClick={handleConfirm}
                 disabled={mutation.isPending}
-                aria-label="Confirmar reemissão do link"
+                aria-label="Confirmar geração do novo link"
               >
                 {mutation.isPending ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

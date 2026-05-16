@@ -171,6 +171,14 @@ export function Precision12Console() {
 
   return (
     <div className="space-y-6">
+      {/*
+        E5.6b / N-5 — H2 sr-only restaura hierarquia semântica.
+        A página (CoachConsole.tsx) tem o H1 "Coach Console" via PageHeader.
+        Sem este H2, as seções (KPIs/Fila/Progresso/Evidências) saltavam de
+        H1 direto pra H3 — violação WCAG 1.3.1.
+      */}
+      <h2 className="sr-only">Precision 12 — Coach</h2>
+
       <Precision12KpiCards data={data} />
 
       <Precision12Filters
