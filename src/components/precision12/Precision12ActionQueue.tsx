@@ -8,11 +8,27 @@
  *
  * Tabela priorizada com os itens derivados pelo hook E4.1. Cada linha tem
  * uma CTA "Abrir" (navegação read-only) e, quando aplicável, ações de
- * "Reemitir link" (`Precision12ReissueLinkDialog`) e "Revogar link"
+ * "Gerar novo link" (`Precision12ReissueLinkDialog`) e "Revogar"
  * (`Precision12RevokeLinkDialog`). Ambas as ações exigem confirmação
  * explícita e mutam exclusivamente via edge function service-role.
  *
  * Microcopy: triagem operacional, NÃO diagnóstico.
+ *
+ * E5.6b — UI/UX hardening da auditoria:
+ *   F-1 altura de linha estável (sem flex-wrap; coluna w-[380px] comporta
+ *       os 3 botões sem quebrar — medições reais: Abrir ~80px + Gerar
+ *       novo link ~140px + Revogar ~88px + gaps = ~316px, cabe em 348px
+ *       internos);
+ *   F-2 botão "Revogar" diferenciado visualmente como destrutivo com
+ *       cores LEGÍVEIS em tema dark (border-rose-500/40 + text-rose-300).
+ *       NÃO usa `text-destructive` porque em dark o token é vermelho
+ *       escuro (rgb 158,46,46) sobre bg-card (rgb 35,32,31) = contraste
+ *       2.22 — falha WCAG AA. rose-300 dá 8.56;
+ *   F-3 ordem Abrir → Gerar novo link → Revogar (CTA navegacional primeiro,
+ *       reparadora no meio, destrutiva isolada à direita);
+ *   N-1 microcopy "Gerar novo link" alinhada com a CTA dentro do dialog
+ *       (antes a fila dizia "Reemitir link" e o dialog dizia "Gerar novo
+ *       link" — coach confundia).
  */
 
 import { useState } from "react";
@@ -156,7 +172,7 @@ export function Precision12ActionQueue({
               <TableHead className="hidden md:table-cell">Status</TableHead>
               <TableHead className="hidden lg:table-cell">Data</TableHead>
               <TableHead className="hidden lg:table-cell">Idade</TableHead>
-              <TableHead className="w-[260px] text-right">Ações</TableHead>
+              <TableHead className="w-[380px] text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -203,49 +219,15 @@ export function Precision12ActionQueue({
                     {ageLabel(item.assessmentDate)}
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex flex-wrap items-center justify-end gap-1">
-                      {canRevoke && item.assessmentId !== null && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            setRevokeTarget({
-                              studentId: item.studentId,
-                              studentName: item.studentName,
-                              assessmentId: item.assessmentId!,
-                            })
-                          }
-                          aria-label={`Revogar link do questionário de ${item.studentName}`}
-                        >
-                          <Ban
-                            className="mr-1 h-3.5 w-3.5"
-                            aria-hidden
-                          />
-                          Revogar link
-                        </Button>
-                      )}
-                      {canReissue && item.assessmentId !== null && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            setReissueTarget({
-                              studentId: item.studentId,
-                              studentName: item.studentName,
-                              assessmentId: item.assessmentId!,
-                            })
-                          }
-                          aria-label={`Reemitir link do questionário de ${item.studentName}`}
-                        >
-                          <RefreshCw
-                            className="mr-1 h-3.5 w-3.5"
-                            aria-hidden
-                          />
-                          Reemitir link
-                        </Button>
-                      )}
+                    {/*
+                      E5.6b — ordem: navegação (Abrir) → reparadora (Gerar
+                      novo link) → destrutiva (Revogar). Sem flex-wrap; a
+                      coluna w-[340px] comporta os 3 botões sem quebrar
+                      altura de linha. Revogar usa variant outline com
+                      borda + texto destrutivos pra diferenciar do Gerar
+                      novo link sem ofuscar com vermelho cheio.
+                    */}
+                    <div className="flex items-center justify-end gap-1">
                       <Button
                         asChild
                         variant="ghost"
@@ -265,6 +247,54 @@ export function Precision12ActionQueue({
                           />
                         </Link>
                       </Button>
+                      {canReissue && item.assessmentId !== null && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setReissueTarget({
+                              studentId: item.studentId,
+                              studentName: item.studentName,
+                              assessmentId: item.assessmentId!,
+                            })
+                          }
+                          aria-label={`Gerar novo link do questionário de ${item.studentName}`}
+                        >
+                          <RefreshCw
+                            className="mr-1 h-3.5 w-3.5"
+                            aria-hidden
+                          />
+                          Gerar novo link
+                        </Button>
+                      )}
+                      {canRevoke && item.assessmentId !== null && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          // E5.6b/F-2 (corrigido na auditoria): usa cores
+                          // explícitas rose-* em vez do token semântico
+                          // `destructive` porque em tema dark o token resolve
+                          // pra rgb(158,46,46), dando contraste 2.22 sobre
+                          // bg-card — falha WCAG AA. rose-300 dá 8.56.
+                          className="border-rose-500/50 text-rose-300 hover:border-rose-400 hover:bg-rose-500/10 hover:text-rose-200"
+                          onClick={() =>
+                            setRevokeTarget({
+                              studentId: item.studentId,
+                              studentName: item.studentName,
+                              assessmentId: item.assessmentId!,
+                            })
+                          }
+                          aria-label={`Revogar link do questionário de ${item.studentName}`}
+                        >
+                          <Ban
+                            className="mr-1 h-3.5 w-3.5"
+                            aria-hidden
+                          />
+                          Revogar
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

@@ -87,9 +87,14 @@ const REISSUE_CONFIRM_MESSAGE =
  * Erros do edge function que ganham tradução amigável. O texto vem do
  * `index.ts` da edge `create-precision12-questionnaire-link` (PR #136).
  */
+// E5.6b/N-1 (corrigido na auditoria): a mensagem amigável também usa
+// "gerar novo link" pra ficar consistente com o título do dialog
+// ("Gerar novo link do questionário") e o botão da fila ("Gerar novo link").
+// O texto do erro server-side em si NÃO muda (é contrato com a edge);
+// apenas a tradução para o coach.
 const SERVER_ERROR_FRIENDLY: Record<string, string> = {
   "Apenas avaliações 'in_progress' permitem reemissão.":
-    "Este questionário não permite reemissão de link.",
+    "Este questionário não permite gerar novo link.",
 };
 
 function friendlyErrorMessage(raw: string | undefined): string {
@@ -195,7 +200,12 @@ export function Precision12ReissueLinkDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Reemitir link do questionário</DialogTitle>
+          {/*
+            E5.6b / N-1 — título do dialog alinhado à microcopy da fila
+            ("Gerar novo link"). Antes o dialog dizia "Reemitir link" mas
+            a CTA interna já era "Gerar novo link" — divergência confundia.
+          */}
+          <DialogTitle>Gerar novo link do questionário</DialogTitle>
           <DialogDescription>
             Aluno: <span className="font-medium">{studentName}</span>
           </DialogDescription>
@@ -253,11 +263,20 @@ export function Precision12ReissueLinkDialog({
               >
                 Cancelar
               </Button>
+              {/*
+                E5.6b / N-2 — CTA marcada como destructive porque a ação
+                REVOGA o link anterior (texto do próprio aviso admite isso).
+                Antes usava variant=default (bg-primary laranja-coral), o
+                que subestimava o caráter destrutivo. Continua diferenciada
+                visualmente do Revoke pelo texto e pelo ícone (RefreshCw vs
+                Ban).
+              */}
               <Button
                 type="button"
+                variant="destructive"
                 onClick={handleConfirm}
                 disabled={mutation.isPending}
-                aria-label="Confirmar reemissão do link"
+                aria-label="Confirmar geração do novo link"
               >
                 {mutation.isPending ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

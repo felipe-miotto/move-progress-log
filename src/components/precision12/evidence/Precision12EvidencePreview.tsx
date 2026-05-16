@@ -24,7 +24,7 @@
 import { useMemo } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import type {
   CoachConsoleAssessment,
   CoachConsoleQuestionnaire,
@@ -70,16 +70,20 @@ export function Precision12EvidencePreview({
     <Card
       className="border"
       data-testid="precision12-evidence-preview"
-      aria-labelledby="p12-evidence-preview-heading"
+      aria-labelledby="precision12-evidence-preview-heading"
     >
+      {/*
+        E5.6b / N-5 — antes este header tinha <CardTitle> (H3) com o texto
+        "Evidência clínica-operacional · Preview", duplicando o H3 que a
+        seção pai no Console.tsx já renderiza ("Evidência clínica-
+        operacional (preview)"). Resultado: dois H3 adjacentes com mesmo
+        conceito, violando hierarquia semântica. Removido o CardTitle —
+        o Card agora é rotulado por `aria-labelledby` apontando ao H3 da
+        seção (id="precision12-evidence-preview-heading" definido no
+        Precision12Console). Mantém o badge de contagem e a microcopy.
+      */}
       <CardHeader className="space-y-2 pb-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <CardTitle
-            id="p12-evidence-preview-heading"
-            className="text-sm uppercase tracking-wide text-muted-foreground"
-          >
-            Evidência clínica-operacional · Preview
-          </CardTitle>
+        <div className="flex flex-wrap items-baseline justify-end gap-2">
           <Badge variant="outline" className="text-[10px]">
             {totalClaims} claim{totalClaims === 1 ? "" : "s"}
           </Badge>
