@@ -58,6 +58,12 @@ export function EvidenceClaimList({
             // (verificado por unit tests do EVIDENCE_CATALOG em E5.1/E5.2);
             // a key permanece estável mesmo se a lista for filtrada ou
             // reordenada em superfícies futuras (Coach Console / drawer).
+            // E5.6a / M-6: `deriveEvidenceGroups` deduplica claims dentro
+            // do mesmo grupo, então essa key não colide aqui mesmo quando
+            // duas responses do mesmo aluno gerariam a mesma claim. Se um
+            // novo caller passar claims já contendo duplicatas, a key vai
+            // colidir e o React vai emitir warning — sinal pra dedup
+            // upstream, não pra trocar a key.
             key={`${claim.domain}-${claim.metric}-${claim.classification}`}
             claim={claim}
             showPrinciples={showPrinciples}

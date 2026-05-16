@@ -32,6 +32,7 @@ import type {
 } from "@/utils/precision12CoachConsole";
 import {
   LIMITATIONS_NOT_COVERED_YET,
+  QUESTIONNAIRE_FIELDS_NOT_MAPPED_YET,
   deriveEvidenceGroups,
 } from "@/utils/precision12EvidenceMapping";
 
@@ -122,15 +123,43 @@ export function Precision12EvidencePreview({
         >
           <summary className="cursor-pointer font-semibold">
             Limitações conhecidas ({LIMITATIONS_NOT_COVERED_YET.length} domínios
+            + {QUESTIONNAIRE_FIELDS_NOT_MAPPED_YET.length} campos do questionário
             ainda não cobertos)
           </summary>
-          <ul className="mt-2 space-y-1">
-            {LIMITATIONS_NOT_COVERED_YET.map((item) => (
-              <li key={item.domain}>
-                <span className="font-mono">{item.domain}</span> — {item.reason}
-              </li>
-            ))}
-          </ul>
+          <div className="mt-2 space-y-3">
+            <div>
+              <p className="font-semibold uppercase tracking-wide text-[10px]">
+                Domínios sem dados ou ref ranges
+              </p>
+              <ul
+                className="mt-1 space-y-1"
+                data-testid="evidence-preview-limitations-domains"
+              >
+                {LIMITATIONS_NOT_COVERED_YET.map((item) => (
+                  <li key={item.domain}>
+                    <span className="font-mono">{item.domain}</span> —{" "}
+                    {item.reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <p className="font-semibold uppercase tracking-wide text-[10px]">
+                Campos do questionário sem claim individual
+              </p>
+              <ul
+                className="mt-1 space-y-1"
+                data-testid="evidence-preview-limitations-fields"
+              >
+                {QUESTIONNAIRE_FIELDS_NOT_MAPPED_YET.map((item) => (
+                  <li key={item.field}>
+                    <span className="font-mono">{item.field}</span> —{" "}
+                    {item.reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
         </details>
       </CardContent>
     </Card>

@@ -36,7 +36,10 @@ import {
   deriveEvidenceClaims,
   type Precision12EvidenceInput,
 } from "./precision12EvidenceDerivation";
-import type { EvidenceClaim } from "./precision12Evidence";
+import {
+  EVIDENCE_RISK_LEVEL_PRIORITY,
+  type EvidenceClaim,
+} from "./precision12Evidence";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Mapping helpers (PURE)
@@ -44,19 +47,30 @@ import type { EvidenceClaim } from "./precision12Evidence";
 
 /**
  * Conta as flags individuais de risco de adesão presentes numa resposta.
- * Espelha a lógica de `countAdherenceRiskFlags` interna do E4.1, exposta
- * aqui de forma granular pra alimentar o `Precision12EvidenceInput`
- * (`adherence.{sleep,stress,energy,barrier}Flag` + `riskFlagCount`).
+ * Alinhado com a lógica de `countAdherenceRiskFlags` interna do E4.1
+ * (E5.6a / M-1): o `riskFlagCount` soma os MESMOS 7 sinais usados pelo
+ * Coach Console para emitir o alerta `adherence_risk` na fila — evita
+ * que fila e preview tenham noções divergentes de "risco de adesão" no
+ * mesmo aluno.
  *
  * Critério (escala 1–5, ver `ADHERENCE_RISK_THRESHOLDS`):
- *   - sleepFlag    ← sleep_quality <= 2
- *   - stressFlag   ← stress_level >= 4
- *   - energyFlag   ← energy_level <= 2
- *   - barrierFlag  ← primary_adherence_barrier ∈ ADHERENCE_RISK_BARRIERS
  *
- * `riskFlagCount` é a soma das 4 flags acima (NÃO inclui outras flags
- * do questionário como pain_status ou consistency_self_rating, pra manter
- * o domínio "sleep_stress_energy_adherence" coeso com o catálogo E5.1/E5.2).
+ *   Flags com claim individual no catálogo (`deriveAdherenceEvidenceClaims`):
+ *     - sleepFlag    ← sleep_quality <= 2
+ *     - stressFlag   ← stress_level >= 4
+ *     - energyFlag   ← energy_level <= 2
+ *     - barrierFlag  ← primary_adherence_barrier ∈ ADHERENCE_RISK_BARRIERS
+ *
+ *   Flags SEM claim individual no catálogo (contribuem só para o agregado;
+ *   ver `QUESTIONNAIRE_FIELDS_NOT_MAPPED_YET` e plano M-3 para cobertura
+ *   individual futura):
+ *     - consistencyFlag    ← consistency_self_rating === "inconsistent"
+ *     - lifeStabilityFlag  ← life_stability === "chaotic"
+ *     - painFlag           ← pain_status != null && pain_status !== "none"
+ *
+ * `riskFlagCount` é a soma das 7 flags acima — mesma fórmula do Coach
+ * Console. A claim agregada "Risco de adesão (≥ 2 flags)" dispara quando
+ * `riskFlagCount >= ADHERENCE_RISK_MIN_FLAGS` (2), igualando a fila.
  */
 export function deriveAdherenceFlagsFromResponse(
   response: CoachConsoleQuestionnaire,
@@ -65,6 +79,9 @@ export function deriveAdherenceFlagsFromResponse(
   stressFlag: boolean;
   energyFlag: boolean;
   barrierFlag: boolean;
+  consistencyFlag: boolean;
+  lifeStabilityFlag: boolean;
+  painFlag: boolean;
   riskFlagCount: number;
 } {
   const sleepFlag =
@@ -80,13 +97,33 @@ export function deriveAdherenceFlagsFromResponse(
     response.primary_adherence_barrier != null &&
     ADHERENCE_RISK_BARRIERS.includes(response.primary_adherence_barrier);
 
+  // Sinais adicionais alinhados ao Console (M-1). Não disparam claim
+  // individual aqui — só contribuem ao `riskFlagCount`. A cobertura
+  // individual desses domínios fica como M-3 (plano futuro).
+  const consistencyFlag = response.consistency_self_rating === "inconsistent";
+  const lifeStabilityFlag = response.life_stability === "chaotic";
+  const painFlag =
+    response.pain_status != null && response.pain_status !== "none";
+
   const riskFlagCount =
     Number(sleepFlag) +
     Number(stressFlag) +
     Number(energyFlag) +
-    Number(barrierFlag);
+    Number(barrierFlag) +
+    Number(consistencyFlag) +
+    Number(lifeStabilityFlag) +
+    Number(painFlag);
 
-  return { sleepFlag, stressFlag, energyFlag, barrierFlag, riskFlagCount };
+  return {
+    sleepFlag,
+    stressFlag,
+    energyFlag,
+    barrierFlag,
+    consistencyFlag,
+    lifeStabilityFlag,
+    painFlag,
+    riskFlagCount,
+  };
 }
 
 /**
@@ -148,13 +185,56 @@ export function indexResponsesByAssessmentId(
 /**
  * Resultado da derivação por aluno: agrupa N responses do mesmo aluno
  * num único bloco de claims. Quando há múltiplas responses do mesmo
- * aluno (raro, mas possível com reissue + retry), as claims são
- * concatenadas na ordem original.
+ * aluno (raro, mas possível com reissue + retry), as claims passam por
+ * dedup (E5.6a / M-6) e por sort de severidade (E5.6a / M-5).
  */
 export interface StudentEvidenceGroup {
   studentId: string;
   studentName: string;
   claims: EvidenceClaim[];
+}
+
+/**
+ * Identidade de uma claim para fins de dedup dentro do mesmo grupo:
+ * `${domain}-${metric}-${classification}` é única no catálogo
+ * (validado em testes do E5.1/E5.2). Mantida em sincronia com a `key`
+ * usada pelo `EvidenceClaimList` (E5.4).
+ */
+function claimKey(claim: EvidenceClaim): string {
+  return `${claim.domain}-${claim.metric}-${claim.classification}`;
+}
+
+/**
+ * Remove claims duplicadas preservando a primeira ocorrência
+ * (E5.6a / M-6). Útil quando duas responses do mesmo aluno geram a
+ * mesma claim PAR-Q (reissue + retry).
+ */
+function dedupClaims(claims: readonly EvidenceClaim[]): EvidenceClaim[] {
+  const seen = new Set<string>();
+  const out: EvidenceClaim[] = [];
+  for (const claim of claims) {
+    const key = claimKey(claim);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(claim);
+  }
+  return out;
+}
+
+/**
+ * Ordena claims por severidade do tom (`actionable` → `watchful` →
+ * `informational` → `reassuring`), preservando a ordem original como
+ * tie-break (Array.prototype.sort é estável desde V8 7.0 / 2018).
+ * E5.6a / M-5.
+ */
+function sortClaimsBySeverity(
+  claims: readonly EvidenceClaim[],
+): EvidenceClaim[] {
+  return [...claims].sort(
+    (a, b) =>
+      EVIDENCE_RISK_LEVEL_PRIORITY[a.riskLanguageLevel] -
+      EVIDENCE_RISK_LEVEL_PRIORITY[b.riskLanguageLevel],
+  );
 }
 
 /**
@@ -167,6 +247,12 @@ export interface StudentEvidenceGroup {
  *     fora do escopo) → ignorado
  *   - student ausente (idem) → fallback para "(aluno desconhecido)"
  *     mantendo `student_id` técnico, pra UI não engolir silenciosamente
+ *
+ * Ordenação determinística (E5.6a):
+ *   - Grupos: por `studentName` ASC, locale pt-BR, sem distinção de acento
+ *     (M-4). "(aluno desconhecido)" cai por último naturalmente pelo
+ *     parêntese, mas é tratado como qualquer nome no compare.
+ *   - Claims dentro de cada grupo: dedup (M-6) → sort por severidade (M-5).
  *
  * Pura (não faz fetch, não muta input nem catálogo).
  */
@@ -208,7 +294,20 @@ export function deriveEvidenceGroups({
     });
   }
 
-  return Array.from(byStudentId.values());
+  // M-6 + M-5: dedup ANTES de sort pra eliminar duplicatas sem reordenar
+  // dentro do mesmo nível de severidade desnecessariamente.
+  for (const group of byStudentId.values()) {
+    group.claims = sortClaimsBySeverity(dedupClaims(group.claims));
+  }
+
+  // M-4: ordenação determinística por nome do aluno.
+  const groups = Array.from(byStudentId.values());
+  groups.sort((a, b) =>
+    a.studentName.localeCompare(b.studentName, "pt-BR", {
+      sensitivity: "base",
+    }),
+  );
+  return groups;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -252,5 +351,54 @@ export const LIMITATIONS_NOT_COVERED_YET: ReadonlyArray<{
     domain: "dexa",
     reason:
       "Hook já carrega dexa_results (E4.6), mas classificação por marcador (body fat / visceral / androide-ginoide / ALM/h²) exige cortes populacionais por sexo/idade — sem ranges, preferimos não emitir do que emitir errado.",
+  },
+];
+
+/**
+ * Catálogo de campos do `CoachConsoleQuestionnaire` que o hook E4.1 JÁ
+ * carrega mas que o mapping E5.6a ainda NÃO converte em claim individual,
+ * com o motivo. Os 3 primeiros contribuem ao `riskFlagCount` agregado de
+ * adesão (alinhado ao Console pelo M-1), mas não disparam claim própria.
+ * Os 3 últimos disparam o alerta operacional `clinical_attention` na fila
+ * do Console, mas o Evidence Layer ainda não cobre — cobertura individual
+ * planejada como M-3 (ver plano para Codex).
+ *
+ * Exposto pra documentação inline na UI (preview) e pra que extensões
+ * futuras tenham um lugar único pra remover entries quando o mapper passar
+ * a cobrir o campo.
+ */
+export const QUESTIONNAIRE_FIELDS_NOT_MAPPED_YET: ReadonlyArray<{
+  field: keyof CoachConsoleQuestionnaire;
+  reason: string;
+}> = [
+  {
+    field: "consistency_self_rating",
+    reason:
+      "Já conta como sinal no agregado de risco de adesão (mesma fila do coach); ainda sem card próprio no preview.",
+  },
+  {
+    field: "life_stability",
+    reason:
+      "Já conta como sinal no agregado de risco de adesão (mesma fila do coach); ainda sem card próprio no preview.",
+  },
+  {
+    field: "pain_status",
+    reason:
+      "Já conta como sinal no agregado de risco de adesão e também dispara 'atenção clínica' na fila; ainda sem card próprio no preview.",
+  },
+  {
+    field: "uses_medications",
+    reason:
+      "Dispara 'atenção clínica' na fila do coach; ainda sem card próprio no preview (cobertura individual planejada).",
+  },
+  {
+    field: "has_medical_condition",
+    reason:
+      "Dispara 'atenção clínica' na fila do coach; ainda sem card próprio no preview (cobertura individual planejada).",
+  },
+  {
+    field: "injury_surgery_history",
+    reason:
+      "Dispara 'atenção clínica' na fila do coach quando preenchido; ainda sem card próprio no preview (cobertura individual planejada).",
   },
 ];

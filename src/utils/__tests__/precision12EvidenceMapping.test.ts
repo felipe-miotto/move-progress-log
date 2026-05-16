@@ -12,6 +12,7 @@ import {
 import { deriveEvidenceClaims } from "../precision12EvidenceDerivation";
 import {
   LIMITATIONS_NOT_COVERED_YET,
+  QUESTIONNAIRE_FIELDS_NOT_MAPPED_YET,
   deriveAdherenceFlagsFromResponse,
   indexResponsesByAssessmentId,
   mapQuestionnaireResponseToEvidenceInput,
@@ -40,13 +41,16 @@ function makeResponse(
 // ── deriveAdherenceFlagsFromResponse ────────────────────────────────────────
 
 describe("deriveAdherenceFlagsFromResponse", () => {
-  it("resposta limpa → todas as flags false e count 0", () => {
+  it("resposta limpa → todas as 7 flags false e count 0", () => {
     const flags = deriveAdherenceFlagsFromResponse(makeResponse());
     expect(flags).toEqual({
       sleepFlag: false,
       stressFlag: false,
       energyFlag: false,
       barrierFlag: false,
+      consistencyFlag: false,
+      lifeStabilityFlag: false,
+      painFlag: false,
       riskFlagCount: 0,
     });
   });
@@ -80,16 +84,105 @@ describe("deriveAdherenceFlagsFromResponse", () => {
     ).toBe(false);
   });
 
-  it("riskFlagCount é a soma das 4 flags (0..4)", () => {
+  // ── E5.6a / M-1: 3 sinais adicionais alinhados ao Coach Console ────────
+  it("consistency_self_rating === 'inconsistent' dispara consistencyFlag (M-1)", () => {
+    expect(
+      deriveAdherenceFlagsFromResponse(
+        makeResponse({ consistency_self_rating: "inconsistent" }),
+      ).consistencyFlag,
+    ).toBe(true);
+    expect(
+      deriveAdherenceFlagsFromResponse(
+        makeResponse({ consistency_self_rating: "moderately_consistent" }),
+      ).consistencyFlag,
+    ).toBe(false);
+  });
+
+  it("life_stability === 'chaotic' dispara lifeStabilityFlag (M-1)", () => {
+    expect(
+      deriveAdherenceFlagsFromResponse(
+        makeResponse({ life_stability: "chaotic" }),
+      ).lifeStabilityFlag,
+    ).toBe(true);
+    expect(
+      deriveAdherenceFlagsFromResponse(
+        makeResponse({ life_stability: "stable_organized" }),
+      ).lifeStabilityFlag,
+    ).toBe(false);
+  });
+
+  it("pain_status !== 'none' dispara painFlag (M-1)", () => {
+    // Enum real do questionário (PAIN_STATUS_OPTIONS):
+    //   'daily' (dor no dia a dia), 'during_training' (dor ao treinar), 'none'.
+    expect(
+      deriveAdherenceFlagsFromResponse(
+        makeResponse({ pain_status: "daily" }),
+      ).painFlag,
+    ).toBe(true);
+    expect(
+      deriveAdherenceFlagsFromResponse(
+        makeResponse({ pain_status: "during_training" }),
+      ).painFlag,
+    ).toBe(true);
+    // pain_status === 'none' não dispara.
+    expect(
+      deriveAdherenceFlagsFromResponse(
+        makeResponse({ pain_status: "none" }),
+      ).painFlag,
+    ).toBe(false);
+    // pain_status null não dispara (defensivo).
+    expect(
+      deriveAdherenceFlagsFromResponse(
+        makeResponse({ pain_status: null }),
+      ).painFlag,
+    ).toBe(false);
+  });
+
+  it("riskFlagCount é a soma das 7 flags (0..7) — alinhado ao Console (M-1)", () => {
     const all = deriveAdherenceFlagsFromResponse(
       makeResponse({
         sleep_quality: 1,
         stress_level: 5,
         energy_level: 1,
         primary_adherence_barrier: "motivation",
+        consistency_self_rating: "inconsistent",
+        life_stability: "chaotic",
+        pain_status: "daily",
       }),
     );
-    expect(all.riskFlagCount).toBe(4);
+    expect(all.riskFlagCount).toBe(7);
+  });
+
+  it("aluno só com pain_status='during_training' + consistency='inconsistent' → riskFlagCount 2 (cenário-chave M-1)", () => {
+    // Antes do M-1, esse cenário disparava o alerta `adherence_risk` no
+    // Console mas NÃO emitia a claim agregada no preview. Agora os dois
+    // sistemas concordam — riskFlagCount >= 2 emite a claim.
+    const flags = deriveAdherenceFlagsFromResponse(
+      makeResponse({
+        consistency_self_rating: "inconsistent",
+        pain_status: "during_training",
+      }),
+    );
+    expect(flags.sleepFlag).toBe(false);
+    expect(flags.stressFlag).toBe(false);
+    expect(flags.energyFlag).toBe(false);
+    expect(flags.barrierFlag).toBe(false);
+    expect(flags.consistencyFlag).toBe(true);
+    expect(flags.painFlag).toBe(true);
+    expect(flags.riskFlagCount).toBe(2);
+  });
+
+  it("1 flag isolada das 3 novas (pain_status='daily') → riskFlagCount 1, abaixo do mínimo (M-1)", () => {
+    // Espelha o teste já existente para 1 flag isolada das 4 antigas,
+    // garantindo que o threshold ADHERENCE_RISK_MIN_FLAGS aplica
+    // uniformemente aos 7 sinais.
+    const flags = deriveAdherenceFlagsFromResponse(
+      makeResponse({ pain_status: "daily" }),
+    );
+    expect(flags.painFlag).toBe(true);
+    expect(flags.consistencyFlag).toBe(false);
+    expect(flags.lifeStabilityFlag).toBe(false);
+    expect(flags.riskFlagCount).toBe(1);
   });
 
   it("valores null em scores não disparam flag", () => {
@@ -190,6 +283,35 @@ describe("mapQuestionnaireResponseToEvidenceInput", () => {
     expect(labels.filter((l) => l.includes("Sono"))).toEqual([]);
     expect(labels.filter((l) => l.includes("Estresse"))).toEqual([]);
   });
+
+  // ── E5.6a / M-1: integração com cenário-chave de paridade Console ↔ preview
+  it(
+    "M-1: pain_status='during_training' + consistency='inconsistent' → emite 'Risco de adesão (≥ 2 flags)' (paridade c/ Console)",
+    () => {
+      const input = mapQuestionnaireResponseToEvidenceInput(
+        makeResponse({
+          parq_blocked: false, // só pra ter PAR-Q cleared no resultado
+          consistency_self_rating: "inconsistent",
+          pain_status: "during_training",
+        }),
+      );
+      // Os 4 flags individuais (sleep/stress/energy/barrier) seguem false.
+      expect(input.adherence?.sleepFlag).toBe(false);
+      expect(input.adherence?.stressFlag).toBe(false);
+      expect(input.adherence?.energyFlag).toBe(false);
+      expect(input.adherence?.barrierFlag).toBe(false);
+      // riskFlagCount agora soma os 7 — bate com o Console.
+      expect(input.adherence?.riskFlagCount).toBe(2);
+      const labels = deriveEvidenceClaims(input).map((c) => c.classification);
+      expect(labels).toContain("PAR-Q sem sinalizações");
+      expect(labels).toContain("Risco de adesão (≥ 2 flags)");
+      // Não emite claims individuais para consistency/pain (M-3 pendente).
+      expect(labels.filter((l) => l.includes("Sono"))).toEqual([]);
+      expect(labels.filter((l) => l.includes("Estresse"))).toEqual([]);
+      expect(labels.filter((l) => l.includes("Baixa energia"))).toEqual([]);
+      expect(labels.filter((l) => l.includes("Barreira"))).toEqual([]);
+    },
+  );
 });
 
 // ── indexResponsesByAssessmentId ────────────────────────────────────────────
@@ -230,6 +352,68 @@ describe("LIMITATIONS_NOT_COVERED_YET", () => {
   it("cada item tem reason não-vazio explicando o motivo", () => {
     for (const item of LIMITATIONS_NOT_COVERED_YET) {
       expect(item.reason.trim().length).toBeGreaterThan(0);
+    }
+  });
+});
+
+// ── QUESTIONNAIRE_FIELDS_NOT_MAPPED_YET (E5.6a / M-7) ───────────────────────
+
+describe("QUESTIONNAIRE_FIELDS_NOT_MAPPED_YET (M-7)", () => {
+  it("documenta os 6 campos do questionário sem claim individual", () => {
+    const fields = QUESTIONNAIRE_FIELDS_NOT_MAPPED_YET.map((l) => l.field);
+    expect(fields).toContain("consistency_self_rating");
+    expect(fields).toContain("life_stability");
+    expect(fields).toContain("pain_status");
+    expect(fields).toContain("uses_medications");
+    expect(fields).toContain("has_medical_condition");
+    expect(fields).toContain("injury_surgery_history");
+    expect(QUESTIONNAIRE_FIELDS_NOT_MAPPED_YET).toHaveLength(6);
+  });
+
+  it("cada item tem reason não-vazio explicando o motivo", () => {
+    for (const item of QUESTIONNAIRE_FIELDS_NOT_MAPPED_YET) {
+      expect(item.reason.trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  it("os 3 primeiros campos sinalizam contribuição ao agregado de risco de adesão", () => {
+    // Esses 3 campos viram contribuição agregada de adesão (alinhado ao Console).
+    // O texto deve mencionar "agregado" / "fila do coach" pra que o coach
+    // entenda a relação sem precisar conhecer nomenclatura interna ("M-1").
+    const aggregatedFields = QUESTIONNAIRE_FIELDS_NOT_MAPPED_YET.filter(
+      (item) => item.reason.toLowerCase().includes("agregado"),
+    ).map((item) => item.field);
+    expect(aggregatedFields).toEqual(
+      expect.arrayContaining([
+        "consistency_self_rating",
+        "life_stability",
+        "pain_status",
+      ]),
+    );
+  });
+
+  it("os 3 últimos campos sinalizam disparo de 'atenção clínica' na fila", () => {
+    const clinicalAttentionFields = QUESTIONNAIRE_FIELDS_NOT_MAPPED_YET.filter(
+      (item) => item.reason.toLowerCase().includes("atenção clínica"),
+    ).map((item) => item.field);
+    expect(clinicalAttentionFields).toEqual(
+      expect.arrayContaining([
+        "pain_status", // contribui pro agregado E dispara clinical_attention
+        "uses_medications",
+        "has_medical_condition",
+        "injury_surgery_history",
+      ]),
+    );
+  });
+
+  it("nenhum reason exibe jargão interno tipo 'M-1', 'M-3' ou 'riskFlagCount' (texto vai pra UI do coach)", () => {
+    // O <details> "Limitações conhecidas" renderiza esses reasons literalmente
+    // no preview. Manter linguagem operacional, sem códigos internos.
+    for (const item of QUESTIONNAIRE_FIELDS_NOT_MAPPED_YET) {
+      expect(item.reason).not.toMatch(/\bM-[0-9]/);
+      expect(item.reason).not.toMatch(/riskFlagCount/);
+      expect(item.reason).not.toMatch(/E[0-9]\.[0-9]/);
+      expect(item.reason).not.toMatch(/clinical_attention/);
     }
   });
 });

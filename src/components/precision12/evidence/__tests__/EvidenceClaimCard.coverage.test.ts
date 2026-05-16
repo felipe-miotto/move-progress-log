@@ -389,11 +389,43 @@ describe("E5.5 Precision12Console — integra Preview no fim do layout", () => {
     );
   });
 
-  it("renderiza <Precision12EvidencePreview> passando data.students/assessments/responses", () => {
+  // E5.6a / M-2: o Console agora passa ARRAYS FILTRADOS pro preview,
+  // pra respeitar os mesmos filtros operacionais que a fila e a tabela.
+  it("renderiza <Precision12EvidencePreview> passando arrays filtrados (M-2)", () => {
     expect(consoleSource).toMatch(/<Precision12EvidencePreview\b/);
-    expect(consoleSource).toMatch(/students=\{data\.students\}/);
-    expect(consoleSource).toMatch(/assessments=\{data\.assessments\}/);
-    expect(consoleSource).toMatch(/responses=\{data\.responses\}/);
+    // Antes do M-2: students={data.students}. Agora: students={filteredStudents}.
+    expect(consoleSource).toMatch(/students=\{filteredStudents\}/);
+    expect(consoleSource).toMatch(
+      /assessments=\{filteredAssessmentsForEvidence\}/,
+    );
+    expect(consoleSource).toMatch(
+      /responses=\{filteredResponsesForEvidence\}/,
+    );
+    // Defesa: não pode mais passar arrays crus diretos do hook.
+    expect(consoleSource).not.toMatch(/<Precision12EvidencePreview[^>]*students=\{data\.students\}/);
+  });
+
+  it("deriva filteredAssessmentsForEvidence e filteredResponsesForEvidence em cascata (M-2)", () => {
+    // Cascata: students filtrados → assessments daqueles alunos → responses
+    // daquelas assessments. Os 3 useMemo devem existir.
+    expect(consoleSource).toContain("filteredStudentIdsForEvidence");
+    expect(consoleSource).toContain("filteredAssessmentsForEvidence");
+    expect(consoleSource).toContain("filteredResponsesForEvidence");
+    // Source-based check: o filtro de assessments usa filteredStudentIdsForEvidence.
+    expect(consoleSource).toMatch(
+      /filteredStudentIdsForEvidence\.has\(a\.student_id\)/,
+    );
+    // E o filtro de responses usa filteredAssessmentIdsForEvidence.
+    expect(consoleSource).toMatch(
+      /filteredAssessmentIdsForEvidence\.has\(r\.assessment_id\)/,
+    );
+  });
+
+  it("mostra FilteredEmpty na seção do preview quando filtros zeram alunos (M-2)", () => {
+    // Mesma microcopy/pattern usado pelas seções de fila e tabela.
+    expect(consoleSource).toContain(
+      "Nenhuma evidência corresponde aos filtros atuais.",
+    );
   });
 
   it("o bloco da preview tem heading com label 'Evidência clínica-operacional (preview)'", () => {
@@ -401,5 +433,29 @@ describe("E5.5 Precision12Console — integra Preview no fim do layout", () => {
     expect(consoleSource).toContain(
       'aria-labelledby="precision12-evidence-preview-heading"',
     );
+  });
+});
+
+// ── E5.6a / M-7: preview lista também QUESTIONNAIRE_FIELDS_NOT_MAPPED_YET ──
+
+describe("E5.6a / M-7 Precision12EvidencePreview — campos não-mapeados", () => {
+  it("importa QUESTIONNAIRE_FIELDS_NOT_MAPPED_YET do mapping", () => {
+    expect(previewSource).toMatch(
+      /import[\s\S]*QUESTIONNAIRE_FIELDS_NOT_MAPPED_YET[\s\S]*from\s*"@\/utils\/precision12EvidenceMapping"/,
+    );
+  });
+
+  it("renderiza as duas listas dentro do <details> (domínios + campos)", () => {
+    expect(previewSource).toContain(
+      'data-testid="evidence-preview-limitations-domains"',
+    );
+    expect(previewSource).toContain(
+      'data-testid="evidence-preview-limitations-fields"',
+    );
+  });
+
+  it("summary do <details> mostra contagem combinada (domínios + campos)", () => {
+    expect(previewSource).toContain("domínios");
+    expect(previewSource).toContain("campos do questionário");
   });
 });

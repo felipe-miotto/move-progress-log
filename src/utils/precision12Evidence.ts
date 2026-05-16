@@ -105,6 +105,19 @@ export const EVIDENCE_RISK_LEVEL_LABEL: Record<EvidenceRiskLanguageLevel, string
   actionable: "Próximo passo",
 };
 
+/**
+ * Prioridade visual de cada nível, do mais ao menos urgente. Usado para
+ * ordenação estável das claims dentro de um grupo (E5.6a / M-5):
+ * `actionable` (Próximo passo) primeiro, `reassuring` (Favorável) por último.
+ * Quanto MENOR o número, MAIOR a prioridade.
+ */
+export const EVIDENCE_RISK_LEVEL_PRIORITY: Record<EvidenceRiskLanguageLevel, number> = {
+  actionable: 0,
+  watchful: 1,
+  informational: 2,
+  reassuring: 3,
+};
+
 /** Referência primária citada por uma claim. */
 export interface EvidenceSource {
   title: string;

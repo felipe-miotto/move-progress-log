@@ -98,6 +98,38 @@ export function Precision12Console() {
     [data, filters],
   );
 
+  // E5.6a / M-2: o preview de evidências precisa respeitar os mesmos
+  // filtros operacionais que a tabela de progresso e a fila — caso
+  // contrário, "ocultar dados de teste" some o SMOKE da fila e da tabela
+  // mas continua mostrando suas claims no preview. Filtramos em cascata:
+  // students → assessments daqueles alunos → responses daqueles assessments.
+  const filteredStudentIdsForEvidence = useMemo(
+    () => new Set(filteredStudents.map((s) => s.id)),
+    [filteredStudents],
+  );
+  const filteredAssessmentsForEvidence = useMemo(
+    () =>
+      data
+        ? data.assessments.filter((a) =>
+            filteredStudentIdsForEvidence.has(a.student_id),
+          )
+        : [],
+    [data, filteredStudentIdsForEvidence],
+  );
+  const filteredAssessmentIdsForEvidence = useMemo(
+    () => new Set(filteredAssessmentsForEvidence.map((a) => a.id)),
+    [filteredAssessmentsForEvidence],
+  );
+  const filteredResponsesForEvidence = useMemo(
+    () =>
+      data
+        ? data.responses.filter((r) =>
+            filteredAssessmentIdsForEvidence.has(r.assessment_id),
+          )
+        : [],
+    [data, filteredAssessmentIdsForEvidence],
+  );
+
   if (query.isLoading) {
     return <LoadingSkeleton />;
   }
@@ -195,6 +227,9 @@ export function Precision12Console() {
         (zero query nova). Cobertura inicial: PAR-Q + Sono/Estresse/
         Energia/Adesão. Demais domínios documentados como pendentes
         dentro do próprio componente (limitações em `<details>`).
+        E5.6a / M-2: agora recebe os arrays JÁ filtrados (em cascata
+        students→assessments→responses) pra respeitar os mesmos filtros
+        operacionais que a fila e a tabela de progresso.
       */}
       <section
         aria-labelledby="precision12-evidence-preview-heading"
@@ -206,11 +241,15 @@ export function Precision12Console() {
         >
           Evidência clínica-operacional (preview)
         </h3>
-        <Precision12EvidencePreview
-          students={data.students}
-          assessments={data.assessments}
-          responses={data.responses}
-        />
+        {data.students.length > 0 && filteredStudents.length === 0 ? (
+          <FilteredEmpty label="Nenhuma evidência corresponde aos filtros atuais." />
+        ) : (
+          <Precision12EvidencePreview
+            students={filteredStudents}
+            assessments={filteredAssessmentsForEvidence}
+            responses={filteredResponsesForEvidence}
+          />
+        )}
       </section>
     </div>
   );

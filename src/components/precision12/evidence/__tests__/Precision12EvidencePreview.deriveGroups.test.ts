@@ -130,7 +130,8 @@ describe("deriveEvidenceGroups — múltiplos alunos / múltiplas responses", ()
       ],
     });
     expect(groups).toHaveLength(2);
-    const names = groups.map((g) => g.studentName).sort();
+    const names = groups.map((g) => g.studentName);
+    // E5.6a / M-4: ordenação determinística por nome — Alex antes de Ana.
     expect(names).toEqual(["Alex Griebeler", "Ana Paula Prado"]);
   });
 
@@ -158,6 +159,162 @@ describe("deriveEvidenceGroups — múltiplos alunos / múltiplas responses", ()
     expect(classifications).toContain("PAR-Q sem sinalizações");
     expect(classifications).toContain("Sono insuficiente");
     expect(classifications).toContain("Estresse alto");
+  });
+});
+
+// ── E5.6a / M-4: ordenação determinística de grupos ─────────────────────────
+
+describe("deriveEvidenceGroups — M-4 ordenação determinística", () => {
+  it("ordena grupos por studentName ASC mesmo quando responses vêm fora de ordem", () => {
+    const groups = deriveEvidenceGroups({
+      students: [
+        student({ id: "s1", name: "Zé da Silva" }),
+        student({ id: "s2", name: "Ana Paula" }),
+        student({ id: "s3", name: "Beto Almeida" }),
+      ],
+      assessments: [
+        assessment({ id: "a1", student_id: "s1" }),
+        assessment({ id: "a2", student_id: "s2" }),
+        assessment({ id: "a3", student_id: "s3" }),
+      ],
+      // Ordem das responses propositalmente embaralhada — não deve afetar
+      // a ordem dos grupos no resultado.
+      responses: [
+        response({ assessment_id: "a1" }), // Zé primeiro
+        response({ assessment_id: "a3" }), // Beto
+        response({ assessment_id: "a2" }), // Ana por último
+      ],
+    });
+    expect(groups.map((g) => g.studentName)).toEqual([
+      "Ana Paula",
+      "Beto Almeida",
+      "Zé da Silva",
+    ]);
+  });
+
+  it("ordenação é estável (locale pt-BR, insensível a acento)", () => {
+    const groups = deriveEvidenceGroups({
+      students: [
+        student({ id: "s1", name: "Ávila" }),
+        student({ id: "s2", name: "Augusto" }),
+      ],
+      assessments: [
+        assessment({ id: "a1", student_id: "s1" }),
+        assessment({ id: "a2", student_id: "s2" }),
+      ],
+      responses: [
+        response({ assessment_id: "a2" }),
+        response({ assessment_id: "a1" }),
+      ],
+    });
+    // "Augusto" (sem acento) > "Ávila" no compare insensível a acento.
+    expect(groups.map((g) => g.studentName)).toEqual(["Augusto", "Ávila"]);
+  });
+});
+
+// ── E5.6a / M-5: sort por severidade dentro de cada grupo ───────────────────
+
+describe("deriveEvidenceGroups — M-5 sort por severidade", () => {
+  it("claims ordenadas: actionable → watchful → informational → reassuring", () => {
+    const groups = deriveEvidenceGroups({
+      students: [student()],
+      assessments: [assessment()],
+      // PAR-Q+ (actionable) + Sono insuficiente (watchful) + Estresse alto (watchful)
+      // Como riskFlagCount = 2, dispara também "Risco de adesão (≥ 2 flags)" (watchful).
+      responses: [
+        response({
+          parq_blocked: true,
+          sleep_quality: 1,
+          stress_level: 5,
+        }),
+      ],
+    });
+    expect(groups).toHaveLength(1);
+    const levels = groups[0].claims.map((c) => c.riskLanguageLevel);
+    // Primeiro claim deve ser o actionable; reassuring (se houvesse) viria por último.
+    expect(levels[0]).toBe("actionable");
+    // Todos os watchful vêm depois do actionable.
+    const firstWatchfulIndex = levels.findIndex((l) => l === "watchful");
+    expect(firstWatchfulIndex).toBeGreaterThan(0);
+    // Nenhum non-actionable aparece ANTES do primeiro actionable.
+    expect(levels.indexOf("actionable")).toBe(0);
+  });
+
+  it("reassuring fica por último quando convive com watchful/actionable", () => {
+    const groups = deriveEvidenceGroups({
+      students: [student()],
+      assessments: [
+        assessment({ id: "a1", student_id: "s1" }),
+        assessment({ id: "a2", student_id: "s1" }),
+      ],
+      responses: [
+        // Response #1: PAR-Q cleared (reassuring)
+        response({ assessment_id: "a1", parq_blocked: false }),
+        // Response #2: PAR-Q+ (actionable) + sono ruim (watchful)
+        response({
+          assessment_id: "a2",
+          parq_blocked: true,
+          sleep_quality: 1,
+        }),
+      ],
+    });
+    expect(groups).toHaveLength(1);
+    const levels = groups[0].claims.map((c) => c.riskLanguageLevel);
+    expect(levels[0]).toBe("actionable");
+    expect(levels[levels.length - 1]).toBe("reassuring");
+  });
+});
+
+// ── E5.6a / M-6: dedup de claims dentro do mesmo grupo ──────────────────────
+
+describe("deriveEvidenceGroups — M-6 dedup de claims duplicadas", () => {
+  it("2 responses idênticas do mesmo aluno → claims únicas (sem duplicata)", () => {
+    const sameResponse = response({ parq_blocked: true });
+    const groups = deriveEvidenceGroups({
+      students: [student()],
+      assessments: [
+        assessment({ id: "a1", student_id: "s1" }),
+        assessment({ id: "a2", student_id: "s1" }),
+      ],
+      responses: [
+        { ...sameResponse, assessment_id: "a1" },
+        { ...sameResponse, assessment_id: "a2" },
+      ],
+    });
+    expect(groups).toHaveLength(1);
+    const classifications = groups[0].claims.map((c) => c.classification);
+    // Deve aparecer só UMA vez, mesmo vindo de 2 responses iguais.
+    const parqCount = classifications.filter(
+      (c) => c === "PAR-Q positivo (blocked)",
+    ).length;
+    expect(parqCount).toBe(1);
+  });
+
+  it("dedup preserva ordem da PRIMEIRA ocorrência", () => {
+    const groups = deriveEvidenceGroups({
+      students: [student()],
+      assessments: [
+        assessment({ id: "a1", student_id: "s1" }),
+        assessment({ id: "a2", student_id: "s1" }),
+      ],
+      responses: [
+        // Response #1: PAR-Q+ (actionable)
+        response({ assessment_id: "a1", parq_blocked: true }),
+        // Response #2: PAR-Q+ DE NOVO (igual) + sono ruim (watchful)
+        response({
+          assessment_id: "a2",
+          parq_blocked: true,
+          sleep_quality: 1,
+        }),
+      ],
+    });
+    expect(groups).toHaveLength(1);
+    const classifications = groups[0].claims.map((c) => c.classification);
+    // Não deve haver duplicata; ordem: PAR-Q+ → Sono insuficiente (após sort
+    // por severidade: actionable vem antes de watchful).
+    expect(classifications.filter((c) => c === "PAR-Q positivo (blocked)"))
+      .toHaveLength(1);
+    expect(classifications).toContain("Sono insuficiente");
   });
 });
 
