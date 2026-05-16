@@ -50,29 +50,35 @@ describe("E5.4 EvidenceClaimCard — campos renderizados", () => {
     expect(cardSource).toContain("{claim.coachAction}");
   });
 
-  it("renderiza disclaimer com label 'Aviso clínico'", () => {
+  it("renderiza disclaimer com label 'Aviso clínico' dentro de <Alert>", () => {
     expect(cardSource).toContain("Aviso clínico");
     expect(cardSource).toContain("{claim.disclaimer}");
+    // Endurecido: disclaimer agora usa Alert do shadcn (visualmente mais
+    // forte que <p role="note">), com ícone Info, mantendo tom sóbrio.
+    expect(cardSource).toContain(
+      'from "@/components/ui/alert"',
+    );
+    expect(cardSource).toMatch(/<Alert\b/);
+    expect(cardSource).toContain("AlertDescription");
+    expect(cardSource).toMatch(/import\s*\{\s*Info\s*\}\s*from\s*"lucide-react"/);
+    expect(cardSource).toMatch(/<Info\b/);
+    // Garante que o <p role="note"> fraco NÃO voltou.
+    expect(cardSource).not.toMatch(/<p[^>]*role="note"/);
   });
 
   it("renderiza classification como título do card", () => {
     expect(cardSource).toContain("{claim.classification}");
   });
 
-  it("renderiza domain via DOMAIN_LABEL", () => {
-    expect(cardSource).toContain("DOMAIN_LABEL[claim.domain]");
-    // Cobre os 7 domínios
-    for (const domain of [
-      "vo2_max",
-      "fc_recovery_1min",
-      "handgrip",
-      "sit_to_stand",
-      "dexa",
-      "questionnaire_parq",
-      "sleep_stress_energy_adherence",
-    ]) {
-      expect(cardSource).toContain(domain);
-    }
+  it("renderiza domain via EVIDENCE_DOMAIN_LABEL importado do util (sem hard-code interno)", () => {
+    expect(cardSource).toContain("EVIDENCE_DOMAIN_LABEL[claim.domain]");
+    expect(cardSource).toMatch(
+      /import\s*\{[\s\S]*?EVIDENCE_DOMAIN_LABEL[\s\S]*?\}\s*from\s*"@\/utils\/precision12Evidence"/,
+    );
+    // Endurecido: NÃO existe mais const local DOMAIN_LABEL no card.
+    expect(cardSource).not.toMatch(/const\s+DOMAIN_LABEL\s*[:=]/);
+    // Cobertura dos 7 domínios continua via lookup do util (testado em
+    // precision12Evidence.test.ts). O card só precisa importar.
   });
 
   it("renderiza observedValue condicionalmente (só quando presente)", () => {
@@ -113,20 +119,21 @@ describe("E5.4 EvidenceClaimCard — fontes", () => {
 // ── EvidenceClaimCard: tom de risco visual ──────────────────────────────────
 
 describe("E5.4 EvidenceClaimCard — riskLanguageLevel não-alarmista", () => {
-  it("mapeia os 4 níveis de risco em labels", () => {
-    expect(cardSource).toContain("RISK_LEVEL_LABEL");
-    expect(cardSource).toContain('"Favorável"');
-    expect(cardSource).toContain('"Informativo"');
-    expect(cardSource).toContain('"Atenção"');
-    expect(cardSource).toContain('"Próximo passo"');
+  it("mapeia os 4 níveis de risco via EVIDENCE_RISK_LEVEL_LABEL importado do util", () => {
+    expect(cardSource).toContain("EVIDENCE_RISK_LEVEL_LABEL[claim.riskLanguageLevel]");
+    expect(cardSource).toMatch(
+      /import\s*\{[\s\S]*?EVIDENCE_RISK_LEVEL_LABEL[\s\S]*?\}\s*from\s*"@\/utils\/precision12Evidence"/,
+    );
+    // Endurecido: NÃO existe mais const local RISK_LEVEL_LABEL no card.
+    expect(cardSource).not.toMatch(/const\s+RISK_LEVEL_LABEL\s*[:=]/);
   });
 
-  it("'actionable' usa label 'Próximo passo' (positive assertion)", () => {
-    // Label literal exata — não tentamos detectar comentários documentais
-    // proibindo termos (já vimos `not.toMatch(/emerg/i)` quebrar em
-    // comentários que dizem "NUNCA emergência"). Aqui basta garantir que
-    // a label final pro usuário é "Próximo passo".
-    expect(cardSource).toMatch(/actionable:\s*"Próximo passo"/);
+  it("'actionable' usa label 'Próximo passo' via util (positive assertion)", () => {
+    // Label literal exata vive em EVIDENCE_RISK_LEVEL_LABEL no util.
+    // Asserção indireta: o card importa essa const e nenhum mapa de label
+    // duplicado existe.
+    expect(cardSource).toContain("EVIDENCE_RISK_LEVEL_LABEL");
+    expect(cardSource).not.toMatch(/actionable:\s*"[^"]*emergência/i);
   });
 
   it("badge variant é 'destructive' apenas para actionable; cores sóbrias", () => {
@@ -163,9 +170,16 @@ describe("E5.4 EvidenceClaimList", () => {
     expect(listSource).toMatch(/claims\.length\s*===\s*0/);
   });
 
-  it("renderiza N EvidenceClaimCard com key estável", () => {
+  it("renderiza N EvidenceClaimCard com key estável (sem index)", () => {
     expect(listSource).toContain("EvidenceClaimCard");
-    expect(listSource).toMatch(/key=\{`\$\{claim\.domain\}-/);
+    // Key é tripleta domain-metric-classification (cada tripleta é única
+    // no catálogo — verificado em precision12Evidence.test.ts). Não usa
+    // index para que filtragem/reordenação futuras (E5.5) não re-mount.
+    expect(listSource).toMatch(
+      /key=\{`\$\{claim\.domain\}-\$\{claim\.metric\}-\$\{claim\.classification\}`\}/,
+    );
+    // Endurecido: NÃO inclui index na key.
+    expect(listSource).not.toMatch(/key=\{`[^`]*\$\{index\}/);
   });
 
   it("repassa showPrinciples pra cada card", () => {

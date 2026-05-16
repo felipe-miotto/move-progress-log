@@ -20,12 +20,17 @@
  * prop `showPrinciples`.
  */
 
+import { Info } from "lucide-react";
+
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import type {
-  EvidenceClaim,
-  EvidenceRiskLanguageLevel,
+import {
+  EVIDENCE_DOMAIN_LABEL,
+  EVIDENCE_RISK_LEVEL_LABEL,
+  type EvidenceClaim,
+  type EvidenceRiskLanguageLevel,
 } from "@/utils/precision12Evidence";
 
 interface EvidenceClaimCardProps {
@@ -33,23 +38,6 @@ interface EvidenceClaimCardProps {
   /** Mostra bloco de debug com as 4 flags de princípio. Default: false. */
   showPrinciples?: boolean;
 }
-
-const DOMAIN_LABEL: Record<EvidenceClaim["domain"], string> = {
-  vo2_max: "VO₂ máx",
-  fc_recovery_1min: "Recuperação FC (1 min)",
-  handgrip: "Força de preensão (handgrip)",
-  sit_to_stand: "Sentar e levantar (sit-to-stand)",
-  dexa: "DEXA / Composição corporal",
-  questionnaire_parq: "Questionário / PAR-Q",
-  sleep_stress_energy_adherence: "Sono · Estresse · Energia · Adesão",
-};
-
-const RISK_LEVEL_LABEL: Record<EvidenceRiskLanguageLevel, string> = {
-  reassuring: "Favorável",
-  informational: "Informativo",
-  watchful: "Atenção",
-  actionable: "Próximo passo",
-};
 
 const RISK_LEVEL_VARIANT: Record<
   EvidenceRiskLanguageLevel,
@@ -74,7 +62,7 @@ export function EvidenceClaimCard({
   claim,
   showPrinciples = false,
 }: EvidenceClaimCardProps) {
-  const riskLabel = RISK_LEVEL_LABEL[claim.riskLanguageLevel];
+  const riskLabel = EVIDENCE_RISK_LEVEL_LABEL[claim.riskLanguageLevel];
   const riskVariant = RISK_LEVEL_VARIANT[claim.riskLanguageLevel];
   const borderClass = RISK_LEVEL_BORDER[claim.riskLanguageLevel];
 
@@ -89,7 +77,7 @@ export function EvidenceClaimCard({
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="space-y-1">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">
-              {DOMAIN_LABEL[claim.domain]}
+              {EVIDENCE_DOMAIN_LABEL[claim.domain]}
             </p>
             <CardTitle className="text-base leading-snug">
               {claim.classification}
@@ -180,13 +168,13 @@ export function EvidenceClaimCard({
           </ul>
         </section>
 
-        <p
-          className="rounded-md border border-dashed border-border bg-muted/40 p-2 text-xs leading-relaxed text-muted-foreground"
-          role="note"
-        >
-          <span className="font-semibold">Aviso clínico:</span>{" "}
-          {claim.disclaimer}
-        </p>
+        <Alert role="note" aria-label="Aviso clínico">
+          <Info className="h-4 w-4" aria-hidden="true" />
+          <AlertDescription className="text-sm leading-relaxed">
+            <span className="font-semibold">Aviso clínico:</span>{" "}
+            {claim.disclaimer}
+          </AlertDescription>
+        </Alert>
 
         {showPrinciples && (
           <section

@@ -52,12 +52,13 @@ export function EvidenceClaimList({
         </h3>
       )}
       <div className="grid gap-3">
-        {claims.map((claim, index) => (
+        {claims.map((claim) => (
           <EvidenceClaimCard
-            // Catálogo pode ter múltiplas claims do mesmo domain/metric
-            // (DEXA com múltiplos marcadores); o index assegura key estável
-            // dentro da mesma lista renderizada.
-            key={`${claim.domain}-${claim.metric}-${claim.classification}-${index}`}
+            // Tripleta (domain, metric, classification) é única no catálogo
+            // (verificado por unit tests do EVIDENCE_CATALOG em E5.1/E5.2);
+            // a key permanece estável mesmo se a lista for filtrada ou
+            // reordenada em superfícies futuras (Coach Console / drawer).
+            key={`${claim.domain}-${claim.metric}-${claim.classification}`}
             claim={claim}
             showPrinciples={showPrinciples}
           />

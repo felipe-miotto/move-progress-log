@@ -20,7 +20,9 @@ import {
   EVIDENCE_CATALOG,
   EVIDENCE_DOMAINS,
   EVIDENCE_DOMAIN_DISCLAIMER_KEYWORDS,
+  EVIDENCE_DOMAIN_LABEL,
   EVIDENCE_PROHIBITED_TERMS,
+  EVIDENCE_RISK_LEVEL_LABEL,
   EVIDENCE_SOURCE_CATALOG,
   PARQ_BLOCKED_COACH_ACTION_KEYWORDS,
   getClaimsByDomain,
@@ -614,5 +616,32 @@ describe("EVIDENCE_SOURCE_CATALOG — referências robustas por teste", () => {
     expect(citations).toContain("Cohen");
     expect(citations).toContain("Ryan");
     expect(citations).toContain("Eynon");
+  });
+});
+
+// ── 10. Labels exportados pra UI (E5.4 endurecido) ──────────────────────────
+
+describe("EVIDENCE_DOMAIN_LABEL + EVIDENCE_RISK_LEVEL_LABEL", () => {
+  it("EVIDENCE_DOMAIN_LABEL cobre os 7 domínios da spec", () => {
+    for (const domain of EVIDENCE_DOMAINS) {
+      const label = EVIDENCE_DOMAIN_LABEL[domain];
+      expect(label, `${domain} sem label`).toBeTruthy();
+      expect(typeof label).toBe("string");
+      expect(label.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("EVIDENCE_RISK_LEVEL_LABEL mapeia os 4 níveis com tom não-alarmista", () => {
+    expect(EVIDENCE_RISK_LEVEL_LABEL.reassuring).toBe("Favorável");
+    expect(EVIDENCE_RISK_LEVEL_LABEL.informational).toBe("Informativo");
+    expect(EVIDENCE_RISK_LEVEL_LABEL.watchful).toBe("Atenção");
+    expect(EVIDENCE_RISK_LEVEL_LABEL.actionable).toBe("Próximo passo");
+    // Tom não-alarmista: nenhuma label contém palavras de pânico.
+    const labels: string[] = Object.values(EVIDENCE_RISK_LEVEL_LABEL);
+    for (const label of labels) {
+      expect(label.toLowerCase()).not.toMatch(
+        /emerg(ência|encia)|alarme|perigo|urgência|urgencia|crítico|critico/,
+      );
+    }
   });
 });

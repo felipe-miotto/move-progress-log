@@ -62,6 +62,22 @@ export const EVIDENCE_DOMAINS: readonly EvidenceDomain[] = [
 ] as const;
 
 /**
+ * Label legível por humano para cada domínio. Exportado pra ser
+ * compartilhado entre `EvidenceClaimCard` (E5.4), futuras superfícies
+ * (Coach Console / drawer / PDF E6) e qualquer ponto que precisar
+ * etiquetar o domínio na UI. Centralizado aqui pra evitar duplicação.
+ */
+export const EVIDENCE_DOMAIN_LABEL: Record<EvidenceDomain, string> = {
+  vo2_max: "VO₂ máx",
+  fc_recovery_1min: "Recuperação FC (1 min)",
+  handgrip: "Força de preensão (handgrip)",
+  sit_to_stand: "Sentar e levantar (sit-to-stand)",
+  dexa: "DEXA / Composição corporal",
+  questionnaire_parq: "Questionário / PAR-Q",
+  sleep_stress_energy_adherence: "Sono · Estresse · Energia · Adesão",
+};
+
+/**
  * Tonalidade da linguagem da claim. NUNCA é alarmista.
  *
  *   • `reassuring`     — resultado favorável; reforço positivo.
@@ -75,6 +91,19 @@ export type EvidenceRiskLanguageLevel =
   | "informational"
   | "watchful"
   | "actionable";
+
+/**
+ * Label legível por humano para cada nível de tom. Centralizado pra ser
+ * compartilhado entre UI (`EvidenceClaimCard`), futuras superfícies de
+ * triagem e o gerador de PDF (E6). Mantém o tom NÃO-alarmista do nível
+ * `actionable` ("Próximo passo", nunca "emergência").
+ */
+export const EVIDENCE_RISK_LEVEL_LABEL: Record<EvidenceRiskLanguageLevel, string> = {
+  reassuring: "Favorável",
+  informational: "Informativo",
+  watchful: "Atenção",
+  actionable: "Próximo passo",
+};
 
 /** Referência primária citada por uma claim. */
 export interface EvidenceSource {
