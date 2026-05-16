@@ -559,9 +559,69 @@ const {
   ADHERENCE_EYNON_2019,
 } = EVIDENCE_SOURCE_CATALOG;
 
-/** Catálogo inicial. Ordem é apenas pra leitura humana; não é semântica. */
+const VO2_SOURCES = [
+  VO2_FRIEND_2022,
+  VO2_KODAMA_2009,
+  EXERCISE_ACSM_GARBER_2011,
+];
+const FC_RECOVERY_SOURCES = [
+  FC_RECOVERY_COLE_1999,
+  FC_RECOVERY_NISHIME_2000,
+  FC_RECOVERY_VIVEKANANTHAN_2003,
+];
+const HANDGRIP_REFERENCE_SOURCES = [
+  HANDGRIP_MATHIOWETZ_1985,
+  HANDGRIP_DODDS_2014,
+  HANDGRIP_LEONG_2015,
+];
+const HANDGRIP_WATCHFUL_SOURCES = [
+  HANDGRIP_MATHIOWETZ_1985,
+  HANDGRIP_DODDS_2014,
+  HANDGRIP_LEONG_2015,
+  HANDGRIP_EWGSOP2_2019,
+];
+const SIT_TO_STAND_SOURCES = [
+  SIT_TO_STAND_ARAUJO_2012,
+  SIT_TO_STAND_ARAUJO_2020,
+];
+const DEXA_BODY_FAT_SOURCES = [
+  DEXA_KELLY_2009,
+  DEXA_GALLAGHER_2000,
+  DEXA_ISCD_2013,
+];
+const DEXA_LEAN_MASS_SOURCES = [
+  DEXA_KELLY_2009,
+  DEXA_BAUMGARTNER_1998,
+  DEXA_ISCD_2013,
+];
+const PARQ_SOURCES = [PARQ_WARBURTON_2011, PARQ_ACSM_THOMPSON_2013];
+const ADHERENCE_SOURCES = [
+  SLEEP_AASM_SRS_2015,
+  STRESS_COHEN_1983,
+  ENERGY_RYAN_1997,
+  ADHERENCE_EYNON_2019,
+];
+
+/** Catálogo ampliado. Ordem é apenas pra leitura humana; não é semântica. */
 export const EVIDENCE_CATALOG: readonly EvidenceClaim[] = [
   // ── VO2 ────────────────────────────────────────────────────────────────
+  {
+    domain: "vo2_max",
+    metric: "vo2_max",
+    observedValue: null,
+    classification: "Muito fraco",
+    interpretation:
+      "VO₂ máx na faixa Muito fraco sugere reserva aeróbica baixa para idade/sexo e pode estar associado a maior risco cardiometabólico em coortes populacionais.",
+    evidenceSummary:
+      "FRIEND oferece percentis contemporâneos de VO₂pico; Kodama et al. mostra associação dose-resposta entre menor aptidão cardiorrespiratória e maior risco de mortalidade/eventos cardiovasculares.",
+    coachAction:
+      "Priorizar base aeróbica progressiva e baixa barreira de adesão. Reavaliar tolerância, recuperação e sinais de fadiga antes de progredir intensidade.",
+    riskLanguageLevel: "actionable",
+    sources: VO2_SOURCES,
+    disclaimer:
+      "Faixas de referência são populacionais; o resultado individual deve ser integrado ao contexto de treino e ao acompanhamento clínico do aluno.",
+    principles: ALL_PRINCIPLES_OK,
+  },
   {
     domain: "vo2_max",
     metric: "vo2_max",
@@ -574,7 +634,24 @@ export const EVIDENCE_CATALOG: readonly EvidenceClaim[] = [
     coachAction:
       "Considerar progressão estruturada em condicionamento aeróbico (zona 2 + alguns intervalados) e reavaliar em 12 semanas. Decisão de carga deve integrar o contexto do aluno e eventual acompanhamento clínico paralelo.",
     riskLanguageLevel: "watchful",
-    sources: [VO2_FRIEND_2022, VO2_KODAMA_2009, EXERCISE_ACSM_GARBER_2011],
+    sources: VO2_SOURCES,
+    disclaimer:
+      "Faixas de referência são populacionais; o resultado individual deve ser integrado ao contexto de treino e ao acompanhamento clínico do aluno.",
+    principles: ALL_PRINCIPLES_OK,
+  },
+  {
+    domain: "vo2_max",
+    metric: "vo2_max",
+    observedValue: null,
+    classification: "Regular",
+    interpretation:
+      "VO₂ máx na faixa Regular sugere capacidade aeróbica intermediária para idade/sexo; há espaço claro para ganho de condicionamento com progressão consistente.",
+    evidenceSummary:
+      "FRIEND contextualiza percentis por sexo/idade; ACSM orienta combinação de volume aeróbico e progressão de intensidade para desenvolver aptidão cardiorrespiratória.",
+    coachAction:
+      "Manter frequência aeróbica mínima consistente, aumentar volume de forma gradual e incluir estímulos moderados conforme recuperação e adesão permitirem.",
+    riskLanguageLevel: "informational",
+    sources: VO2_SOURCES,
     disclaimer:
       "Faixas de referência são populacionais; o resultado individual deve ser integrado ao contexto de treino e ao acompanhamento clínico do aluno.",
     principles: ALL_PRINCIPLES_OK,
@@ -591,9 +668,26 @@ export const EVIDENCE_CATALOG: readonly EvidenceClaim[] = [
     coachAction:
       "Manter rotina aeróbica; pode-se trabalhar progressão de performance (limiares, economia de corrida/bike). Integrar com objetivos do aluno e contexto de treino.",
     riskLanguageLevel: "reassuring",
-    sources: [VO2_FRIEND_2022, VO2_KODAMA_2009, EXERCISE_ACSM_GARBER_2011],
+    sources: VO2_SOURCES,
     disclaimer:
       "Mesmo com resultado favorável, manter acompanhamento periódico e reler dentro do contexto multidimensional do treino e do estilo de vida.",
+    principles: ALL_PRINCIPLES_OK,
+  },
+  {
+    domain: "vo2_max",
+    metric: "vo2_max",
+    observedValue: null,
+    classification: "Excelente",
+    interpretation:
+      "VO₂ máx na faixa Excelente sugere aptidão cardiorrespiratória alta para idade/sexo e está associado a perfil de risco mais favorável em estudos populacionais.",
+    evidenceSummary:
+      "FRIEND define percentis altos de VO₂pico; evidência epidemiológica associa maior aptidão cardiorrespiratória a menor mortalidade e menor risco cardiovascular.",
+    coachAction:
+      "Preservar base aeróbica, individualizar estímulos de performance e evitar que progressão de intensidade comprometa recuperação, força e adesão.",
+    riskLanguageLevel: "reassuring",
+    sources: VO2_SOURCES,
+    disclaimer:
+      "Resultado favorável não elimina necessidade de acompanhamento periódico e leitura dentro do contexto integral de treino e estilo de vida.",
     principles: ALL_PRINCIPLES_OK,
   },
 
@@ -610,11 +704,24 @@ export const EVIDENCE_CATALOG: readonly EvidenceClaim[] = [
     coachAction:
       "Reavaliar em sessões subsequentes para verificar consistência; integrar com hidratação, sono e contexto de carga recente antes de tirar conclusão.",
     riskLanguageLevel: "watchful",
-    sources: [
-      FC_RECOVERY_COLE_1999,
-      FC_RECOVERY_NISHIME_2000,
-      FC_RECOVERY_VIVEKANANTHAN_2003,
-    ],
+    sources: FC_RECOVERY_SOURCES,
+    disclaimer:
+      "Métrica isolada não fecha quadro — manter acompanhamento integrado com outras variáveis e com contexto clínico/treino.",
+    principles: ALL_PRINCIPLES_OK,
+  },
+  {
+    domain: "fc_recovery_1min",
+    metric: "fc_recovery_1min_bpm",
+    observedValue: null,
+    classification: "Adequada",
+    interpretation:
+      "Recuperação de FC no primeiro minuto em faixa adequada sugere resposta autonômica pós-esforço compatível com boa recuperação naquele contexto de teste.",
+    evidenceSummary:
+      "Cole, Nishime e Vivekananthan associam recuperação mais rápida de FC a perfil prognóstico mais favorável; a métrica deve ser lida junto do protocolo e do esforço atingido.",
+    coachAction:
+      "Manter monitoramento em reavaliações, comparando sempre protocolo, esforço percebido, sono e carga recente para interpretar tendências.",
+    riskLanguageLevel: "reassuring",
+    sources: FC_RECOVERY_SOURCES,
     disclaimer:
       "Métrica isolada não fecha quadro — manter acompanhamento integrado com outras variáveis e com contexto clínico/treino.",
     principles: ALL_PRINCIPLES_OK,
@@ -633,12 +740,7 @@ export const EVIDENCE_CATALOG: readonly EvidenceClaim[] = [
     coachAction:
       "Inserir trabalho de força global e acompanhamento de adesão; reavaliar handgrip em 8-12 semanas. Discutir nutrição (proteína adequada) com profissional habilitado se relevante ao caso.",
     riskLanguageLevel: "watchful",
-    sources: [
-      HANDGRIP_MATHIOWETZ_1985,
-      HANDGRIP_DODDS_2014,
-      HANDGRIP_LEONG_2015,
-      HANDGRIP_EWGSOP2_2019,
-    ],
+    sources: HANDGRIP_WATCHFUL_SOURCES,
     disclaimer:
       "Resultado deve ser interpretado em conjunto com outras métricas e com o acompanhamento de treino, não isolado.",
     principles: ALL_PRINCIPLES_OK,
@@ -655,11 +757,24 @@ export const EVIDENCE_CATALOG: readonly EvidenceClaim[] = [
     coachAction:
       "Manter rotina de força e reavaliar periodicamente. Integrar com objetivos individuais do aluno no treino.",
     riskLanguageLevel: "informational",
-    sources: [
-      HANDGRIP_MATHIOWETZ_1985,
-      HANDGRIP_DODDS_2014,
-      HANDGRIP_LEONG_2015,
-    ],
+    sources: HANDGRIP_REFERENCE_SOURCES,
+    disclaimer:
+      "Métrica pontual; manter acompanhamento periódico de treino e contexto integral.",
+    principles: ALL_PRINCIPLES_OK,
+  },
+  {
+    domain: "handgrip",
+    metric: "handgrip_kg",
+    observedValue: null,
+    classification: "Alto",
+    interpretation:
+      "Handgrip na faixa Alta sugere força de preensão preservada para idade/sexo e está associado a perfil funcional mais favorável em coortes populacionais.",
+    evidenceSummary:
+      "Mathiowetz e Dodds contextualizam valores de referência; PURE associa maior força de preensão a menor risco de mortalidade e eventos cardiovasculares.",
+    coachAction:
+      "Manter treino de força global e usar handgrip como marcador simples de tendência, sem substituir avaliação de força por padrões de movimento.",
+    riskLanguageLevel: "reassuring",
+    sources: HANDGRIP_REFERENCE_SOURCES,
     disclaimer:
       "Métrica pontual; manter acompanhamento periódico de treino e contexto integral.",
     principles: ALL_PRINCIPLES_OK,
@@ -672,13 +787,30 @@ export const EVIDENCE_CATALOG: readonly EvidenceClaim[] = [
     observedValue: null,
     classification: "Alerta",
     interpretation:
-      "Score baixo (0–3) sugere perda combinada em força, mobilidade e equilíbrio. Indica necessidade de acompanhamento próximo, não diagnóstico.",
+      "Score baixo (0–3) sugere perda combinada em força, mobilidade e equilíbrio. Indica necessidade de acompanhamento próximo como sinal operacional.",
     evidenceSummary:
       "Brito/Araújo et al. reportam associação entre score baixo e maior mortalidade total; Araújo et al. 2020 fornece scores de referência por sexo e idade.",
     coachAction:
       "Trabalhar mobilidade de quadril/tornozelo, força de membros inferiores, core e equilíbrio. Reavaliar em 12 semanas; score é modificável mesmo após os 70 anos.",
     riskLanguageLevel: "watchful",
-    sources: [SIT_TO_STAND_ARAUJO_2012, SIT_TO_STAND_ARAUJO_2020],
+    sources: SIT_TO_STAND_SOURCES,
+    disclaimer:
+      "Score deve ser integrado ao histórico do aluno e ao acompanhamento clínico/treino, não usado isoladamente.",
+    principles: ALL_PRINCIPLES_OK,
+  },
+  {
+    domain: "sit_to_stand",
+    metric: "sit_to_stand_total",
+    observedValue: null,
+    classification: "Intermediário",
+    interpretation:
+      "Score intermediário sugere capacidade funcional útil, com oportunidades de melhora em mobilidade, força de membros inferiores e equilíbrio.",
+    evidenceSummary:
+      "Brito/Araújo associa scores mais baixos a maior risco em coorte de seguimento; Araújo et al. 2020 fornece referência por sexo/idade para contextualizar faixas intermediárias.",
+    coachAction:
+      "Manter progressão funcional com ênfase em controle, amplitude, força de membros inferiores e equilíbrio. Reavaliar periodicamente para observar tendência.",
+    riskLanguageLevel: "informational",
+    sources: SIT_TO_STAND_SOURCES,
     disclaimer:
       "Score deve ser integrado ao histórico do aluno e ao acompanhamento clínico/treino, não usado isoladamente.",
     principles: ALL_PRINCIPLES_OK,
@@ -695,7 +827,7 @@ export const EVIDENCE_CATALOG: readonly EvidenceClaim[] = [
     coachAction:
       "Manter rotina e progressão funcional periódica. Continuar acompanhamento integral.",
     riskLanguageLevel: "reassuring",
-    sources: [SIT_TO_STAND_ARAUJO_2012, SIT_TO_STAND_ARAUJO_2020],
+    sources: SIT_TO_STAND_SOURCES,
     disclaimer:
       "Resultado favorável; manter reavaliação periódica e acompanhamento do contexto integral do aluno.",
     principles: ALL_PRINCIPLES_OK,
@@ -714,7 +846,58 @@ export const EVIDENCE_CATALOG: readonly EvidenceClaim[] = [
     coachAction:
       "Integrar com VO₂, força, adesão e contexto nutricional; ajustar treino e, se aplicável, encaminhar a profissional de nutrição. Reavaliar DEXA em 4–6 meses.",
     riskLanguageLevel: "watchful",
-    sources: [DEXA_KELLY_2009, DEXA_GALLAGHER_2000, DEXA_ISCD_2013],
+    sources: DEXA_BODY_FAT_SOURCES,
+    disclaimer:
+      "Este app interpreta o laudo DEXA para acompanhamento de performance e composição; NÃO substitui o laudo médico da clínica parceira nem avaliação clínica especializada.",
+    principles: ALL_PRINCIPLES_OK,
+  },
+  {
+    domain: "dexa",
+    metric: "body_fat_pct",
+    observedValue: null,
+    classification: "% gordura dentro da referência",
+    interpretation:
+      "% de gordura corporal dentro da referência para idade/sexo sugere composição favorável naquele componente, sem dispensar leitura conjunta com massa magra, VO₂, força e adesão.",
+    evidenceSummary:
+      "NHANES/Kelly e Gallagher fornecem referências populacionais de composição por DXA; ISCD reforça que medidas devem considerar técnica, repetibilidade e contexto.",
+    coachAction:
+      "Manter rotina de força, condicionamento e hábitos de recuperação. Usar o resultado como baseline para acompanhar tendência em ciclos futuros.",
+    riskLanguageLevel: "reassuring",
+    sources: DEXA_BODY_FAT_SOURCES,
+    disclaimer:
+      "Este app interpreta o laudo DEXA para acompanhamento de performance e composição; NÃO substitui o laudo médico da clínica parceira nem avaliação clínica especializada.",
+    principles: ALL_PRINCIPLES_OK,
+  },
+  {
+    domain: "dexa",
+    metric: "visceral_fat_g",
+    observedValue: null,
+    classification: "Gordura visceral elevada",
+    interpretation:
+      "Gordura visceral elevada no laudo DEXA pode estar associada a perfil cardiometabólico menos favorável e merece acompanhamento de tendência ao longo do ciclo.",
+    evidenceSummary:
+      "NHANES/Kelly oferece referência por DXA e ISCD orienta interpretação técnica; % gordura e distribuição corporal devem ser lidas em conjunto, não isoladamente.",
+    coachAction:
+      "Integrar com VO₂, circunferências se disponíveis, adesão e contexto nutricional. Priorizar consistência de treino aeróbico/força e reavaliar em 4–6 meses.",
+    riskLanguageLevel: "watchful",
+    sources: DEXA_BODY_FAT_SOURCES,
+    disclaimer:
+      "Este app interpreta o laudo DEXA para acompanhamento de performance e composição; NÃO substitui o laudo médico da clínica parceira nem avaliação clínica especializada.",
+    principles: ALL_PRINCIPLES_OK,
+  },
+  {
+    domain: "dexa",
+    metric: "android_gynoid_ratio",
+    observedValue: null,
+    classification: "Relação androide/ginoide elevada",
+    interpretation:
+      "Relação androide/ginoide elevada sugere maior concentração relativa de gordura na região central, componente associado a perfil cardiometabólico menos favorável em estudos populacionais.",
+    evidenceSummary:
+      "NHANES/Kelly e Gallagher contextualizam composição corporal por DXA; ISCD reforça leitura técnica e repetibilidade das medidas de composição.",
+    coachAction:
+      "Acompanhar tendência junto de VO₂, força e adesão. Ajustar plano de treino e considerar integração com orientação nutricional quando fizer sentido.",
+    riskLanguageLevel: "watchful",
+    sources: DEXA_BODY_FAT_SOURCES,
     disclaimer:
       "Este app interpreta o laudo DEXA para acompanhamento de performance e composição; NÃO substitui o laudo médico da clínica parceira nem avaliação clínica especializada.",
     principles: ALL_PRINCIPLES_OK,
@@ -731,7 +914,24 @@ export const EVIDENCE_CATALOG: readonly EvidenceClaim[] = [
     coachAction:
       "Estruturar protocolo de força progressiva e acompanhar adesão. Considerar encaminhamento para nutrição clínica se ingestão proteica/calórica for fator. Reavaliar em 4–6 meses.",
     riskLanguageLevel: "actionable",
-    sources: [DEXA_KELLY_2009, DEXA_BAUMGARTNER_1998, DEXA_ISCD_2013],
+    sources: DEXA_LEAN_MASS_SOURCES,
+    disclaimer:
+      "Este app interpreta o laudo DEXA para acompanhamento de performance e composição; NÃO substitui o laudo médico da clínica parceira nem avaliação clínica especializada.",
+    principles: ALL_PRINCIPLES_OK,
+  },
+  {
+    domain: "dexa",
+    metric: "appendicular_lean_mass_kg",
+    observedValue: null,
+    classification: "ALM/altura² dentro da referência",
+    interpretation:
+      "Massa magra apendicular relativa à altura dentro da referência sugere reserva muscular favorável naquele componente, considerando idade, sexo e contexto de treino.",
+    evidenceSummary:
+      "NHANES/Kelly contextualiza massa magra por DXA; Baumgartner descreve ALM/altura² como índice populacional; ISCD orienta aquisição e repetibilidade das medidas.",
+    coachAction:
+      "Manter treino de força progressivo, acompanhar performance funcional e usar DEXA futura para observar tendência de massa magra ao longo do programa.",
+    riskLanguageLevel: "reassuring",
+    sources: DEXA_LEAN_MASS_SOURCES,
     disclaimer:
       "Este app interpreta o laudo DEXA para acompanhamento de performance e composição; NÃO substitui o laudo médico da clínica parceira nem avaliação clínica especializada.",
     principles: ALL_PRINCIPLES_OK,
@@ -750,7 +950,7 @@ export const EVIDENCE_CATALOG: readonly EvidenceClaim[] = [
     coachAction:
       "Revisar respostas do questionário com o aluno, encaminhar para acompanhamento clínico antes de prescrever treino vigoroso, e manter linhas de comunicação abertas com o profissional de saúde.",
     riskLanguageLevel: "actionable",
-    sources: [PARQ_WARBURTON_2011, PARQ_ACSM_THOMPSON_2013],
+    sources: PARQ_SOURCES,
     disclaimer:
       "PAR-Q é triagem operacional; NÃO substitui avaliação clínica nem laudo médico. Bloqueio significa apenas pausa precaucional para revisão profissional.",
     principles: ALL_PRINCIPLES_OK,
@@ -767,7 +967,7 @@ export const EVIDENCE_CATALOG: readonly EvidenceClaim[] = [
     coachAction:
       "Prosseguir com a programação. Manter reavaliação periódica do questionário em ciclos do programa.",
     riskLanguageLevel: "reassuring",
-    sources: [PARQ_WARBURTON_2011, PARQ_ACSM_THOMPSON_2013],
+    sources: PARQ_SOURCES,
     disclaimer:
       "PAR-Q é triagem operacional; NÃO substitui avaliação clínica. Manter atenção a eventuais mudanças de saúde durante o ciclo.",
     principles: ALL_PRINCIPLES_OK,
@@ -776,24 +976,87 @@ export const EVIDENCE_CATALOG: readonly EvidenceClaim[] = [
   // ── Sono / estresse / energia / adesão ─────────────────────────────────
   {
     domain: "sleep_stress_energy_adherence",
+    metric: "sleep_quality",
+    observedValue: null,
+    classification: "Sono insuficiente",
+    interpretation:
+      "Sono insuficiente ou de baixa qualidade pode estar associado a pior recuperação, menor energia percebida e maior dificuldade de aderir ao plano.",
+    evidenceSummary:
+      "O consenso AASM/SRS contextualiza necessidade de sono em adultos; revisões de adesão em exercício incluem fatores psicossociais e barreiras autorrelatadas como componentes relevantes.",
+    coachAction:
+      "Ajustar carga quando recuperação estiver baixa, discutir rotina pré-sono e acompanhar tendência no próximo questionário sem transformar o achado em rótulo clínico.",
+    riskLanguageLevel: "watchful",
+    sources: [SLEEP_AASM_SRS_2015, ADHERENCE_EYNON_2019],
+    disclaimer:
+      "Risco de adesão é sinal operacional, não substitui avaliação clínica — sempre integrar ao contexto integral do aluno e ao acompanhamento profissional adequado.",
+    principles: ALL_PRINCIPLES_OK,
+  },
+  {
+    domain: "sleep_stress_energy_adherence",
+    metric: "stress_level",
+    observedValue: null,
+    classification: "Estresse alto",
+    interpretation:
+      "Estresse percebido alto pode estar associado a menor recuperação percebida, maior barreira de adesão e necessidade de ajuste no plano de treino.",
+    evidenceSummary:
+      "Cohen fundamenta a mensuração de estresse percebido; Eynon et al. revisa fatores psicossociais associados à adesão em programas de exercício.",
+    coachAction:
+      "Reduzir complexidade operacional quando necessário, ajustar frequência/carga e considerar encaminhamento a profissional habilitado se o relato sugerir necessidade.",
+    riskLanguageLevel: "watchful",
+    sources: [STRESS_COHEN_1983, ADHERENCE_EYNON_2019],
+    disclaimer:
+      "Risco de adesão é sinal operacional, não substitui avaliação clínica — sempre integrar ao contexto integral do aluno e ao acompanhamento profissional adequado.",
+    principles: ALL_PRINCIPLES_OK,
+  },
+  {
+    domain: "sleep_stress_energy_adherence",
+    metric: "energy_level",
+    observedValue: null,
+    classification: "Baixa energia",
+    interpretation:
+      "Baixa energia autorrelatada pode estar associada a menor prontidão para treino e maior risco de inconsistência no ciclo.",
+    evidenceSummary:
+      "Ryan/Frederick descreve vitalidade subjetiva como reflexo dinâmico de energia e bem-estar; Eynon et al. contextualiza fatores psicossociais ligados à adesão.",
+    coachAction:
+      "Ajustar expectativa de sessão, observar tendência semanal e cruzar com sono, estresse, alimentação e carga recente antes de progredir volume.",
+    riskLanguageLevel: "watchful",
+    sources: [ENERGY_RYAN_1997, ADHERENCE_EYNON_2019],
+    disclaimer:
+      "Risco de adesão é sinal operacional, não substitui avaliação clínica — sempre integrar ao contexto integral do aluno e ao acompanhamento profissional adequado.",
+    principles: ALL_PRINCIPLES_OK,
+  },
+  {
+    domain: "sleep_stress_energy_adherence",
+    metric: "adherence_barrier",
+    observedValue: null,
+    classification: "Barreira de adesão relevante",
+    interpretation:
+      "Barreira autorrelatada relevante pode estar associada a maior chance de interrupção do plano se não for traduzida em ajuste operacional concreto.",
+    evidenceSummary:
+      "Eynon et al. revisa fatores psicossociais associados à adesão em programas de exercício; sono, estresse e vitalidade ajudam a contextualizar a barreira relatada.",
+    coachAction:
+      "Converter a barreira em ajuste prático: reduzir fricção, simplificar frequência, escolher horários viáveis e combinar revisão curta no próximo contato.",
+    riskLanguageLevel: "actionable",
+    sources: ADHERENCE_SOURCES,
+    disclaimer:
+      "Risco de adesão é sinal operacional, não substitui avaliação clínica — sempre integrar ao contexto integral do aluno e ao acompanhamento profissional adequado.",
+    principles: ALL_PRINCIPLES_OK,
+  },
+  {
+    domain: "sleep_stress_energy_adherence",
     metric: "adherence_risk_flags",
     observedValue: null,
     classification: "Risco de adesão (≥ 2 flags)",
     interpretation:
-      "Combinação de sono ruim, estresse alto, baixa energia e/ou barreiras autorrelatadas pode estar associada a menor adesão ao programa. Não indica diagnóstico — sinaliza necessidade de acompanhamento próximo.",
+      "Combinação de sono ruim, estresse alto, baixa energia e/ou barreiras autorrelatadas pode estar associada a menor adesão ao programa. É sinal operacional para acompanhamento próximo.",
     evidenceSummary:
       "AASM/SRS contextualiza sono em adultos; Cohen fundamenta estresse percebido; Ryan/Frederick valida vitalidade subjetiva; Eynon et al. revisa fatores psicossociais associados à adesão em programas de exercício.",
     coachAction:
       "Conversar com o aluno sobre barreiras específicas, ajustar carga e frequência do plano, e considerar encaminhamento a profissional de saúde mental se houver indício pertinente. Reavaliar no próximo questionário do ciclo.",
     riskLanguageLevel: "watchful",
-    sources: [
-      SLEEP_AASM_SRS_2015,
-      STRESS_COHEN_1983,
-      ENERGY_RYAN_1997,
-      ADHERENCE_EYNON_2019,
-    ],
+    sources: ADHERENCE_SOURCES,
     disclaimer:
-      "Risco de adesão é sinal operacional, não diagnóstico clínico — sempre integrar ao contexto integral do aluno e ao acompanhamento profissional adequado.",
+      "Risco de adesão é sinal operacional, não substitui avaliação clínica — sempre integrar ao contexto integral do aluno e ao acompanhamento profissional adequado.",
     principles: ALL_PRINCIPLES_OK,
   },
 ] as const;

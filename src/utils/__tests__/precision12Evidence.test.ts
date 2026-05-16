@@ -224,6 +224,10 @@ describe("EVIDENCE_CATALOG", () => {
     expect(EVIDENCE_CATALOG.length).toBeGreaterThan(0);
   });
 
+  it("E5.2 publica catálogo ampliado com pelo menos 25 claims", () => {
+    expect(EVIDENCE_CATALOG.length).toBeGreaterThanOrEqual(25);
+  });
+
   it("toda claim passa em validateEvidenceClaim", () => {
     for (const claim of EVIDENCE_CATALOG) {
       const issues = validateEvidenceClaim(claim);
@@ -313,6 +317,13 @@ describe("EVIDENCE_CATALOG", () => {
     }
   });
 
+  it("não duplica classification dentro do mesmo domínio", () => {
+    const keys = EVIDENCE_CATALOG.map(
+      (claim) => `${claim.domain}:${claim.classification}`,
+    );
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
   it("cada domínio listado tem >= 1 claim no catálogo (cobertura mínima E5.1)", () => {
     for (const domain of EVIDENCE_DOMAINS) {
       const claims = getClaimsByDomain(domain);
@@ -320,6 +331,57 @@ describe("EVIDENCE_CATALOG", () => {
         claims.length,
         `domínio ${domain} sem claim populada`,
       ).toBeGreaterThan(0);
+    }
+  });
+});
+
+// ── 4b. E5.2 — cobertura de classificações por domínio ─────────────────────
+
+describe("E5.2 cobertura ampliada — classificações publicadas", () => {
+  const expectedClassifications: Record<EvidenceDomain, string[]> = {
+    vo2_max: ["Muito fraco", "Fraco", "Regular", "Bom", "Excelente"],
+    fc_recovery_1min: ["Atenção", "Adequada"],
+    handgrip: ["Baixo", "Médio", "Alto"],
+    sit_to_stand: ["Alerta", "Intermediário", "Excelente"],
+    dexa: [
+      "% gordura elevada para faixa etária",
+      "% gordura dentro da referência",
+      "Gordura visceral elevada",
+      "Relação androide/ginoide elevada",
+      "ALM/altura² abaixo do corte populacional",
+      "ALM/altura² dentro da referência",
+    ],
+    questionnaire_parq: ["PAR-Q positivo (blocked)", "PAR-Q sem sinalizações"],
+    sleep_stress_energy_adherence: [
+      "Sono insuficiente",
+      "Estresse alto",
+      "Baixa energia",
+      "Barreira de adesão relevante",
+      "Risco de adesão (≥ 2 flags)",
+    ],
+  };
+
+  for (const [domain, classifications] of Object.entries(
+    expectedClassifications,
+  ) as [EvidenceDomain, string[]][]) {
+    it(`${domain} tem todas as classificações esperadas`, () => {
+      const published = getClaimsByDomain(domain).map(
+        (claim) => claim.classification,
+      );
+
+      for (const classification of classifications) {
+        expect(published).toContain(classification);
+      }
+    });
+  }
+
+  it("cada classificação esperada resolve via getEvidenceClaim", () => {
+    for (const [domain, classifications] of Object.entries(
+      expectedClassifications,
+    ) as [EvidenceDomain, string[]][]) {
+      for (const classification of classifications) {
+        expect(getEvidenceClaim(domain, classification)).not.toBeNull();
+      }
     }
   });
 });
