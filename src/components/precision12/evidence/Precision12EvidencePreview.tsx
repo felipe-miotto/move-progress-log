@@ -7,15 +7,16 @@
  * claims dentro do componente burro `EvidenceClaimList` (E5.4),
  * agrupado por ALUNO (com nome legível, não UUID técnico).
  *
- * Cobertura atual (E5.5):
+ * Cobertura atual (E5.5/E5.5b):
+ *   - VO₂ e FC recovery (a partir de vo2_assessment_details)
+ *   - Handgrip (a partir de handgrip_results)
+ *   - Sit-to-Stand (a partir de sit_to_stand_results)
  *   - PAR-Q (a partir de questionnaire_responses.parq_blocked)
  *   - Sono/Estresse/Energia/Adesão (a partir das colunas da response)
  *
  * Cobertura PENDENTE (ver LIMITATIONS_NOT_COVERED_YET):
- *   - VO₂, FC recovery, Handgrip, Sit-to-Stand, DEXA
- *   Esses domínios precisam fetch adicional + lookups de ref_ranges.
- *   Próximo PR pode estender o hook E4.1 e adicionar mappers em
- *   `precision12EvidenceMapping.ts`.
+ *   - DEXA
+ *   DEXA precisa cortes por sexo/idade antes de emitir claims.
  *
  * Read-only absoluto: sem hook próprio, sem fetch, sem mutation, sem
  * abertura automática de janela. Componente "burro".
@@ -27,8 +28,11 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import type {
   CoachConsoleAssessment,
+  CoachConsoleHandgripResult,
   CoachConsoleQuestionnaire,
+  CoachConsoleSitToStandResult,
   CoachConsoleStudent,
+  CoachConsoleVo2Result,
 } from "@/utils/precision12CoachConsole";
 import {
   LIMITATIONS_NOT_COVERED_YET,
@@ -49,6 +53,12 @@ interface Precision12EvidencePreviewProps {
   assessments: readonly CoachConsoleAssessment[];
   /** Mesmas `responses` carregadas pelo hook E4.1. */
   responses: readonly CoachConsoleQuestionnaire[];
+  /** Resultados VO₂ já classificados, carregados pelo hook do console. */
+  vo2Results: readonly CoachConsoleVo2Result[];
+  /** Resultados handgrip já classificados, carregados pelo hook do console. */
+  handgripResults: readonly CoachConsoleHandgripResult[];
+  /** Resultados sit-to-stand já classificados, carregados pelo hook do console. */
+  sitToStandResults: readonly CoachConsoleSitToStandResult[];
   /** Repassa pra cada card (default: false). */
   showPrinciples?: boolean;
 }
@@ -57,11 +67,29 @@ export function Precision12EvidencePreview({
   students,
   assessments,
   responses,
+  vo2Results,
+  handgripResults,
+  sitToStandResults,
   showPrinciples = false,
 }: Precision12EvidencePreviewProps) {
   const groups = useMemo(
-    () => deriveEvidenceGroups({ students, assessments, responses }),
-    [students, assessments, responses],
+    () =>
+      deriveEvidenceGroups({
+        students,
+        assessments,
+        responses,
+        vo2Results,
+        handgripResults,
+        sitToStandResults,
+      }),
+    [
+      students,
+      assessments,
+      responses,
+      vo2Results,
+      handgripResults,
+      sitToStandResults,
+    ],
   );
 
   const totalClaims = groups.reduce((sum, g) => sum + g.claims.length, 0);
@@ -95,8 +123,10 @@ export function Precision12EvidencePreview({
         </div>
         <p className="text-xs text-muted-foreground">
           Texto associativo, não diagnóstico. Cobertura atual:{" "}
-          <strong>PAR-Q + Sono/Estresse/Energia/Adesão</strong>. Demais domínios
-          ficam pendentes de dados (ver lista abaixo).
+          <strong>
+            VO₂/FC + Handgrip + Sit-to-Stand + PAR-Q + Sono/Estresse/Energia/Adesão
+          </strong>
+          . DEXA fica pendente de cortes por sexo/idade (ver lista abaixo).
         </p>
       </CardHeader>
 

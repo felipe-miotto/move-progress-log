@@ -26,20 +26,30 @@ import {
   type AssessmentStatusCounts,
   type CoachConsoleAssessment,
   type CoachConsoleDexaResult,
+  type CoachConsoleHandgripResult,
   type CoachConsoleLink,
   type CoachConsoleQuestionnaire,
+  type CoachConsoleSitToStandResult,
   type CoachConsoleStudent,
+  type CoachConsoleVo2Result,
   type StudentProgress,
 } from "@/utils/precision12CoachConsole";
 
 const QUESTIONNAIRE_TYPE = "questionnaire_precision12";
 const DEXA_TYPE = "dexa";
+const HANDGRIP_TYPE = "handgrip";
+const SIT_TO_STAND_TYPE = "sit_to_stand";
 
 const ASSESSMENT_COLUMNS =
   "id, student_id, assessment_type, status, assessment_date, created_at" as const;
 const QUESTIONNAIRE_COLUMNS =
   "assessment_id, parq_blocked, primary_adherence_barrier, sleep_quality, stress_level, energy_level, consistency_self_rating, life_stability, pain_status, uses_medications, has_medical_condition, injury_surgery_history" as const;
 const LINK_COLUMNS = "assessment_id, used_at, revoked_at, expires_at" as const;
+const VO2_COLUMNS =
+  "assessment_id, vo2_final, vo2_classification, recovery_drop_1min, recovery_classification" as const;
+const HANDGRIP_COLUMNS = "assessment_id, best_kg, classification" as const;
+const SIT_TO_STAND_COLUMNS =
+  "assessment_id, total_score, classification" as const;
 // E4.6 — Subset enxuto do schema `dexa_results` usado pela triagem do
 // Coach Console. Mantido alinhado com `CoachConsoleDexaResult`.
 const DEXA_COLUMNS =
@@ -49,6 +59,10 @@ export interface Precision12CoachConsoleRaw {
   students: CoachConsoleStudent[];
   assessments: CoachConsoleAssessment[];
   responses: CoachConsoleQuestionnaire[];
+  /** E5.5b — resultados físicos já classificados, read-only. */
+  vo2Results: CoachConsoleVo2Result[];
+  handgripResults: CoachConsoleHandgripResult[];
+  sitToStandResults: CoachConsoleSitToStandResult[];
   links: CoachConsoleLink[];
   /** E4.6 — usado para emitir alerta `dexa_pending` na fila. */
   dexaResults: CoachConsoleDexaResult[];
@@ -81,6 +95,15 @@ async function fetchCoachConsoleData(): Promise<Precision12CoachConsoleRaw> {
   const studentIds = [...new Set(assessments.map((a) => a.student_id))];
   const questionnaireAssessmentIds = assessments
     .filter((a) => a.assessment_type === QUESTIONNAIRE_TYPE)
+    .map((a) => a.id);
+  const vo2AssessmentIds = assessments
+    .filter((a) => a.assessment_type.startsWith("vo2_"))
+    .map((a) => a.id);
+  const handgripAssessmentIds = assessments
+    .filter((a) => a.assessment_type === HANDGRIP_TYPE)
+    .map((a) => a.id);
+  const sitToStandAssessmentIds = assessments
+    .filter((a) => a.assessment_type === SIT_TO_STAND_TYPE)
     .map((a) => a.id);
   // E4.6 — IDs das DEXA. Só fazemos a query se houver alguma DEXA — evita
   // request vazio com .in("assessment_id", []) (gera 400 em alguns clients).
@@ -124,7 +147,40 @@ async function fetchCoachConsoleData(): Promise<Precision12CoachConsoleRaw> {
     links = (linksRes.data ?? []) as CoachConsoleLink[];
   }
 
-  // 5. dexa_results (E4.6) — só se houver assessment DEXA. RLS via JOIN com
+  // 5. Resultados físicos já classificados (E5.5b). Bulk `.in()` por tabela,
+  // sem ranges novos e sem cálculo clínico no client.
+  let vo2Results: CoachConsoleVo2Result[] = [];
+  if (vo2AssessmentIds.length > 0) {
+    const { data: vo2Raw, error: vo2Error } = await supabase
+      .from("vo2_assessment_details")
+      .select(VO2_COLUMNS)
+      .in("assessment_id", vo2AssessmentIds);
+    if (vo2Error) throw vo2Error;
+    vo2Results = (vo2Raw ?? []) as CoachConsoleVo2Result[];
+  }
+
+  let handgripResults: CoachConsoleHandgripResult[] = [];
+  if (handgripAssessmentIds.length > 0) {
+    const { data: handgripRaw, error: handgripError } = await supabase
+      .from("handgrip_results")
+      .select(HANDGRIP_COLUMNS)
+      .in("assessment_id", handgripAssessmentIds);
+    if (handgripError) throw handgripError;
+    handgripResults = (handgripRaw ?? []) as CoachConsoleHandgripResult[];
+  }
+
+  let sitToStandResults: CoachConsoleSitToStandResult[] = [];
+  if (sitToStandAssessmentIds.length > 0) {
+    const { data: sitToStandRaw, error: sitToStandError } = await supabase
+      .from("sit_to_stand_results")
+      .select(SIT_TO_STAND_COLUMNS)
+      .in("assessment_id", sitToStandAssessmentIds);
+    if (sitToStandError) throw sitToStandError;
+    sitToStandResults =
+      (sitToStandRaw ?? []) as CoachConsoleSitToStandResult[];
+  }
+
+  // 6. dexa_results (E4.6) — só se houver assessment DEXA. RLS via JOIN com
   //    assessments→students libera SELECT pra admin sem RPC.
   let dexaResults: CoachConsoleDexaResult[] = [];
   if (dexaAssessmentIds.length > 0) {
@@ -136,7 +192,16 @@ async function fetchCoachConsoleData(): Promise<Precision12CoachConsoleRaw> {
     dexaResults = (dexaRaw ?? []) as CoachConsoleDexaResult[];
   }
 
-  return { students, assessments, responses, links, dexaResults };
+  return {
+    students,
+    assessments,
+    responses,
+    vo2Results,
+    handgripResults,
+    sitToStandResults,
+    links,
+    dexaResults,
+  };
 }
 
 /**
