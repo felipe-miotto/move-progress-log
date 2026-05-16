@@ -392,13 +392,17 @@ describe("QUESTIONNAIRE_FIELDS_NOT_MAPPED_YET (M-7)", () => {
     );
   });
 
-  it("os 3 últimos campos sinalizam disparo de 'atenção clínica' na fila", () => {
-    const clinicalAttentionFields = QUESTIONNAIRE_FIELDS_NOT_MAPPED_YET.filter(
-      (item) => item.reason.toLowerCase().includes("atenção clínica"),
+  it("E5.6c: campos clínicos descrevem-se como 'sinal clínico relevante' (sem afirmar disparo de fila)", () => {
+    // E5.6c — copy corrigida: a versão anterior afirmava que esses campos
+    // "disparam atenção clínica na fila", o que é factualmente errado —
+    // `deriveActionQueue` não emite item `clinical_attention` na fila.
+    // Texto novo descreve o campo como sinal clínico relevante do
+    // questionário, sem prometer comportamento da fila que a UI não faz.
+    const clinicalFields = QUESTIONNAIRE_FIELDS_NOT_MAPPED_YET.filter((item) =>
+      item.reason.toLowerCase().includes("sinal clínico relevante"),
     ).map((item) => item.field);
-    expect(clinicalAttentionFields).toEqual(
+    expect(clinicalFields).toEqual(
       expect.arrayContaining([
-        "pain_status", // contribui pro agregado E dispara clinical_attention
         "uses_medications",
         "has_medical_condition",
         "injury_surgery_history",
@@ -406,14 +410,31 @@ describe("QUESTIONNAIRE_FIELDS_NOT_MAPPED_YET (M-7)", () => {
     );
   });
 
-  it("nenhum reason exibe jargão interno tipo 'M-1', 'M-3' ou 'riskFlagCount' (texto vai pra UI do coach)", () => {
+  it("nenhum reason exibe jargão interno tipo 'M-1', 'M-3', 'riskFlagCount', 'clinical_attention' ou 'E5.x' (texto vai pra UI do coach)", () => {
     // O <details> "Limitações conhecidas" renderiza esses reasons literalmente
     // no preview. Manter linguagem operacional, sem códigos internos.
+    // E5.6c — também blocked: 'clinical_attention' (não é parte real da
+    // fila operacional) e referências a sprints/etapas (E5.6a, E5.6b etc.).
     for (const item of QUESTIONNAIRE_FIELDS_NOT_MAPPED_YET) {
       expect(item.reason).not.toMatch(/\bM-[0-9]/);
       expect(item.reason).not.toMatch(/riskFlagCount/);
-      expect(item.reason).not.toMatch(/E[0-9]\.[0-9]/);
+      expect(item.reason).not.toMatch(/\bE[0-9]\.[0-9]/);
       expect(item.reason).not.toMatch(/clinical_attention/);
+    }
+  });
+
+  it("E5.6c: nenhum reason afirma 'disparo na fila' / 'na fila do coach' (comportamento não existente)", () => {
+    // Antes da correção, 4 campos diziam "dispara atenção clínica na fila"
+    // / "na fila do coach", o que é falso — `deriveActionQueue` em
+    // `precision12CoachConsole.ts` NÃO cria itens do tipo
+    // `clinical_attention`. A copy agora descreve o campo como sinal
+    // clínico sem promessa de comportamento da fila.
+    for (const item of QUESTIONNAIRE_FIELDS_NOT_MAPPED_YET) {
+      const lowerReason = item.reason.toLowerCase();
+      expect(lowerReason).not.toContain("dispara");
+      expect(lowerReason).not.toContain("na fila");
+      // Frases tipo "atenção clínica na fila" também sumiram.
+      expect(lowerReason).not.toContain("atenção clínica");
     }
   });
 });

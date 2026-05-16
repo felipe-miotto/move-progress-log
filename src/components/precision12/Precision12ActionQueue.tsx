@@ -15,10 +15,9 @@
  * Microcopy: triagem operacional, NÃO diagnóstico.
  *
  * E5.6b — UI/UX hardening da auditoria:
- *   F-1 altura de linha estável (sem flex-wrap; coluna w-[380px] comporta
- *       os 3 botões sem quebrar — medições reais: Abrir ~80px + Gerar
- *       novo link ~140px + Revogar ~88px + gaps = ~316px, cabe em 348px
- *       internos);
+ *   F-1 altura de linha estável (sem flex-wrap; coluna comporta os 3 botões
+ *       sem quebrar — medições reais: Abrir ~80px + Gerar novo link ~140px +
+ *       Revogar ~88px + gaps = ~316px);
  *   F-2 botão "Revogar" diferenciado visualmente como destrutivo com
  *       cores LEGÍVEIS em tema dark (border-rose-500/40 + text-rose-300).
  *       NÃO usa `text-destructive` porque em dark o token é vermelho
@@ -29,6 +28,19 @@
  *   N-1 microcopy "Gerar novo link" alinhada com a CTA dentro do dialog
  *       (antes a fila dizia "Reemitir link" e o dialog dizia "Gerar novo
  *       link" — coach confundia).
+ *
+ * E5.6c — densidade da fila + scroll responsivo:
+ *   - coluna Ações afinada para w-[360px] (interno 328px; 316px de botões
+ *     deixam ~12px de folga real — calculado com medições do DOM em prod;
+ *     valor anterior do E5.6b se mostrou excessivo e comprimia as colunas
+ *     vizinhas);
+ *   - Status/Data/Idade ganham whitespace-nowrap pra não quebrar "Em
+ *     andamento" / "2026-05-13" / "3 dias" em duas linhas — eram a causa
+ *     real do row 113px no E5.6b (e não as ações, que já cabiam);
+ *   - badge de alerta também recebe whitespace-nowrap (mantém "Questionário
+ *     pendente" numa linha só);
+ *   - wrapper externo ganha overflow-x-auto pra que viewports < 1280px
+ *     façam scroll horizontal em vez de comprimir colunas.
  */
 
 import { useState } from "react";
@@ -163,7 +175,13 @@ export function Precision12ActionQueue({
 
   return (
     <>
-      <div className="rounded-md border">
+      {/*
+        E5.6c — overflow-x-auto no wrapper garante que viewports menores
+        que 1280px fazem scroll horizontal em vez de comprimir colunas
+        e quebrar texto em duas linhas. Combina com whitespace-nowrap
+        nas colunas Status/Data/Idade e no badge de alerta.
+      */}
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -172,7 +190,7 @@ export function Precision12ActionQueue({
               <TableHead className="hidden md:table-cell">Status</TableHead>
               <TableHead className="hidden lg:table-cell">Data</TableHead>
               <TableHead className="hidden lg:table-cell">Idade</TableHead>
-              <TableHead className="w-[380px] text-right">Ações</TableHead>
+              <TableHead className="w-[360px] text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -195,10 +213,17 @@ export function Precision12ActionQueue({
                 >
                   <TableCell className="font-medium">{item.studentName}</TableCell>
                   <TableCell>
+                    {/*
+                      E5.6c — badge ganha whitespace-nowrap pra que
+                      "Questionário pendente" / "Sem avaliação no ciclo"
+                      etc. não quebrem em duas linhas quando o viewport
+                      aperta. O sub-label (assessmentTypeLabel) ainda pode
+                      quebrar livremente, porque é metadata complementar.
+                    */}
                     <div className="flex flex-col gap-0.5">
                       <Badge
                         variant={ALERT_VARIANT[item.alertType]}
-                        className="w-fit"
+                        className="w-fit whitespace-nowrap"
                       >
                         {ALERT_LABEL[item.alertType]}
                       </Badge>
@@ -209,23 +234,32 @@ export function Precision12ActionQueue({
                       )}
                     </div>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                  {/*
+                    E5.6c — Status/Data/Idade com whitespace-nowrap pra
+                    proteger "Em andamento", "2026-05-13", "3 dias" de
+                    quebrarem em duas linhas. Quando o viewport for muito
+                    pequeno, o overflow-x-auto no wrapper externo entra em
+                    ação em vez de comprimir esses textos.
+                  */}
+                  <TableCell className="hidden md:table-cell text-sm text-muted-foreground whitespace-nowrap">
                     {item.status ? STATUS_LABEL[item.status] : "—"}
                   </TableCell>
-                  <TableCell className="hidden lg:table-cell text-sm text-muted-foreground tabular-nums">
+                  <TableCell className="hidden lg:table-cell text-sm text-muted-foreground tabular-nums whitespace-nowrap">
                     {item.assessmentDate ?? "—"}
                   </TableCell>
-                  <TableCell className="hidden lg:table-cell text-sm text-muted-foreground tabular-nums">
+                  <TableCell className="hidden lg:table-cell text-sm text-muted-foreground tabular-nums whitespace-nowrap">
                     {ageLabel(item.assessmentDate)}
                   </TableCell>
                   <TableCell className="text-right">
                     {/*
                       E5.6b — ordem: navegação (Abrir) → reparadora (Gerar
                       novo link) → destrutiva (Revogar). Sem flex-wrap; a
-                      coluna w-[340px] comporta os 3 botões sem quebrar
-                      altura de linha. Revogar usa variant outline com
-                      borda + texto destrutivos pra diferenciar do Gerar
-                      novo link sem ofuscar com vermelho cheio.
+                      coluna comporta os 3 botões sem quebrar altura de
+                      linha (largura definida no TableHead acima, ajustada
+                      em E5.6c após medições reais do DOM em prod).
+                      Revogar usa variant outline com cores rose explícitas
+                      pra diferenciar do Gerar novo link sem ofuscar com
+                      vermelho cheio.
                     */}
                     <div className="flex items-center justify-end gap-1">
                       <Button

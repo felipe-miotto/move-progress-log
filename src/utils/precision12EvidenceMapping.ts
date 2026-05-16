@@ -356,12 +356,16 @@ export const LIMITATIONS_NOT_COVERED_YET: ReadonlyArray<{
 
 /**
  * Catálogo de campos do `CoachConsoleQuestionnaire` que o hook E4.1 JÁ
- * carrega mas que o mapping E5.6a ainda NÃO converte em claim individual,
- * com o motivo. Os 3 primeiros contribuem ao `riskFlagCount` agregado de
- * adesão (alinhado ao Console pelo M-1), mas não disparam claim própria.
- * Os 3 últimos disparam o alerta operacional `clinical_attention` na fila
- * do Console, mas o Evidence Layer ainda não cobre — cobertura individual
- * planejada como M-3 (ver plano para Codex).
+ * carrega mas que o mapping ainda NÃO converte em claim individual, com
+ * o motivo. Os 3 primeiros contribuem ao `riskFlagCount` agregado de
+ * adesão (alinhamento E5.6a), mas não emitem claim própria. Os 3 últimos
+ * são sinais clínicos relevantes do questionário sem cobertura individual
+ * no Evidence Layer ainda (cobertura planejada para um próximo lote).
+ *
+ * E5.6c — copy reescrita pra descrever cada campo apenas como sinal
+ * clínico do questionário, sem prometer comportamento de outras
+ * superfícies da UI que poderiam não corresponder à realidade do
+ * `deriveActionQueue`.
  *
  * Exposto pra documentação inline na UI (preview) e pra que extensões
  * futuras tenham um lugar único pra remover entries quando o mapper passar
@@ -374,31 +378,31 @@ export const QUESTIONNAIRE_FIELDS_NOT_MAPPED_YET: ReadonlyArray<{
   {
     field: "consistency_self_rating",
     reason:
-      "Já conta como sinal no agregado de risco de adesão (mesma fila do coach); ainda sem card próprio no preview.",
+      "Já conta como sinal no agregado de risco de adesão; ainda sem card próprio no preview.",
   },
   {
     field: "life_stability",
     reason:
-      "Já conta como sinal no agregado de risco de adesão (mesma fila do coach); ainda sem card próprio no preview.",
+      "Já conta como sinal no agregado de risco de adesão; ainda sem card próprio no preview.",
   },
   {
     field: "pain_status",
     reason:
-      "Já conta como sinal no agregado de risco de adesão e também dispara 'atenção clínica' na fila; ainda sem card próprio no preview.",
+      "Já conta como sinal no agregado de risco de adesão quando indica dor; ainda sem card próprio no preview.",
   },
   {
     field: "uses_medications",
     reason:
-      "Dispara 'atenção clínica' na fila do coach; ainda sem card próprio no preview (cobertura individual planejada).",
+      "Sinal clínico relevante do questionário; ainda sem card próprio no preview (cobertura individual planejada).",
   },
   {
     field: "has_medical_condition",
     reason:
-      "Dispara 'atenção clínica' na fila do coach; ainda sem card próprio no preview (cobertura individual planejada).",
+      "Sinal clínico relevante do questionário; ainda sem card próprio no preview (cobertura individual planejada).",
   },
   {
     field: "injury_surgery_history",
     reason:
-      "Dispara 'atenção clínica' na fila do coach quando preenchido; ainda sem card próprio no preview (cobertura individual planejada).",
+      "Sinal clínico relevante quando preenchido; ainda sem card próprio no preview (cobertura individual planejada).",
   },
 ];

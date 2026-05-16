@@ -377,10 +377,9 @@ describe("E4.5 Precision12ActionQueue — revoke UI integration", () => {
     expect(precision12ActionQueueSource).toMatch(
       /canRevokeQuestionnaireLink\(\s*item\s*,\s*activeLinkAssessmentIds\s*,?\s*\)/,
     );
-    // E5.6b/F-2: label simplificado pra "Revogar" (sem "link") — a coluna
-    // Ações precisa caber em w-[340px] sem quebrar; e visualmente o caráter
-    // destrutivo agora é sinalizado pelas classes (border-destructive/text-
-    // destructive), não pelo texto.
+    // E5.6b/E5.6c: label simplificado para "Revogar".
+    // A largura da coluna é validada nos testes F-1; o caráter destrutivo
+    // é sinalizado por classes rose explícitas, não por texto mais longo.
     expect(precision12ActionQueueSource).toMatch(/>\s*\n\s*Revogar\s*\n\s*</);
     expect(precision12ActionQueueSource).toMatch(
       /canRevoke\s*&&\s*item\.assessmentId\s*!==\s*null/,
@@ -640,14 +639,37 @@ describe("E4.6 Precision12 — DEXA alert wiring", () => {
 // ── E5.6b — UI/UX hardening (auditoria pós-E5.6a) ───────────────────────────
 
 describe("E5.6b — fila: F-1 altura estável + F-3 ordem + F-2 destrutivo diferenciado", () => {
-  it("F-1: coluna 'Ações' tem w-[380px] pra comportar os 3 botões sem flex-wrap (corrigido na auditoria)", () => {
-    // Auditoria mediu botões reais: Abrir ~80px + Gerar novo link ~140px +
-    // Revogar ~88px + 2 gaps = ~316px. w-[340px] (interno 308px) NÃO cabia
-    // — gerava overflow horizontal. w-[380px] (interno 348px) dá folga.
-    expect(precision12ActionQueueSource).toContain('w-[380px] text-right');
-    // Defesa: tamanhos antigos não podem reaparecer (regressão).
+  it("E5.6c F-1: coluna 'Ações' tem w-[360px] (não w-[380px] nem w-[340px] nem w-[260px])", () => {
+    // E5.6c — w-[380px] do E5.6b se mostrou excessivo: comprimia
+    // Status/Data/Idade, forçando quebra em duas linhas e levando o row
+    // a 113px. w-[360px] (interno 328px) ainda comporta os 316px de
+    // botões (folga 12px) e libera espaço pras demais colunas.
+    expect(precision12ActionQueueSource).toContain('w-[360px] text-right');
     expect(precision12ActionQueueSource).not.toContain('w-[260px]');
     expect(precision12ActionQueueSource).not.toContain('w-[340px] text-right');
+    expect(precision12ActionQueueSource).not.toContain('w-[380px] text-right');
+  });
+
+  it("E5.6c: wrapper externo da tabela usa overflow-x-auto pra viewports menores", () => {
+    expect(precision12ActionQueueSource).toMatch(
+      /<div className="rounded-md border overflow-x-auto">/,
+    );
+  });
+
+  it("E5.6c: Status/Data/Idade e badge do alerta usam whitespace-nowrap pra não quebrar texto", () => {
+    // Status: "Em andamento" não pode virar "Em\nandamento".
+    expect(precision12ActionQueueSource).toMatch(
+      /hidden md:table-cell text-sm text-muted-foreground whitespace-nowrap/,
+    );
+    // Data + Idade (ambas usam tabular-nums + whitespace-nowrap).
+    const matches = precision12ActionQueueSource.match(
+      /hidden lg:table-cell text-sm text-muted-foreground tabular-nums whitespace-nowrap/g,
+    ) ?? [];
+    expect(matches.length).toBeGreaterThanOrEqual(2);
+    // Badge do alerta também (mantém "Questionário pendente" em 1 linha).
+    expect(precision12ActionQueueSource).toMatch(
+      /className="w-fit whitespace-nowrap"/,
+    );
   });
 
   it("F-1: container de ações NÃO usa flex-wrap (era o gerador da altura inconsistente 77→101px)", () => {
