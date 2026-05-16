@@ -7,7 +7,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   ADHERENCE_RISK_MIN_FLAGS,
+  type CoachConsoleHandgripResult,
   type CoachConsoleQuestionnaire,
+  type CoachConsoleSitToStandResult,
+  type CoachConsoleVo2Result,
 } from "../precision12CoachConsole";
 import { deriveEvidenceClaims } from "../precision12EvidenceDerivation";
 import {
@@ -15,7 +18,14 @@ import {
   QUESTIONNAIRE_FIELDS_NOT_MAPPED_YET,
   deriveAdherenceFlagsFromResponse,
   indexResponsesByAssessmentId,
+  mapHandgripResultToEvidenceInput,
   mapQuestionnaireResponseToEvidenceInput,
+  mapSitToStandResultToEvidenceInput,
+  mapVo2ResultToEvidenceInput,
+  normalizeFcRecoveryEvidenceClassification,
+  normalizeHandgripEvidenceClassification,
+  normalizeSitToStandEvidenceClassification,
+  normalizeVo2EvidenceClassification,
 } from "../precision12EvidenceMapping";
 
 function makeResponse(
@@ -34,6 +44,41 @@ function makeResponse(
     uses_medications: false,
     has_medical_condition: false,
     injury_surgery_history: null,
+    ...overrides,
+  };
+}
+
+function makeVo2Result(
+  overrides: Partial<CoachConsoleVo2Result> = {},
+): CoachConsoleVo2Result {
+  return {
+    assessment_id: "vo2-1",
+    vo2_final: 32.4,
+    vo2_classification: "Fraco",
+    recovery_drop_1min: 18,
+    recovery_classification: "Adequada",
+    ...overrides,
+  };
+}
+
+function makeHandgripResult(
+  overrides: Partial<CoachConsoleHandgripResult> = {},
+): CoachConsoleHandgripResult {
+  return {
+    assessment_id: "hg-1",
+    best_kg: 42.5,
+    classification: "Alto",
+    ...overrides,
+  };
+}
+
+function makeSitToStandResult(
+  overrides: Partial<CoachConsoleSitToStandResult> = {},
+): CoachConsoleSitToStandResult {
+  return {
+    assessment_id: "s2s-1",
+    total_score: 7,
+    classification: "Bom",
     ...overrides,
   };
 }
@@ -314,6 +359,128 @@ describe("mapQuestionnaireResponseToEvidenceInput", () => {
   );
 });
 
+// ── Physical result mappers (E5.5b) ─────────────────────────────────────────
+
+describe("classification normalizers — physical tests (E5.5b)", () => {
+  it("VO₂ normaliza aliases do banco para labels do catálogo", () => {
+    expect(normalizeVo2EvidenceClassification("Muito Fraco")).toBe("Muito fraco");
+    expect(normalizeVo2EvidenceClassification("Superior")).toBe("Excelente");
+    expect(normalizeVo2EvidenceClassification(" Fraco ")).toBe("Fraco");
+    expect(normalizeVo2EvidenceClassification("não existe")).toBeNull();
+  });
+
+  it("FC recovery aceita apenas Atenção/Adequada", () => {
+    expect(normalizeFcRecoveryEvidenceClassification("Atenção")).toBe("Atenção");
+    expect(normalizeFcRecoveryEvidenceClassification("Adequada")).toBe("Adequada");
+    expect(normalizeFcRecoveryEvidenceClassification("Excelente")).toBeNull();
+  });
+
+  it("Handgrip colapsa extremos para claims existentes do catálogo", () => {
+    expect(normalizeHandgripEvidenceClassification("Muito Baixo")).toBe("Baixo");
+    expect(normalizeHandgripEvidenceClassification("Baixo")).toBe("Baixo");
+    expect(normalizeHandgripEvidenceClassification("Médio")).toBe("Médio");
+    expect(normalizeHandgripEvidenceClassification("Muito Alto")).toBe("Alto");
+  });
+
+  it("Sit-to-Stand normaliza Atenção/Bom para Intermediário", () => {
+    expect(normalizeSitToStandEvidenceClassification("Alerta")).toBe("Alerta");
+    expect(normalizeSitToStandEvidenceClassification("Atenção")).toBe(
+      "Intermediário",
+    );
+    expect(normalizeSitToStandEvidenceClassification("Bom")).toBe(
+      "Intermediário",
+    );
+    expect(normalizeSitToStandEvidenceClassification("Excelente")).toBe(
+      "Excelente",
+    );
+  });
+});
+
+describe("mapVo2ResultToEvidenceInput", () => {
+  it("mapeia VO₂ + FC recovery com observedValue", () => {
+    const input = mapVo2ResultToEvidenceInput(makeVo2Result());
+    expect(input.vo2).toEqual({
+      classification: "Fraco",
+      observedValue: "32.4 ml/kg/min",
+    });
+    expect(input.fcRecovery1Min).toEqual({
+      classification: "Adequada",
+      observedValue: "18 bpm",
+    });
+  });
+
+  it("integra com deriveEvidenceClaims gerando 2 claims físicas", () => {
+    const claims = deriveEvidenceClaims(
+      mapVo2ResultToEvidenceInput(makeVo2Result()),
+    );
+    expect(claims.map((c) => c.domain)).toEqual([
+      "vo2_max",
+      "fc_recovery_1min",
+    ]);
+    expect(claims.map((c) => c.observedValue)).toEqual([
+      "32.4 ml/kg/min",
+      "18 bpm",
+    ]);
+  });
+
+  it("classificação desconhecida não quebra nem inventa claim", () => {
+    const claims = deriveEvidenceClaims(
+      mapVo2ResultToEvidenceInput(
+        makeVo2Result({
+          vo2_classification: "fora do catálogo",
+          recovery_classification: null,
+        }),
+      ),
+    );
+    expect(claims).toEqual([]);
+  });
+});
+
+describe("mapHandgripResultToEvidenceInput", () => {
+  it("mapeia classificação + melhor kg", () => {
+    const input = mapHandgripResultToEvidenceInput(makeHandgripResult());
+    expect(input.handgrip).toEqual({
+      classification: "Alto",
+      observedValue: "42.5 kg",
+    });
+  });
+
+  it("Muito Baixo vira claim Baixo conservadora", () => {
+    const claims = deriveEvidenceClaims(
+      mapHandgripResultToEvidenceInput(
+        makeHandgripResult({ classification: "Muito Baixo", best_kg: 18 }),
+      ),
+    );
+    expect(claims[0].classification).toBe("Baixo");
+    expect(claims[0].observedValue).toBe("18 kg");
+  });
+});
+
+describe("mapSitToStandResultToEvidenceInput", () => {
+  it("mapeia score total + classificação intermediária", () => {
+    const input = mapSitToStandResultToEvidenceInput(makeSitToStandResult());
+    expect(input.sitToStand).toEqual({
+      classification: "Intermediário",
+      observedValue: "7 pontos",
+    });
+  });
+
+  it("Alerta e Excelente chegam ao catálogo sem renomear", () => {
+    const alert = deriveEvidenceClaims(
+      mapSitToStandResultToEvidenceInput(
+        makeSitToStandResult({ classification: "Alerta", total_score: 3 }),
+      ),
+    );
+    const excellent = deriveEvidenceClaims(
+      mapSitToStandResultToEvidenceInput(
+        makeSitToStandResult({ classification: "Excelente", total_score: 9 }),
+      ),
+    );
+    expect(alert[0].classification).toBe("Alerta");
+    expect(excellent[0].classification).toBe("Excelente");
+  });
+});
+
 // ── indexResponsesByAssessmentId ────────────────────────────────────────────
 
 describe("indexResponsesByAssessmentId", () => {
@@ -340,13 +507,9 @@ describe("indexResponsesByAssessmentId", () => {
 // ── LIMITATIONS_NOT_COVERED_YET ─────────────────────────────────────────────
 
 describe("LIMITATIONS_NOT_COVERED_YET", () => {
-  it("documenta os 5 domínios ainda não cobertos por mappers", () => {
+  it("documenta só DEXA como domínio ainda não coberto por mapper", () => {
     const domains = LIMITATIONS_NOT_COVERED_YET.map((l) => l.domain);
-    expect(domains).toContain("vo2_max");
-    expect(domains).toContain("fc_recovery_1min");
-    expect(domains).toContain("handgrip");
-    expect(domains).toContain("sit_to_stand");
-    expect(domains).toContain("dexa");
+    expect(domains).toEqual(["dexa"]);
   });
 
   it("cada item tem reason não-vazio explicando o motivo", () => {

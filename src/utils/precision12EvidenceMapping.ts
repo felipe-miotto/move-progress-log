@@ -4,15 +4,11 @@
  *
  * Apenas funções PURAS. Sem fetch novo, sem hook, sem mutation.
  *
- * Escopo conservador desta rodada: cobre **PAR-Q + Adesão**, derivados de
- * `questionnaire_responses` (já carregado pelo hook E4.1). Domínios
- * restantes ficam como limitação documentada (ver
+ * Escopo conservador desta rodada: cobre **PAR-Q + Adesão** e resultados
+ * físicos que já chegam com classificação persistida no banco
+ * (VO₂, FC recovery, Handgrip, Sit-to-Stand). Domínios restantes ficam
+ * como limitação documentada (ver
  * `LIMITATIONS_NOT_COVERED_YET` ao final):
- *
- *   - VO₂ / Handgrip / Sit-to-Stand: o hook não carrega
- *     `vo2_results` / `handgrip_results` / `sit_to_stand_results` nem
- *     ref ranges (`classification.ts` exige lookup populacional por
- *     sexo/idade). Adicionar fetch + ranges é um PR separado.
  *
  *   - DEXA: o hook JÁ carrega `dexa_results` (E4.6), mas a classificação
  *     ("% gordura elevada para faixa etária", etc.) exige cortes
@@ -29,8 +25,11 @@ import {
   ADHERENCE_RISK_MIN_FLAGS,
   ADHERENCE_RISK_THRESHOLDS,
   type CoachConsoleAssessment,
+  type CoachConsoleHandgripResult,
   type CoachConsoleQuestionnaire,
+  type CoachConsoleSitToStandResult,
   type CoachConsoleStudent,
+  type CoachConsoleVo2Result,
 } from "./precision12CoachConsole";
 import {
   deriveEvidenceClaims,
@@ -44,6 +43,91 @@ import {
 // ────────────────────────────────────────────────────────────────────────────
 // Mapping helpers (PURE)
 // ────────────────────────────────────────────────────────────────────────────
+
+const VO2_CLASSIFICATION_TO_CATALOG: Readonly<Record<string, string>> = {
+  "Muito Fraco": "Muito fraco",
+  "Muito fraco": "Muito fraco",
+  Fraco: "Fraco",
+  Regular: "Regular",
+  Bom: "Bom",
+  Excelente: "Excelente",
+  // O catálogo E5 agrupa o topo favorável em "Excelente".
+  Superior: "Excelente",
+};
+
+const FC_RECOVERY_CLASSIFICATION_TO_CATALOG: Readonly<Record<string, string>> = {
+  Atenção: "Atenção",
+  Adequada: "Adequada",
+};
+
+const HANDGRIP_CLASSIFICATION_TO_CATALOG: Readonly<Record<string, string>> = {
+  "Muito Baixo": "Baixo",
+  Baixo: "Baixo",
+  Médio: "Médio",
+  Alto: "Alto",
+  "Muito Alto": "Alto",
+};
+
+const SIT_TO_STAND_CLASSIFICATION_TO_CATALOG: Readonly<Record<string, string>> = {
+  Alerta: "Alerta",
+  Atenção: "Intermediário",
+  Bom: "Intermediário",
+  Intermediário: "Intermediário",
+  Excelente: "Excelente",
+};
+
+function normalizeFromCatalogMap(
+  classification: string | null | undefined,
+  map: Readonly<Record<string, string>>,
+): string | null {
+  const trimmed = classification?.trim() ?? "";
+  if (trimmed.length === 0) return null;
+  return map[trimmed] ?? null;
+}
+
+export function normalizeVo2EvidenceClassification(
+  classification: string | null | undefined,
+): string | null {
+  return normalizeFromCatalogMap(classification, VO2_CLASSIFICATION_TO_CATALOG);
+}
+
+export function normalizeFcRecoveryEvidenceClassification(
+  classification: string | null | undefined,
+): string | null {
+  return normalizeFromCatalogMap(
+    classification,
+    FC_RECOVERY_CLASSIFICATION_TO_CATALOG,
+  );
+}
+
+export function normalizeHandgripEvidenceClassification(
+  classification: string | null | undefined,
+): string | null {
+  return normalizeFromCatalogMap(
+    classification,
+    HANDGRIP_CLASSIFICATION_TO_CATALOG,
+  );
+}
+
+export function normalizeSitToStandEvidenceClassification(
+  classification: string | null | undefined,
+): string | null {
+  return normalizeFromCatalogMap(
+    classification,
+    SIT_TO_STAND_CLASSIFICATION_TO_CATALOG,
+  );
+}
+
+function formatObservedNumber(
+  value: number | null | undefined,
+  unit: string,
+  fractionDigits = 1,
+): string | null {
+  if (value == null || !Number.isFinite(value)) return null;
+  const fixed = value.toFixed(fractionDigits);
+  const trimmed = fixed.replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
+  return `${trimmed} ${unit}`;
+}
 
 /**
  * Conta as flags individuais de risco de adesão presentes numa resposta.
@@ -164,6 +248,54 @@ export function mapQuestionnaireResponseToEvidenceInput(
   };
 }
 
+export function mapVo2ResultToEvidenceInput(
+  result: CoachConsoleVo2Result | null | undefined,
+): Precision12EvidenceInput {
+  if (!result) return {};
+  return {
+    vo2: {
+      classification: normalizeVo2EvidenceClassification(
+        result.vo2_classification,
+      ),
+      observedValue: formatObservedNumber(result.vo2_final, "ml/kg/min", 1),
+    },
+    fcRecovery1Min: {
+      classification: normalizeFcRecoveryEvidenceClassification(
+        result.recovery_classification,
+      ),
+      observedValue: formatObservedNumber(result.recovery_drop_1min, "bpm", 0),
+    },
+  };
+}
+
+export function mapHandgripResultToEvidenceInput(
+  result: CoachConsoleHandgripResult | null | undefined,
+): Precision12EvidenceInput {
+  if (!result) return {};
+  return {
+    handgrip: {
+      classification: normalizeHandgripEvidenceClassification(
+        result.classification,
+      ),
+      observedValue: formatObservedNumber(result.best_kg, "kg", 1),
+    },
+  };
+}
+
+export function mapSitToStandResultToEvidenceInput(
+  result: CoachConsoleSitToStandResult | null | undefined,
+): Precision12EvidenceInput {
+  if (!result) return {};
+  return {
+    sitToStand: {
+      classification: normalizeSitToStandEvidenceClassification(
+        result.classification,
+      ),
+      observedValue: formatObservedNumber(result.total_score, "pontos", 1),
+    },
+  };
+}
+
 /**
  * Indexa as responses por `assessment_id` pra lookup O(1) pela UI.
  * Defensivo: ignora linhas sem `assessment_id`.
@@ -260,31 +392,28 @@ export function deriveEvidenceGroups({
   students,
   assessments,
   responses,
+  vo2Results = [],
+  handgripResults = [],
+  sitToStandResults = [],
 }: {
   students: readonly CoachConsoleStudent[];
   assessments: readonly CoachConsoleAssessment[];
   responses: readonly CoachConsoleQuestionnaire[];
+  vo2Results?: readonly CoachConsoleVo2Result[];
+  handgripResults?: readonly CoachConsoleHandgripResult[];
+  sitToStandResults?: readonly CoachConsoleSitToStandResult[];
 }): StudentEvidenceGroup[] {
   const studentById = new Map(students.map((s) => [s.id, s]));
   const assessmentById = new Map(assessments.map((a) => [a.id, a]));
 
   const byStudentId = new Map<string, StudentEvidenceGroup>();
 
-  for (const response of responses) {
-    if (!response.assessment_id) continue;
-    const assessment = assessmentById.get(response.assessment_id);
-    if (!assessment) continue;
-    const studentId = assessment.student_id;
-
-    const input: Precision12EvidenceInput =
-      mapQuestionnaireResponseToEvidenceInput(response);
-    const claims = deriveEvidenceClaims(input);
-    if (claims.length === 0) continue;
-
+  const appendClaims = (studentId: string, claims: EvidenceClaim[]) => {
+    if (claims.length === 0) return;
     const existing = byStudentId.get(studentId);
     if (existing) {
       existing.claims = [...existing.claims, ...claims];
-      continue;
+      return;
     }
     const student = studentById.get(studentId);
     byStudentId.set(studentId, {
@@ -292,6 +421,45 @@ export function deriveEvidenceGroups({
       studentName: student?.name ?? "(aluno desconhecido)",
       claims,
     });
+  };
+
+  const appendClaimsFromAssessment = (
+    assessmentId: string,
+    input: Precision12EvidenceInput,
+  ) => {
+    if (!assessmentId) return;
+    const assessment = assessmentById.get(assessmentId);
+    if (!assessment) return;
+    const claims = deriveEvidenceClaims(input);
+    appendClaims(assessment.student_id, claims);
+  };
+
+  for (const response of responses) {
+    appendClaimsFromAssessment(
+      response.assessment_id,
+      mapQuestionnaireResponseToEvidenceInput(response),
+    );
+  }
+
+  for (const result of vo2Results) {
+    appendClaimsFromAssessment(
+      result.assessment_id,
+      mapVo2ResultToEvidenceInput(result),
+    );
+  }
+
+  for (const result of handgripResults) {
+    appendClaimsFromAssessment(
+      result.assessment_id,
+      mapHandgripResultToEvidenceInput(result),
+    );
+  }
+
+  for (const result of sitToStandResults) {
+    appendClaimsFromAssessment(
+      result.assessment_id,
+      mapSitToStandResultToEvidenceInput(result),
+    );
   }
 
   // M-6 + M-5: dedup ANTES de sort pra eliminar duplicatas sem reordenar
@@ -317,7 +485,7 @@ export function deriveEvidenceGroups({
 /**
  * Catálogo de domínios que o catálogo (E5.1/E5.2) cobre mas que esta
  * rodada NÃO mapeia, e o motivo. Exposto pra ser usado em estados vazios
- * da UI ("Cobertura atual: PAR-Q + Adesão") e em documentação.
+ * da UI e em documentação.
  *
  * Quando um domínio sair daqui, basta adicionar o mapper correspondente
  * acima e atualizar `mapQuestionnaireResponseToEvidenceInput` (ou criar
@@ -327,26 +495,6 @@ export const LIMITATIONS_NOT_COVERED_YET: ReadonlyArray<{
   domain: string;
   reason: string;
 }> = [
-  {
-    domain: "vo2_max",
-    reason:
-      "Hook do Coach Console não carrega vo2_results nem ref ranges; classificação requer lookup populacional por sexo/idade.",
-  },
-  {
-    domain: "fc_recovery_1min",
-    reason:
-      "Hook do Coach Console não carrega vo2_results; recuperação de FC é coluna desse result.",
-  },
-  {
-    domain: "handgrip",
-    reason:
-      "Hook do Coach Console não carrega handgrip_results nem ref ranges; classificação requer lookup populacional por sexo/idade.",
-  },
-  {
-    domain: "sit_to_stand",
-    reason:
-      "Hook do Coach Console não carrega sit_to_stand_results nem ref ranges; classificação requer lookup por faixa etária.",
-  },
   {
     domain: "dexa",
     reason:

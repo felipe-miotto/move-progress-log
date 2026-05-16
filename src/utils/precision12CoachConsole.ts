@@ -45,6 +45,26 @@ export interface CoachConsoleQuestionnaire {
   injury_surgery_history: string | null;
 }
 
+export interface CoachConsoleVo2Result {
+  assessment_id: string;
+  vo2_final: number | null;
+  vo2_classification: string | null;
+  recovery_drop_1min: number | null;
+  recovery_classification: string | null;
+}
+
+export interface CoachConsoleHandgripResult {
+  assessment_id: string;
+  best_kg: number | null;
+  classification: string | null;
+}
+
+export interface CoachConsoleSitToStandResult {
+  assessment_id: string;
+  total_score: number | null;
+  classification: string | null;
+}
+
 export interface CoachConsoleStudent {
   id: string;
   name: string;

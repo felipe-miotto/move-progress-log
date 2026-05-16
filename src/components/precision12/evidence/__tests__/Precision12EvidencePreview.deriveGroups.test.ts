@@ -11,8 +11,11 @@ import { describe, expect, it } from "vitest";
 
 import type {
   CoachConsoleAssessment,
+  CoachConsoleHandgripResult,
   CoachConsoleQuestionnaire,
+  CoachConsoleSitToStandResult,
   CoachConsoleStudent,
+  CoachConsoleVo2Result,
 } from "@/utils/precision12CoachConsole";
 
 import { deriveEvidenceGroups } from "@/utils/precision12EvidenceMapping";
@@ -53,6 +56,41 @@ function response(
     uses_medications: false,
     has_medical_condition: false,
     injury_surgery_history: null,
+    ...overrides,
+  };
+}
+
+function vo2Result(
+  overrides: Partial<CoachConsoleVo2Result> = {},
+): CoachConsoleVo2Result {
+  return {
+    assessment_id: "vo2-1",
+    vo2_final: 35.2,
+    vo2_classification: "Bom",
+    recovery_drop_1min: 10,
+    recovery_classification: "Atenção",
+    ...overrides,
+  };
+}
+
+function handgripResult(
+  overrides: Partial<CoachConsoleHandgripResult> = {},
+): CoachConsoleHandgripResult {
+  return {
+    assessment_id: "hg-1",
+    best_kg: 24,
+    classification: "Baixo",
+    ...overrides,
+  };
+}
+
+function sitToStandResult(
+  overrides: Partial<CoachConsoleSitToStandResult> = {},
+): CoachConsoleSitToStandResult {
+  return {
+    assessment_id: "s2s-1",
+    total_score: 8,
+    classification: "Excelente",
     ...overrides,
   };
 }
@@ -159,6 +197,72 @@ describe("deriveEvidenceGroups — múltiplos alunos / múltiplas responses", ()
     expect(classifications).toContain("PAR-Q sem sinalizações");
     expect(classifications).toContain("Sono insuficiente");
     expect(classifications).toContain("Estresse alto");
+  });
+});
+
+describe("deriveEvidenceGroups — resultados físicos E5.5b", () => {
+  it("VO₂ result gera claims VO₂ + FC recovery no grupo do aluno", () => {
+    const groups = deriveEvidenceGroups({
+      students: [student()],
+      assessments: [
+        assessment({
+          id: "vo2-1",
+          student_id: "s1",
+          assessment_type: "vo2_bike_max",
+        }),
+      ],
+      responses: [],
+      vo2Results: [vo2Result()],
+    });
+    expect(groups).toHaveLength(1);
+    expect(groups[0].studentName).toBe("Alex Griebeler");
+    expect(groups[0].claims.map((c) => c.domain)).toEqual([
+      "fc_recovery_1min",
+      "vo2_max",
+    ]);
+    expect(groups[0].claims.map((c) => c.observedValue)).toEqual([
+      "10 bpm",
+      "35.2 ml/kg/min",
+    ]);
+  });
+
+  it("Handgrip e Sit-to-Stand entram junto com questionnaire no mesmo grupo", () => {
+    const groups = deriveEvidenceGroups({
+      students: [student()],
+      assessments: [
+        assessment({ id: "a1", student_id: "s1" }),
+        assessment({
+          id: "hg-1",
+          student_id: "s1",
+          assessment_type: "handgrip",
+        }),
+        assessment({
+          id: "s2s-1",
+          student_id: "s1",
+          assessment_type: "sit_to_stand",
+        }),
+      ],
+      responses: [response({ assessment_id: "a1", parq_blocked: false })],
+      handgripResults: [handgripResult()],
+      sitToStandResults: [sitToStandResult()],
+    });
+    expect(groups).toHaveLength(1);
+    const domains = groups[0].claims.map((c) => c.domain);
+    expect(domains).toContain("questionnaire_parq");
+    expect(domains).toContain("handgrip");
+    expect(domains).toContain("sit_to_stand");
+  });
+
+  it("resultado físico cuja assessment não está na lista é ignorado", () => {
+    const groups = deriveEvidenceGroups({
+      students: [student()],
+      assessments: [],
+      responses: [],
+      vo2Results: [vo2Result({ assessment_id: "ghost" })],
+      handgripResults: [handgripResult({ assessment_id: "ghost" })],
+      sitToStandResults: [sitToStandResult({ assessment_id: "ghost" })],
+    });
+    expect(groups).toEqual([]);
   });
 });
 

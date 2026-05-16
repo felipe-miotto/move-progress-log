@@ -298,13 +298,20 @@ describe("E5.5 Precision12EvidencePreview", () => {
     );
   });
 
-  it("consome students + assessments + responses (todos do hook E4.1), sem nova query", () => {
+  it("consome arrays do hook do console, sem query própria", () => {
     expect(previewSource).toContain("students: readonly CoachConsoleStudent[]");
     expect(previewSource).toContain(
       "assessments: readonly CoachConsoleAssessment[]",
     );
     expect(previewSource).toContain(
       "responses: readonly CoachConsoleQuestionnaire[]",
+    );
+    expect(previewSource).toContain("vo2Results: readonly CoachConsoleVo2Result[]");
+    expect(previewSource).toContain(
+      "handgripResults: readonly CoachConsoleHandgripResult[]",
+    );
+    expect(previewSource).toContain(
+      "sitToStandResults: readonly CoachConsoleSitToStandResult[]",
     );
     // Defesa: nenhum hook próprio.
     expect(previewSource).not.toMatch(/\buseQuery\b/);
@@ -401,21 +408,33 @@ describe("E5.5 Precision12Console — integra Preview no fim do layout", () => {
     expect(consoleSource).toMatch(
       /responses=\{filteredResponsesForEvidence\}/,
     );
+    expect(consoleSource).toMatch(
+      /vo2Results=\{filteredVo2ResultsForEvidence\}/,
+    );
+    expect(consoleSource).toMatch(
+      /handgripResults=\{filteredHandgripResultsForEvidence\}/,
+    );
+    expect(consoleSource).toMatch(
+      /sitToStandResults=\{filteredSitToStandResultsForEvidence\}/,
+    );
     // Defesa: não pode mais passar arrays crus diretos do hook.
     expect(consoleSource).not.toMatch(/<Precision12EvidencePreview[^>]*students=\{data\.students\}/);
   });
 
-  it("deriva filteredAssessmentsForEvidence e filteredResponsesForEvidence em cascata (M-2)", () => {
-    // Cascata: students filtrados → assessments daqueles alunos → responses
-    // daquelas assessments. Os 3 useMemo devem existir.
+  it("deriva child results filtrados em cascata (M-2)", () => {
+    // Cascata: students filtrados → assessments daqueles alunos → child
+    // results daquelas assessments. Os useMemo principais devem existir.
     expect(consoleSource).toContain("filteredStudentIdsForEvidence");
     expect(consoleSource).toContain("filteredAssessmentsForEvidence");
     expect(consoleSource).toContain("filteredResponsesForEvidence");
+    expect(consoleSource).toContain("filteredVo2ResultsForEvidence");
+    expect(consoleSource).toContain("filteredHandgripResultsForEvidence");
+    expect(consoleSource).toContain("filteredSitToStandResultsForEvidence");
     // Source-based check: o filtro de assessments usa filteredStudentIdsForEvidence.
     expect(consoleSource).toMatch(
       /filteredStudentIdsForEvidence\.has\(a\.student_id\)/,
     );
-    // E o filtro de responses usa filteredAssessmentIdsForEvidence.
+    // E os filtros de child results usam filteredAssessmentIdsForEvidence.
     expect(consoleSource).toMatch(
       /filteredAssessmentIdsForEvidence\.has\(r\.assessment_id\)/,
     );

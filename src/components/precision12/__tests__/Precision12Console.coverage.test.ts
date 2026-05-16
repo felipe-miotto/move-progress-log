@@ -22,6 +22,12 @@ const coachConsoleSource = readFileSync(coachConsolePath, "utf-8");
 const precision12ConsolePath = resolve(__dirname, "../Precision12Console.tsx");
 const precision12ConsoleSource = readFileSync(precision12ConsolePath, "utf-8");
 
+const precision12HookPath = resolve(
+  __dirname,
+  "../../../hooks/usePrecision12CoachConsole.ts",
+);
+const precision12HookSource = readFileSync(precision12HookPath, "utf-8");
+
 const precision12FiltersPath = resolve(__dirname, "../Precision12Filters.tsx");
 const precision12FiltersSource = readFileSync(precision12FiltersPath, "utf-8");
 
@@ -124,6 +130,49 @@ describe("E4.2 Precision12Console — sanity", () => {
   it("não introduz mutation (read-only nesta etapa)", () => {
     expect(precision12ConsoleSource).not.toContain("useMutation");
     expect(precision12ConsoleSource).not.toMatch(/supabase\.[a-z]+\.(insert|update|delete|upsert)/);
+  });
+});
+
+describe("E5.5b usePrecision12CoachConsole — physical evidence result fetch", () => {
+  it("carrega VO₂, handgrip e sit-to-stand em bulk por assessment_id", () => {
+    expect(precision12HookSource).toContain(
+      '.from("vo2_assessment_details")',
+    );
+    expect(precision12HookSource).toContain('.from("handgrip_results")');
+    expect(precision12HookSource).toContain('.from("sit_to_stand_results")');
+    expect(precision12HookSource).toContain(
+      '.in("assessment_id", vo2AssessmentIds)',
+    );
+    expect(precision12HookSource).toContain(
+      '.in("assessment_id", handgripAssessmentIds)',
+    );
+    expect(precision12HookSource).toContain(
+      '.in("assessment_id", sitToStandAssessmentIds)',
+    );
+  });
+
+  it("pula queries físicas quando não há assessment daquele tipo", () => {
+    expect(precision12HookSource).toContain(
+      "if (vo2AssessmentIds.length > 0)",
+    );
+    expect(precision12HookSource).toContain(
+      "if (handgripAssessmentIds.length > 0)",
+    );
+    expect(precision12HookSource).toContain(
+      "if (sitToStandAssessmentIds.length > 0)",
+    );
+  });
+
+  it("expõe resultados físicos no raw data do hook para o preview", () => {
+    expect(precision12HookSource).toContain(
+      "vo2Results: CoachConsoleVo2Result[]",
+    );
+    expect(precision12HookSource).toContain(
+      "handgripResults: CoachConsoleHandgripResult[]",
+    );
+    expect(precision12HookSource).toContain(
+      "sitToStandResults: CoachConsoleSitToStandResult[]",
+    );
   });
 });
 

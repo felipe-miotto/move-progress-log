@@ -129,6 +129,33 @@ export function Precision12Console() {
         : [],
     [data, filteredAssessmentIdsForEvidence],
   );
+  const filteredVo2ResultsForEvidence = useMemo(
+    () =>
+      data
+        ? data.vo2Results.filter((r) =>
+            filteredAssessmentIdsForEvidence.has(r.assessment_id),
+          )
+        : [],
+    [data, filteredAssessmentIdsForEvidence],
+  );
+  const filteredHandgripResultsForEvidence = useMemo(
+    () =>
+      data
+        ? data.handgripResults.filter((r) =>
+            filteredAssessmentIdsForEvidence.has(r.assessment_id),
+          )
+        : [],
+    [data, filteredAssessmentIdsForEvidence],
+  );
+  const filteredSitToStandResultsForEvidence = useMemo(
+    () =>
+      data
+        ? data.sitToStandResults.filter((r) =>
+            filteredAssessmentIdsForEvidence.has(r.assessment_id),
+          )
+        : [],
+    [data, filteredAssessmentIdsForEvidence],
+  );
 
   if (query.isLoading) {
     return <LoadingSkeleton />;
@@ -231,12 +258,11 @@ export function Precision12Console() {
 
       {/*
         E5.5 — Preview read-only de evidências clínico-operacionais.
-        Consome `responses` e `students` JÁ carregados pelo hook E4.1
-        (zero query nova). Cobertura inicial: PAR-Q + Sono/Estresse/
-        Energia/Adesão. Demais domínios documentados como pendentes
-        dentro do próprio componente (limitações em `<details>`).
+        Consome dados JÁ carregados pelo hook do console. Cobertura:
+        físicos classificados + PAR-Q + Sono/Estresse/Energia/Adesão.
+        DEXA segue documentado como pendente por exigir cortes por sexo/idade.
         E5.6a / M-2: agora recebe os arrays JÁ filtrados (em cascata
-        students→assessments→responses) pra respeitar os mesmos filtros
+        students→assessments→child results) pra respeitar os mesmos filtros
         operacionais que a fila e a tabela de progresso.
       */}
       <section
@@ -256,6 +282,9 @@ export function Precision12Console() {
             students={filteredStudents}
             assessments={filteredAssessmentsForEvidence}
             responses={filteredResponsesForEvidence}
+            vo2Results={filteredVo2ResultsForEvidence}
+            handgripResults={filteredHandgripResultsForEvidence}
+            sitToStandResults={filteredSitToStandResultsForEvidence}
           />
         )}
       </section>
