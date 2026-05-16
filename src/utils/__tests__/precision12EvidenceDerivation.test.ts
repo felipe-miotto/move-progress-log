@@ -142,6 +142,62 @@ describe("observedValue → instantiateClaim, catálogo permanece com null", () 
   });
 });
 
+// ── 3.b Trim em classification + observedValue ──────────────────────────────
+
+describe("tryDerive — trim resilience", () => {
+  it("classification com espaços no entorno resolve como classificação trimada", () => {
+    const out = deriveVo2EvidenceClaims({
+      vo2: { classification: " Fraco " },
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].classification).toBe("Fraco");
+  });
+
+  it("classification com tabs/newlines no entorno resolve normalmente", () => {
+    const out = deriveHandgripEvidenceClaims({
+      handgrip: { classification: "\t Médio \n" },
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].classification).toBe("Médio");
+  });
+
+  it("observedValue com espaços no entorno é injetado trimado", () => {
+    const out = deriveVo2EvidenceClaims({
+      vo2: { classification: "Fraco", observedValue: " 27 ml/kg/min " },
+    });
+    expect(out[0].observedValue).toBe("27 ml/kg/min");
+  });
+
+  it("observedValue só com espaços/tab/newline → tratado como ausente (null)", () => {
+    const out = deriveVo2EvidenceClaims({
+      vo2: { classification: "Fraco", observedValue: "   \t\n  " },
+    });
+    expect(out[0].observedValue).toBeNull();
+  });
+
+  it("classification só com espaços → ignora silenciosamente ([])", () => {
+    const out = deriveVo2EvidenceClaims({
+      vo2: { classification: "   ", observedValue: "27 ml/kg/min" },
+    });
+    expect(out).toEqual([]);
+  });
+
+  it("trim em DEXA preserva múltiplos marcadores com observedValues normalizados", () => {
+    const out = deriveDexaEvidenceClaims({
+      dexa: {
+        bodyFatClassification: "  % gordura elevada para faixa etária  ",
+        bodyFatObservedValue: " 32% ",
+        visceralFatClassification: "Gordura visceral elevada",
+        visceralFatObservedValue: "  ",
+      },
+    });
+    expect(out).toHaveLength(2);
+    expect(out[0].classification).toBe("% gordura elevada para faixa etária");
+    expect(out[0].observedValue).toBe("32%");
+    expect(out[1].observedValue).toBeNull();
+  });
+});
+
 // ── 4. Classificação inexistente → ignora silenciosamente ───────────────────
 
 describe("classificação inexistente é ignorada silenciosamente", () => {

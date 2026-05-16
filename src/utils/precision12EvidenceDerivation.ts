@@ -86,17 +86,26 @@ export interface Precision12EvidenceInput {
 /**
  * Lookup + instanciação opcional do observedValue. Retorna null quando o
  * catálogo não tem entry para essa (domain, classification) — não lança.
+ *
+ * Ambos `classification` e `observedValue` passam por `.trim()` antes do uso:
+ *   • Whitespace no entorno é descartado (resiliente a dado vindo de form
+ *     com espaços extras).
+ *   • `classification` 100% vazio após trim → retorna null.
+ *   • `observedValue` 100% vazio após trim → trata como ausente e devolve a
+ *     claim do catálogo sem chamar `instantiateClaim`.
  */
 function tryDerive(
   domain: EvidenceDomain,
   classification: string | null | undefined,
   observedValue: string | null | undefined,
 ): EvidenceClaim | null {
-  if (!classification || classification.trim().length === 0) return null;
-  const claim = getEvidenceClaim(domain, classification);
+  const trimmedClassification = classification?.trim() ?? "";
+  if (trimmedClassification.length === 0) return null;
+  const claim = getEvidenceClaim(domain, trimmedClassification);
   if (!claim) return null;
-  if (observedValue && observedValue.length > 0) {
-    return instantiateClaim(claim, observedValue);
+  const trimmedObservedValue = observedValue?.trim() ?? "";
+  if (trimmedObservedValue.length > 0) {
+    return instantiateClaim(claim, trimmedObservedValue);
   }
   return claim;
 }
