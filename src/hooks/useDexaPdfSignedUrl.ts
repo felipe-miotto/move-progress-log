@@ -58,7 +58,9 @@ export interface UseDexaPdfSignedUrlResult {
   /**
    * Assina o `storagePath` e devolve a URL. Devolve `null` se `storagePath`
    * for vazio/null ou se a API recusar (erro de auth/path inválido).
-   * Em caso de erro, `error` é atualizado com a mensagem do Supabase.
+   * Em caso de erro, `error` recebe uma mensagem genérica fixa
+   * (`DEXA_PDF_SIGNED_URL_GENERIC_ERROR`), sem detalhes do Supabase nem
+   * do path do objeto. Diagnóstico interno fica server-side.
    */
   sign: (storagePath: string | null | undefined) => Promise<string | null>;
   isLoading: boolean;
