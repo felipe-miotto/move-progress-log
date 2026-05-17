@@ -283,8 +283,9 @@ export const DexaForm = ({
         <DialogHeader>
           <DialogTitle>DEXA — composição corporal</DialogTitle>
           <DialogDescription>
-            Faça upload do PDF do scan e preencha os campos clínicos
-            extraídos do laudo. Extração automática por IA virá em E5.
+            Faça upload do PDF do laudo DEXA e preencha os campos manualmente
+            com os dados da clínica parceira. A leitura automática do PDF
+            será implementada em etapa futura.
           </DialogDescription>
         </DialogHeader>
 
