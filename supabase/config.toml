@@ -95,3 +95,7 @@ verify_jwt = false
 # Internal health endpoint - protected by x-admin-key OR admin JWT (validated in code)
 [functions.smoke-health]
 verify_jwt = false
+
+# AI-assisted DEXA PDF extraction (draft fill only — never auto-saves)
+[functions.extract-dexa-pdf]
+verify_jwt = true

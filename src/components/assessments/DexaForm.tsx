@@ -4,27 +4,35 @@
  * Fluxo MVP:
  *   1. Coach recebe o PDF do scan DEXA da clínica
  *   2. Faz upload do PDF no bucket privado `dexa-pdfs`
- *   3. Digita ~17 campos clínicos extraídos manualmente do laudo
- *   4. (Opcional) preenche regional_distribution por região anatômica
- *   5. Submit → RPC `create_precision12_assessment` com kind="dexa"
- *
- * Extração automática via IA ainda não está implementada. Este form
- * opera em modo manual: upload do PDF + preenchimento pelo coach com
- * os dados da clínica parceira (`extraction_method = "manual"` no
- * payload; `raw_extracted_json` permanece `null`). Quando a leitura
- * automática chegar, este header passa a descrever o novo flag.
+ *   3. (Opcional) Clica "Ler PDF e preencher campos" — chama a edge
+ *      `extract-dexa-pdf`, que envia o PDF pra OpenAI Responses API
+ *      multimodal e devolve JSON estruturado. O frontend preenche o
+ *      formulário como RASCUNHO; **nenhum dado é persistido aqui**.
+ *      Campos já preenchidos manualmente NÃO são sobrescritos.
+ *   4. Coach revisa todos os campos
+ *   5. (Opcional) preenche regional_distribution por região anatômica
+ *   6. Submit → RPC `create_precision12_assessment` com kind="dexa"
+ *      Só aqui os dados são persistidos. `extraction_method` vira
+ *      "hybrid" se a IA preencheu algum campo, senão "manual".
  *
  * Cores de visceral_fat_g (pra futuro): green <100g, amber 100-150g, red >150g.
  * Aqui só coleta valor; classificação visual será adicionada em etapa
  * futura.
  */
 
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Upload, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Loader2,
+  Sparkles,
+  Upload,
+  X,
+} from "lucide-react";
 import { z } from "zod";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Dialog,
   DialogContent,
@@ -60,6 +68,14 @@ import {
   dexaSchema,
   localTodayIso,
 } from "@/utils/assessmentValidation";
+import {
+  DEXA_EXTRACTION_FIELDS,
+  applyDexaExtractionToEmptyFields,
+  normalizeDexaExtractionResponse,
+  sanitizeDexaExtractionForStorage,
+  type DexaExtraction,
+  type DexaExtractionFieldName,
+} from "@/utils/dexaPdfExtraction";
 
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -100,6 +116,21 @@ interface DexaFormProps {
 const parseNumber = (value: string): number | undefined =>
   value === "" ? undefined : Number(value);
 
+/**
+ * Mensagem genérica fixa pra falhas de upload do PDF / salvamento.
+ *
+ * Hardening (PR #159 follow-up): NÃO concatenamos `err.message`,
+ * `error.message` ou `signError.message` aqui — essas mensagens
+ * podem incluir path do bucket, querystring de token, hostname do
+ * Supabase ou stack trace, e qualquer captura automática (toast,
+ * Sentry, logging do browser) re-exibiria isso pro coach/cliente.
+ *
+ * Diagnóstico interno fica disponível server-side via Supabase
+ * Dashboard (logs do Storage).
+ */
+const DEXA_UPLOAD_GENERIC_ERROR_DESCRIPTION =
+  "Tente novamente. Se o problema persistir, verifique o PDF ou refaça o upload.";
+
 const REGIONS = [
   { key: "trunk", label: "Tronco" },
   { key: "arms_right", label: "Braço direito" },
@@ -123,6 +154,29 @@ export const DexaForm = ({
   const [isSaving, setIsSaving] = useState(false);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  /**
+   * Path do PDF JÁ no bucket. Populado quando o coach clica "Ler PDF"
+   * (upload sob demanda). O submit reusa esse path em vez de subir
+   * outro arquivo. Quando o coach remove o PDF, o path é limpo (sem
+   * apagar o objeto — risco/follow-up de cleanup).
+   */
+  const [uploadedPdfPath, setUploadedPdfPath] = useState<string | null>(null);
+  const [isExtracting, setIsExtracting] = useState(false);
+  /**
+   * Resultado da última extração aplicada. Mantém também os campos que
+   * foram efetivamente preenchidos (`applied`), pra renderizar UI de
+   * revisão e pra que o submit decida `extraction_method='hybrid'`.
+   */
+  const [extractionState, setExtractionState] = useState<{
+    extraction: DexaExtraction;
+    applied: DexaExtractionFieldName[];
+    skipped: DexaExtractionFieldName[];
+  } | null>(null);
+  /**
+   * Guard pra evitar dois cliques rápidos no botão "Ler PDF" disparando
+   * dois uploads + duas chamadas à edge.
+   */
+  const extractionInFlight = useRef(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -165,27 +219,123 @@ export const DexaForm = ({
       return;
     }
 
+    // Trocou o arquivo → invalida path/extração anteriores. NÃO
+    // remove o objeto antigo do bucket (cleanup destrutivo fica como
+    // follow-up; risco de arquivo órfão se o coach abandonar a tela
+    // depois de extrair).
     setPdfFile(file);
+    setUploadedPdfPath(null);
+    setExtractionState(null);
   };
 
   const removePdf = () => {
     setPdfFile(null);
+    // Preserva os campos preenchidos (manual ou extraídos): a regra de
+    // produto é não destruir trabalho do coach sem confirmação. Só
+    // limpa metadata da extração.
+    setUploadedPdfPath(null);
+    setExtractionState(null);
   };
+
+  /**
+   * Faz upload do PDF se ainda não foi feito. Retorna o storage path.
+   * Idempotente: se já há `uploadedPdfPath`, devolve sem subir de novo.
+   */
+  const uploadPdfIfNeeded = useCallback(async (): Promise<string | null> => {
+    if (uploadedPdfPath) return uploadedPdfPath;
+    if (!pdfFile) return null;
+    setIsUploading(true);
+    try {
+      const ext = pdfFile.name.split(".").pop() ?? "pdf";
+      const path = `${studentId}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+      const { error } = await supabase.storage
+        .from("dexa-pdfs")
+        .upload(path, pdfFile, { contentType: "application/pdf" });
+      if (error) throw error;
+      setUploadedPdfPath(path);
+      return path;
+    } finally {
+      setIsUploading(false);
+    }
+  }, [pdfFile, studentId, uploadedPdfPath]);
+
+  /**
+   * Roda a edge `extract-dexa-pdf` e aplica o resultado nos campos
+   * VAZIOS do formulário. Nunca persiste nada: o submit existente é
+   * quem grava no banco, depois da revisão humana.
+   */
+  const handleExtract = useCallback(async () => {
+    if (extractionInFlight.current) return;
+    if (!pdfFile && !uploadedPdfPath) return;
+    extractionInFlight.current = true;
+    setIsExtracting(true);
+    try {
+      const path = await uploadPdfIfNeeded();
+      if (!path) {
+        notify.error("Não foi possível preparar o PDF para leitura");
+        return;
+      }
+      const { data, error } = await supabase.functions.invoke(
+        "extract-dexa-pdf",
+        {
+          body: { student_id: studentId, storage_path: path },
+        },
+      );
+      if (error || !data || typeof data !== "object" || (data as { ok?: unknown }).ok !== true) {
+        // Genérico e SEM detalhes internos. A edge já loga server-side.
+        notify.error("Não foi possível ler o PDF automaticamente", {
+          description:
+            "Você ainda pode preencher os campos manualmente e salvar.",
+        });
+        return;
+      }
+      const extraction = normalizeDexaExtractionResponse(
+        (data as { extraction: unknown }).extraction,
+      );
+      const currentValues = Object.fromEntries(
+        DEXA_EXTRACTION_FIELDS.map((field) => [field, form.getValues(field as never)]),
+      ) as Record<DexaExtractionFieldName, unknown>;
+      const result = applyDexaExtractionToEmptyFields(currentValues, extraction);
+      // Aplica cada campo via react-hook-form (mantém validation/dirty).
+      for (const fieldName of result.appliedFields) {
+        form.setValue(
+          fieldName as never,
+          result.values[fieldName] as never,
+          { shouldDirty: true, shouldValidate: true },
+        );
+      }
+      setExtractionState({
+        extraction,
+        applied: result.appliedFields,
+        skipped: result.skippedFields,
+      });
+      notify.success("Campos preenchidos automaticamente", {
+        description: "Revise todos os dados antes de salvar.",
+      });
+    } catch {
+      notify.error("Não foi possível ler o PDF automaticamente", {
+        description:
+          "Você ainda pode preencher os campos manualmente e salvar.",
+      });
+    } finally {
+      setIsExtracting(false);
+      extractionInFlight.current = false;
+    }
+  }, [form, pdfFile, studentId, uploadPdfIfNeeded, uploadedPdfPath]);
 
   const onSubmit = async (data: FormData) => {
     setIsSaving(true);
-    let uploadedPdfPath: string | null = null;
     let mutationStarted = false;
     try {
-      if (pdfFile) {
-        setIsUploading(true);
-        const ext = pdfFile.name.split(".").pop() ?? "pdf";
-        uploadedPdfPath = `${studentId}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
-        const { error } = await supabase.storage
-          .from("dexa-pdfs")
-          .upload(uploadedPdfPath, pdfFile, { contentType: "application/pdf" });
-        if (error) throw error;
-      }
+      // Reusa o path do upload anterior (feito pra extração) OU sobe
+      // agora se o coach ignorou a extração e salvou direto.
+      const finalPdfPath = await uploadPdfIfNeeded();
+
+      const usedExtraction =
+        extractionState != null && extractionState.applied.length > 0;
+      const sanitizedExtraction = usedExtraction
+        ? sanitizeDexaExtractionForStorage(extractionState.extraction)
+        : null;
 
       mutationStarted = true;
       const result = await createAssessment.mutateAsync({
@@ -217,24 +367,30 @@ export const DexaForm = ({
             fat_percentile: data.fat_percentile ?? null,
             bmr_harris_benedict_kcal: data.bmr_harris_benedict_kcal ?? null,
             bmr_mifflin_stjeor_kcal: data.bmr_mifflin_stjeor_kcal ?? null,
-            scan_pdf_storage_path: uploadedPdfPath,
+            scan_pdf_storage_path: finalPdfPath,
             scan_pdf_url: null,
             regional_distribution: data.regional_distribution ?? null,
             conclusion_text: data.conclusion_text || null,
-            raw_extracted_json: null,
-            extraction_confidence: null,
-            extraction_method: "manual",
+            raw_extracted_json: sanitizedExtraction,
+            extraction_confidence: usedExtraction
+              ? sanitizedExtraction?.overall_confidence ?? null
+              : null,
+            extraction_method: usedExtraction ? "hybrid" : "manual",
           },
         },
       });
       form.reset();
       setPdfFile(null);
+      setUploadedPdfPath(null);
+      setExtractionState(null);
       onOpenChange(false);
       onCreated?.(result.id);
-    } catch (err) {
+    } catch {
+      // Hardening: `err` deliberadamente não-bindado pra impedir refactor
+      // acidental que reintroduza `err.message` no toast.
       if (!mutationStarted) {
         notify.error("Erro no upload do PDF", {
-          description: err instanceof Error ? err.message : "Tente novamente",
+          description: DEXA_UPLOAD_GENERIC_ERROR_DESCRIPTION,
         });
       }
     } finally {
@@ -287,9 +443,10 @@ export const DexaForm = ({
         <DialogHeader>
           <DialogTitle>DEXA — composição corporal</DialogTitle>
           <DialogDescription>
-            Faça upload do PDF do laudo DEXA e preencha os campos manualmente
-            com os dados da clínica parceira. A leitura automática do PDF
-            será implementada em etapa futura.
+            Faça upload do PDF do laudo DEXA. Você pode preencher os campos
+            manualmente OU clicar &quot;Ler PDF e preencher campos&quot; pra
+            que a IA gere um rascunho — revisão humana e clique em &quot;Salvar
+            avaliação&quot; continuam obrigatórios.
           </DialogDescription>
         </DialogHeader>
 
@@ -354,9 +511,88 @@ export const DexaForm = ({
                 </label>
               )}
               <p className="text-xs text-muted-foreground">
-                Upload é opcional e só acontece ao salvar; cancelar esta tela
-                não cria arquivo órfão.
+                Quando você clica em &quot;Ler PDF&quot;, o upload acontece
+                imediatamente para a leitura automática rodar. Se preferir
+                preencher manualmente, o upload acontece só ao salvar.
               </p>
+
+              {/*
+                PR-IA: botão de extração assistida. Só aparece com PDF
+                selecionado. NÃO chama `createAssessment.mutateAsync` —
+                apenas chama a edge `extract-dexa-pdf` e preenche o form
+                como rascunho.
+              */}
+              {pdfFile && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleExtract}
+                  disabled={isExtracting || isUploading || isSaving}
+                  aria-label="Ler PDF e preencher campos automaticamente"
+                  data-testid="dexa-extract-button"
+                >
+                  {isExtracting ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                  ) : (
+                    <Sparkles className="mr-2 h-4 w-4" aria-hidden />
+                  )}
+                  {isExtracting ? "Lendo PDF…" : "Ler PDF e preencher campos"}
+                </Button>
+              )}
+
+              {/*
+                PR-IA: revisão pós-extração. Aparece quando a IA aplicou ao
+                menos 1 campo. NÃO substitui o submit manual.
+              */}
+              {extractionState && extractionState.applied.length > 0 && (
+                <Alert
+                  className="mt-3"
+                  data-testid="dexa-extraction-review"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  <AlertTitle>Leitura automática aplicada</AlertTitle>
+                  <AlertDescription className="space-y-1 text-xs">
+                    <p>
+                      Campos preenchidos automaticamente:{" "}
+                      <strong>{extractionState.applied.length}</strong>. Revise
+                      todos os dados antes de salvar.
+                    </p>
+                    <p>
+                      Confiança geral:{" "}
+                      <strong>
+                        {Math.round(
+                          extractionState.extraction.overall_confidence * 100,
+                        )}
+                        %
+                      </strong>
+                    </p>
+                    {extractionState.skipped.length > 0 && (
+                      <p>
+                        Não sobrescritos (já preenchidos manualmente):{" "}
+                        {extractionState.skipped.join(", ")}.
+                      </p>
+                    )}
+                    {extractionState.extraction.missing_fields.length > 0 && (
+                      <p>
+                        Campos não encontrados no laudo:{" "}
+                        {extractionState.extraction.missing_fields.join(", ")}.
+                      </p>
+                    )}
+                    {extractionState.extraction.warnings.length > 0 && (
+                      <ul className="ml-4 list-disc">
+                        {extractionState.extraction.warnings.map((w, i) => (
+                          <li key={i}>{w}</li>
+                        ))}
+                      </ul>
+                    )}
+                    <p className="flex items-center gap-1 pt-1 text-muted-foreground">
+                      <AlertTriangle className="h-3 w-3" aria-hidden />A
+                      leitura automática não substitui revisão humana do
+                      laudo.
+                    </p>
+                  </AlertDescription>
+                </Alert>
+              )}
             </section>
 
             {/* Massa + percentuais core */}
