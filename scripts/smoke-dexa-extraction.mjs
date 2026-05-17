@@ -199,7 +199,9 @@ async function extract(pdfPath, apiKey, model) {
           {
             type: "input_file",
             filename: "dexa.pdf",
-            file_data: `data:application/pdf;base64,${base64}`,
+            // OpenAI Responses API: `file_data` espera base64 PURO.
+            // Espelha o fix da edge `extract-dexa-pdf`.
+            file_data: base64,
           },
           {
             type: "input_text",
