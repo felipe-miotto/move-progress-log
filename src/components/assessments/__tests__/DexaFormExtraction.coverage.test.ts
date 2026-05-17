@@ -254,7 +254,14 @@ describe("extract-dexa-pdf edge — contrato + segurança", () => {
   it("usa Responses API (POST https://api.openai.com/v1/responses) com input_file PDF", () => {
     expect(edgeSource).toContain("https://api.openai.com/v1/responses");
     expect(edgeSource).toContain('type: "input_file"');
-    expect(edgeSource).toContain("data:application/pdf;base64,");
+    // Garantias do shape do `input_file`:
+    expect(edgeSource).toContain('filename: "dexa.pdf"');
+    // `file_data` deve receber a variável base64 PURA — sem prefixo de
+    // data URL. O prefixo `data:application/pdf;base64,` fazia o
+    // request retornar 502 (Responses API espera base64 puro).
+    const code = stripComments(edgeSource);
+    expect(code).toMatch(/file_data:\s*base64Pdf/);
+    expect(code).not.toMatch(/data:application\/pdf;base64,/);
   });
 
   it("prompt instrui sem classificar/diagnosticar/inventar", () => {
