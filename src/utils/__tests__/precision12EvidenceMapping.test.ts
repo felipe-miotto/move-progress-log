@@ -78,7 +78,7 @@ function makeSitToStandResult(
   return {
     assessment_id: "s2s-1",
     total_score: 7,
-    classification: "Bom",
+    classification: "Intermediário",
     ...overrides,
   };
 }
@@ -362,9 +362,9 @@ describe("mapQuestionnaireResponseToEvidenceInput", () => {
 // ── Physical result mappers (E5.5b) ─────────────────────────────────────────
 
 describe("classification normalizers — physical tests (E5.5b)", () => {
-  it("VO₂ normaliza aliases do banco para labels do catálogo", () => {
+  it("VO₂ aceita apenas labels cobertos pelo catálogo, sem colapsar Superior", () => {
     expect(normalizeVo2EvidenceClassification("Muito Fraco")).toBe("Muito fraco");
-    expect(normalizeVo2EvidenceClassification("Superior")).toBe("Excelente");
+    expect(normalizeVo2EvidenceClassification("Superior")).toBeNull();
     expect(normalizeVo2EvidenceClassification(" Fraco ")).toBe("Fraco");
     expect(normalizeVo2EvidenceClassification("não existe")).toBeNull();
   });
@@ -375,21 +375,17 @@ describe("classification normalizers — physical tests (E5.5b)", () => {
     expect(normalizeFcRecoveryEvidenceClassification("Excelente")).toBeNull();
   });
 
-  it("Handgrip colapsa extremos para claims existentes do catálogo", () => {
-    expect(normalizeHandgripEvidenceClassification("Muito Baixo")).toBe("Baixo");
+  it("Handgrip aceita apenas labels cobertos pelo catálogo, sem colapsar extremos", () => {
+    expect(normalizeHandgripEvidenceClassification("Muito Baixo")).toBeNull();
     expect(normalizeHandgripEvidenceClassification("Baixo")).toBe("Baixo");
     expect(normalizeHandgripEvidenceClassification("Médio")).toBe("Médio");
-    expect(normalizeHandgripEvidenceClassification("Muito Alto")).toBe("Alto");
+    expect(normalizeHandgripEvidenceClassification("Muito Alto")).toBeNull();
   });
 
-  it("Sit-to-Stand normaliza Atenção/Bom para Intermediário", () => {
+  it("Sit-to-Stand aceita apenas labels cobertos pelo catálogo, sem colapsar Atenção/Bom", () => {
     expect(normalizeSitToStandEvidenceClassification("Alerta")).toBe("Alerta");
-    expect(normalizeSitToStandEvidenceClassification("Atenção")).toBe(
-      "Intermediário",
-    );
-    expect(normalizeSitToStandEvidenceClassification("Bom")).toBe(
-      "Intermediário",
-    );
+    expect(normalizeSitToStandEvidenceClassification("Atenção")).toBeNull();
+    expect(normalizeSitToStandEvidenceClassification("Bom")).toBeNull();
     expect(normalizeSitToStandEvidenceClassification("Excelente")).toBe(
       "Excelente",
     );
@@ -445,14 +441,13 @@ describe("mapHandgripResultToEvidenceInput", () => {
     });
   });
 
-  it("Muito Baixo vira claim Baixo conservadora", () => {
+  it("Muito Baixo não inventa claim Baixo quando o catálogo não tem esse label exato", () => {
     const claims = deriveEvidenceClaims(
       mapHandgripResultToEvidenceInput(
         makeHandgripResult({ classification: "Muito Baixo", best_kg: 18 }),
       ),
     );
-    expect(claims[0].classification).toBe("Baixo");
-    expect(claims[0].observedValue).toBe("18 kg");
+    expect(claims).toEqual([]);
   });
 });
 
