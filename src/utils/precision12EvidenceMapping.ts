@@ -51,8 +51,6 @@ const VO2_CLASSIFICATION_TO_CATALOG: Readonly<Record<string, string>> = {
   Regular: "Regular",
   Bom: "Bom",
   Excelente: "Excelente",
-  // O catálogo E5 agrupa o topo favorável em "Excelente".
-  Superior: "Excelente",
 };
 
 const FC_RECOVERY_CLASSIFICATION_TO_CATALOG: Readonly<Record<string, string>> = {
@@ -61,17 +59,13 @@ const FC_RECOVERY_CLASSIFICATION_TO_CATALOG: Readonly<Record<string, string>> = 
 };
 
 const HANDGRIP_CLASSIFICATION_TO_CATALOG: Readonly<Record<string, string>> = {
-  "Muito Baixo": "Baixo",
   Baixo: "Baixo",
   Médio: "Médio",
   Alto: "Alto",
-  "Muito Alto": "Alto",
 };
 
 const SIT_TO_STAND_CLASSIFICATION_TO_CATALOG: Readonly<Record<string, string>> = {
   Alerta: "Alerta",
-  Atenção: "Intermediário",
-  Bom: "Intermediário",
   Intermediário: "Intermediário",
   Excelente: "Excelente",
 };
@@ -326,8 +320,19 @@ export interface StudentEvidenceGroup {
   claims: EvidenceClaim[];
 }
 
+interface StudentEvidenceGroupDraft {
+  studentId: string;
+  studentName: string;
+  claimEntries: EvidenceClaimEntry[];
+}
+
+interface EvidenceClaimEntry {
+  claim: EvidenceClaim;
+  dedupKey: string;
+}
+
 /**
- * Identidade de uma claim para fins de dedup dentro do mesmo grupo:
+ * Identidade base de uma claim para fins de dedup dentro do mesmo grupo:
  * `${domain}-${metric}-${classification}` é única no catálogo
  * (validado em testes do E5.1/E5.2). Mantida em sincronia com a `key`
  * usada pelo `EvidenceClaimList` (E5.4).
@@ -340,15 +345,19 @@ function claimKey(claim: EvidenceClaim): string {
  * Remove claims duplicadas preservando a primeira ocorrência
  * (E5.6a / M-6). Útil quando duas responses do mesmo aluno geram a
  * mesma claim PAR-Q (reissue + retry).
+ *
+ * Resultados físicos usam `assessmentId + claimKey` como chave de dedup para
+ * preservar retestes separados, mesmo quando a classificação se repete.
  */
-function dedupClaims(claims: readonly EvidenceClaim[]): EvidenceClaim[] {
+function dedupClaimEntries(
+  entries: readonly EvidenceClaimEntry[],
+): EvidenceClaimEntry[] {
   const seen = new Set<string>();
-  const out: EvidenceClaim[] = [];
-  for (const claim of claims) {
-    const key = claimKey(claim);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(claim);
+  const out: EvidenceClaimEntry[] = [];
+  for (const entry of entries) {
+    if (seen.has(entry.dedupKey)) continue;
+    seen.add(entry.dedupKey);
+    out.push(entry);
   }
   return out;
 }
@@ -359,13 +368,13 @@ function dedupClaims(claims: readonly EvidenceClaim[]): EvidenceClaim[] {
  * tie-break (Array.prototype.sort é estável desde V8 7.0 / 2018).
  * E5.6a / M-5.
  */
-function sortClaimsBySeverity(
-  claims: readonly EvidenceClaim[],
-): EvidenceClaim[] {
-  return [...claims].sort(
+function sortClaimEntriesBySeverity(
+  entries: readonly EvidenceClaimEntry[],
+): EvidenceClaimEntry[] {
+  return [...entries].sort(
     (a, b) =>
-      EVIDENCE_RISK_LEVEL_PRIORITY[a.riskLanguageLevel] -
-      EVIDENCE_RISK_LEVEL_PRIORITY[b.riskLanguageLevel],
+      EVIDENCE_RISK_LEVEL_PRIORITY[a.claim.riskLanguageLevel] -
+      EVIDENCE_RISK_LEVEL_PRIORITY[b.claim.riskLanguageLevel],
   );
 }
 
@@ -406,32 +415,44 @@ export function deriveEvidenceGroups({
   const studentById = new Map(students.map((s) => [s.id, s]));
   const assessmentById = new Map(assessments.map((a) => [a.id, a]));
 
-  const byStudentId = new Map<string, StudentEvidenceGroup>();
+  const byStudentId = new Map<string, StudentEvidenceGroupDraft>();
 
-  const appendClaims = (studentId: string, claims: EvidenceClaim[]) => {
-    if (claims.length === 0) return;
+  const appendClaimEntries = (
+    studentId: string,
+    claimEntries: EvidenceClaimEntry[],
+  ) => {
+    if (claimEntries.length === 0) return;
     const existing = byStudentId.get(studentId);
     if (existing) {
-      existing.claims = [...existing.claims, ...claims];
+      existing.claimEntries = [...existing.claimEntries, ...claimEntries];
       return;
     }
     const student = studentById.get(studentId);
     byStudentId.set(studentId, {
       studentId,
       studentName: student?.name ?? "(aluno desconhecido)",
-      claims,
+      claimEntries,
     });
   };
 
   const appendClaimsFromAssessment = (
     assessmentId: string,
     input: Precision12EvidenceInput,
+    options: { dedupScope?: string; requireCompleted?: boolean } = {},
   ) => {
     if (!assessmentId) return;
     const assessment = assessmentById.get(assessmentId);
     if (!assessment) return;
+    if (options.requireCompleted && assessment.status !== "completed") return;
     const claims = deriveEvidenceClaims(input);
-    appendClaims(assessment.student_id, claims);
+    const claimEntries = claims.map((claim) => ({
+      claim,
+      dedupKey:
+        options.dedupScope != null
+          ? `${options.dedupScope}:${claimKey(claim)}`
+          : claimKey(claim),
+    }));
+    appendClaimEntries(assessment.student_id, claimEntries);
   };
 
   for (const response of responses) {
@@ -445,6 +466,7 @@ export function deriveEvidenceGroups({
     appendClaimsFromAssessment(
       result.assessment_id,
       mapVo2ResultToEvidenceInput(result),
+      { dedupScope: result.assessment_id, requireCompleted: true },
     );
   }
 
@@ -452,6 +474,7 @@ export function deriveEvidenceGroups({
     appendClaimsFromAssessment(
       result.assessment_id,
       mapHandgripResultToEvidenceInput(result),
+      { dedupScope: result.assessment_id, requireCompleted: true },
     );
   }
 
@@ -459,17 +482,26 @@ export function deriveEvidenceGroups({
     appendClaimsFromAssessment(
       result.assessment_id,
       mapSitToStandResultToEvidenceInput(result),
+      { dedupScope: result.assessment_id, requireCompleted: true },
     );
   }
 
   // M-6 + M-5: dedup ANTES de sort pra eliminar duplicatas sem reordenar
   // dentro do mesmo nível de severidade desnecessariamente.
   for (const group of byStudentId.values()) {
-    group.claims = sortClaimsBySeverity(dedupClaims(group.claims));
+    group.claimEntries = sortClaimEntriesBySeverity(
+      dedupClaimEntries(group.claimEntries),
+    );
   }
 
   // M-4: ordenação determinística por nome do aluno.
-  const groups = Array.from(byStudentId.values());
+  const groups: StudentEvidenceGroup[] = Array.from(byStudentId.values()).map(
+    (group) => ({
+      studentId: group.studentId,
+      studentName: group.studentName,
+      claims: group.claimEntries.map((entry) => entry.claim),
+    }),
+  );
   groups.sort((a, b) =>
     a.studentName.localeCompare(b.studentName, "pt-BR", {
       sensitivity: "base",

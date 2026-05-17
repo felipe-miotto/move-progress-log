@@ -264,6 +264,68 @@ describe("deriveEvidenceGroups — resultados físicos E5.5b", () => {
     });
     expect(groups).toEqual([]);
   });
+
+  it("resultado físico só gera evidência quando a assessment está completed", () => {
+    const groups = deriveEvidenceGroups({
+      students: [student()],
+      assessments: [
+        assessment({
+          id: "vo2-1",
+          student_id: "s1",
+          assessment_type: "vo2_bike_max",
+          status: "in_progress",
+        }),
+        assessment({
+          id: "hg-1",
+          student_id: "s1",
+          assessment_type: "handgrip",
+          status: "aborted",
+        }),
+        assessment({
+          id: "s2s-1",
+          student_id: "s1",
+          assessment_type: "sit_to_stand",
+          status: "blocked",
+        }),
+      ],
+      responses: [],
+      vo2Results: [vo2Result()],
+      handgripResults: [handgripResult()],
+      sitToStandResults: [sitToStandResult()],
+    });
+    expect(groups).toEqual([]);
+  });
+
+  it("preserva retestes físicos separados quando a classificação se repete", () => {
+    const groups = deriveEvidenceGroups({
+      students: [student()],
+      assessments: [
+        assessment({
+          id: "vo2-1",
+          student_id: "s1",
+          assessment_type: "vo2_bike_max",
+        }),
+        assessment({
+          id: "vo2-2",
+          student_id: "s1",
+          assessment_type: "vo2_bike_max",
+        }),
+      ],
+      responses: [],
+      vo2Results: [
+        vo2Result({ assessment_id: "vo2-1", vo2_final: 35.2 }),
+        vo2Result({ assessment_id: "vo2-2", vo2_final: 36.1 }),
+      ],
+    });
+
+    expect(groups).toHaveLength(1);
+    const vo2Claims = groups[0].claims.filter((claim) => claim.domain === "vo2_max");
+    expect(vo2Claims).toHaveLength(2);
+    expect(vo2Claims.map((claim) => claim.observedValue)).toEqual([
+      "35.2 ml/kg/min",
+      "36.1 ml/kg/min",
+    ]);
+  });
 });
 
 // ── E5.6a / M-4: ordenação determinística de grupos ─────────────────────────
