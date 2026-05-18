@@ -61,6 +61,13 @@ export type DexaNumericFieldName = (typeof DEXA_NUMERIC_FIELDS)[number];
 export const DEXA_NON_NUMERIC_FIELDS = [
   "conclusion_text",
   "regional_distribution",
+  /**
+   * scan_date — data de REALIZAÇÃO do exame (ISO YYYY-MM-DD).
+   * Aplicada ao `assessment_date` do form quando extraída e válida.
+   * Veja `applyDexaScanDateToAssessmentDate` pra regras de
+   * non-overwrite (não sobrescreve se o coach já digitou).
+   */
+  "scan_date",
 ] as const;
 
 /** Todas as chaves esperadas em `extraction.fields`. */
@@ -136,6 +143,8 @@ export interface DexaExtraction {
   fields: Record<DexaNumericFieldName, DexaExtractionField<number>> & {
     conclusion_text: DexaExtractionField<string>;
     regional_distribution: DexaRegionalDistributionField;
+    /** Data de REALIZAÇÃO do exame em ISO YYYY-MM-DD ou null. */
+    scan_date: DexaExtractionField<string>;
   };
   overall_confidence: number;
   missing_fields: string[];
@@ -276,6 +285,76 @@ function normalizeConclusionField(raw: unknown): DexaExtractionField<string> {
   };
 }
 
+/**
+ * Valida + coage `scan_date` extraído pela IA. Aceita ISO YYYY-MM-DD
+ * E variantes BR (DD/MM/YYYY, DD-MM-YYYY) por robustez — a IA é
+ * instruída pra devolver ISO, mas se escorregar, normalizamos aqui.
+ * Rejeita data futura (cutoff: hoje em UTC + 1 dia de tolerância pra
+ * fusos avançados). Rejeita ano < 1900. Tipos não-string viram null.
+ */
+const SCAN_DATE_ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
+const SCAN_DATE_BR_RE = /^(\d{2})[/-](\d{2})[/-](\d{4})$/;
+
+function coerceScanDateValue(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return null;
+
+  // Tenta ISO direto.
+  let iso: string | null = null;
+  if (SCAN_DATE_ISO_RE.test(trimmed)) {
+    iso = trimmed;
+  } else {
+    // Tenta BR DD/MM/YYYY ou DD-MM-YYYY.
+    const m = trimmed.match(SCAN_DATE_BR_RE);
+    if (m) {
+      iso = `${m[3]}-${m[2]}-${m[1]}`;
+    }
+  }
+  if (!iso || !SCAN_DATE_ISO_RE.test(iso)) return null;
+
+  // Valida via Date — pega ano/mês/dia inválidos (ex.: 2026-13-01).
+  const parsed = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  if (parsed.toISOString().slice(0, 10) !== iso) return null;
+
+  // Rejeita ano implausível.
+  const year = parsed.getUTCFullYear();
+  if (year < 1900) return null;
+
+  // Rejeita data futura. Cutoff: hoje em UTC + 1 dia de tolerância
+  // (cobre fusos avançados em relação ao server, ex.: aluno
+  // Auckland UTC+13 fazendo exame "hoje" pra um app rodando UTC-3).
+  const now = new Date();
+  const todayUtcMs = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+  );
+  const examMs = parsed.getTime();
+  if (examMs > todayUtcMs + 24 * 3_600_000) return null;
+
+  return iso;
+}
+
+function defaultScanDateField(): DexaExtractionField<string> {
+  return { value: null, confidence: 0, source_text: null, page: null };
+}
+
+function normalizeScanDateField(raw: unknown): DexaExtractionField<string> {
+  if (!raw || typeof raw !== "object") return defaultScanDateField();
+  const obj = raw as Record<string, unknown>;
+  return {
+    value: coerceScanDateValue(obj.value),
+    confidence: clamp01(obj.confidence),
+    source_text: coerceString(obj.source_text, DEXA_SOURCE_TEXT_MAX_CHARS),
+    page:
+      typeof obj.page === "number" && Number.isFinite(obj.page)
+        ? Math.max(0, Math.trunc(obj.page))
+        : null,
+  };
+}
+
 function normalizeRegionalDistributionField(
   raw: unknown,
 ): DexaRegionalDistributionField {
@@ -367,12 +446,76 @@ export function normalizeDexaExtractionResponse(raw: unknown): DexaExtraction {
       regional_distribution: normalizeRegionalDistributionField(
         fieldsRaw.regional_distribution,
       ),
+      // Aceita `scan_date` (chave canônica) E `exam_date` (sinônimo
+      // tolerante — caso provider/prompt futuro use o outro nome).
+      scan_date: normalizeScanDateField(
+        fieldsRaw.scan_date ?? fieldsRaw.exam_date,
+      ),
     },
     overall_confidence: clamp01(obj.overall_confidence),
     missing_fields: coerceStringArray(obj.missing_fields),
     warnings: coerceStringArray(obj.warnings),
     model: coerceString(obj.model, 120) ?? "",
     extracted_at: coerceString(obj.extracted_at, 64) ?? "",
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// scan_date → assessment_date: regra de non-overwrite
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface ApplyDexaScanDateResult {
+  /** Valor que deve ser SETADO em `assessment_date` (ou null pra no-op). */
+  nextValue: string | null;
+  /** True se aplicou (caller deve fazer setValue). */
+  applied: boolean;
+  /** Motivo da decisão (útil pra UI/log). */
+  reason:
+    | "applied"
+    | "skipped_no_scan_date"
+    | "skipped_invalid_format"
+    | "skipped_manual_override";
+}
+
+/**
+ * Aplica a `scan_date` extraída ao `assessment_date` do form, com
+ * regra de NON-OVERWRITE: se o coach já preencheu manualmente um
+ * valor DIFERENTE, NÃO sobrescreve.
+ *
+ * Regras:
+ *   - scan_date ausente / inválido → no-op (`applied: false`).
+ *   - assessment_date atual VAZIO ("") → aplica scan_date.
+ *   - assessment_date atual === scan_date → idempotente (`applied: false`,
+ *     já está com o valor certo).
+ *   - assessment_date atual NÃO-VAZIO e !== scan_date → coach digitou,
+ *     respeita o valor manual (`skipped_manual_override`).
+ */
+export function applyDexaScanDateToAssessmentDate(
+  scanDateValue: string | null | undefined,
+  currentAssessmentDate: string | null | undefined,
+): ApplyDexaScanDateResult {
+  // Coage scan_date pra ISO seguro novamente (defensivo — pode vir
+  // direto da IA antes do normalizer rodar, ou de fonte não confiável).
+  const scanDate = coerceScanDateValue(scanDateValue);
+  if (!scanDate) {
+    return {
+      nextValue: null,
+      applied: false,
+      reason: scanDateValue ? "skipped_invalid_format" : "skipped_no_scan_date",
+    };
+  }
+  const current =
+    typeof currentAssessmentDate === "string" ? currentAssessmentDate.trim() : "";
+  if (current.length === 0) {
+    return { nextValue: scanDate, applied: true, reason: "applied" };
+  }
+  if (current === scanDate) {
+    return { nextValue: scanDate, applied: false, reason: "applied" };
+  }
+  return {
+    nextValue: current,
+    applied: false,
+    reason: "skipped_manual_override",
   };
 }
 
@@ -423,6 +566,11 @@ export function applyDexaExtractionToEmptyFields<TValues extends DexaFormValueMa
   const skipped: DexaExtractionFieldName[] = [];
 
   for (const fieldName of DEXA_EXTRACTION_FIELDS) {
+    // `scan_date` é extração mas NÃO é campo clínico do DexaForm —
+    // ele é aplicado separadamente ao `assessment_date` (do
+    // assessmentBaseSchema) via `applyDexaScanDateToAssessmentDate`,
+    // com regra de non-overwrite específica. Aqui, pulamos.
+    if (fieldName === "scan_date") continue;
     const incoming = extraction.fields[fieldName]?.value;
     if (incoming == null || (typeof incoming === "string" && incoming.trim() === "")) {
       continue;

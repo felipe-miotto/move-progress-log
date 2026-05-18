@@ -318,6 +318,7 @@ Regras absolutas:
 - appendicular_lean_mass_kg: só calcule a soma dos membros se o laudo apresentar a fórmula. Caso contrário, devolva null e adicione um warning.
 - regional_distribution: preencha SOMENTE regiões claramente identificadas (trunk, arms_right, arms_left, legs_right, legs_left, android, gynoid). Se o laudo agregar como "membros superiores" sem distinguir direito/esquerdo, NÃO invente: deixe direito e esquerdo null e adicione um warning.
 - conclusion_text: copie o texto da seção "conclusão" ou equivalente. Se não houver, null.
+- scan_date: a DATA EM QUE O EXAME FOI REALIZADO (data do scan DEXA), em formato ISO YYYY-MM-DD. Procure no cabeçalho do laudo, na seção de identificação do paciente, ou junto dos resultados. Se o laudo apresentar MÚLTIPLAS datas (ex.: data do exame, data do nascimento, data de emissão, data de impressão, data do laudo, data da assinatura médica), PREFIRA SEMPRE a data de REALIZAÇÃO do exame — nunca a data de emissão/impressão/assinatura. Se o laudo trouxer só o nascimento e a emissão, sem data de realização, devolva null. Se a data estiver em formato brasileiro (DD/MM/YYYY), converta pra ISO (YYYY-MM-DD). NÃO INVENTE: se não houver data de exame inequívoca, value=null.
 - Para cada campo extraído, registre source_text com o trecho LITERAL do laudo (no máximo 200 caracteres) e page (1-indexed) onde foi encontrado.
 - confidence ∈ [0,1] por campo + overall_confidence ∈ [0,1].
 - missing_fields: liste os campos do schema que você NÃO encontrou.
@@ -343,6 +344,7 @@ const RESPONSE_JSON_SCHEMA = {
           ...DEXA_NUMERIC_FIELDS,
           "conclusion_text",
           "regional_distribution",
+          "scan_date",
         ],
         properties: Object.fromEntries([
           ...DEXA_NUMERIC_FIELDS.map((name) => [
@@ -366,6 +368,23 @@ const RESPONSE_JSON_SCHEMA = {
               additionalProperties: false,
               required: ["value", "confidence", "source_text", "page"],
               properties: {
+                value: { type: ["string", "null"] },
+                confidence: { type: "number", minimum: 0, maximum: 1 },
+                source_text: { type: ["string", "null"] },
+                page: { type: ["integer", "null"] },
+              },
+            },
+          ],
+          [
+            "scan_date",
+            {
+              type: "object",
+              additionalProperties: false,
+              required: ["value", "confidence", "source_text", "page"],
+              properties: {
+                // Data de REALIZAÇÃO do exame em ISO YYYY-MM-DD,
+                // ou null. Prompt detalha a regra (ver
+                // EXTRACTION_INSTRUCTIONS — "scan_date").
                 value: { type: ["string", "null"] },
                 confidence: { type: "number", minimum: 0, maximum: 1 },
                 source_text: { type: ["string", "null"] },
@@ -660,6 +679,36 @@ function normalizeConclusionField(raw: unknown) {
   };
 }
 
+/**
+ * scan_date: ISO YYYY-MM-DD ou null. Validação ESTRITA no edge — só
+ * passa se for formato ISO exato e o ano cair entre 1900 e (ano
+ * atual + 1, defesa contra clock skew). Não filtra data futura aqui
+ * (deixa pro client, que tem o timezone local do coach), só formato.
+ * Qualquer outro shape vira null sem warning.
+ */
+const SCAN_DATE_ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
+function normalizeScanDateField(raw: unknown) {
+  if (!isPlainObject(raw)) return defaultField();
+  const valueRaw = raw.value;
+  let value: string | null = null;
+  if (typeof valueRaw === "string" && SCAN_DATE_ISO_RE.test(valueRaw)) {
+    const parsed = new Date(`${valueRaw}T00:00:00Z`);
+    if (!Number.isNaN(parsed.getTime())) {
+      const year = parsed.getUTCFullYear();
+      const currentYear = new Date().getUTCFullYear();
+      if (year >= 1900 && year <= currentYear + 1) {
+        value = valueRaw;
+      }
+    }
+  }
+  return {
+    value,
+    confidence: clamp01(raw.confidence),
+    source_text: coerceNullableString(raw.source_text, DEXA_SOURCE_TEXT_MAX_CHARS),
+    page: coerceNullablePage(raw.page),
+  };
+}
+
 function normalizeRegionalField(raw: unknown) {
   if (!isPlainObject(raw)) return defaultField();
   const valueRaw = raw.value;
@@ -731,6 +780,9 @@ export function normalizeEdgeExtraction(
   );
   fields.regional_distribution = normalizeRegionalField(
     (fieldsRaw as Record<string, unknown>).regional_distribution,
+  );
+  fields.scan_date = normalizeScanDateField(
+    (fieldsRaw as Record<string, unknown>).scan_date,
   );
 
   const normalized = {

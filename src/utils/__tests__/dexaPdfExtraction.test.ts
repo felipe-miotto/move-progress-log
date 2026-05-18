@@ -12,6 +12,7 @@ import {
   DEXA_REGION_KEYS,
   DEXA_SOURCE_TEXT_MAX_CHARS,
   applyDexaExtractionToEmptyFields,
+  applyDexaScanDateToAssessmentDate,
   isDexaFieldEmpty,
   normalizeDexaExtractionResponse,
   parseBrazilianNumber,
@@ -391,5 +392,163 @@ describe("sanitizeDexaExtractionForStorage", () => {
     expect(out.model).toBe("gpt-test");
     expect(out.extracted_at).toBe("2026-05-17T00:00:00Z");
     expect(out.fields.fat_pct.value).toBe(22.5);
+  });
+});
+
+// ── scan_date — extraction + non-overwrite apply ────────────────────────────
+
+describe("normalizeDexaExtractionResponse — scan_date", () => {
+  it("aceita ISO YYYY-MM-DD válida", () => {
+    const out = normalizeDexaExtractionResponse({
+      fields: {
+        scan_date: { value: "2026-05-10", confidence: 0.95, source_text: "Data do exame: 10/05/2026", page: 1 },
+      },
+    });
+    expect(out.fields.scan_date.value).toBe("2026-05-10");
+    expect(out.fields.scan_date.confidence).toBe(0.95);
+  });
+
+  it("aceita variante BR DD/MM/YYYY e normaliza pra ISO", () => {
+    const out = normalizeDexaExtractionResponse({
+      fields: { scan_date: { value: "10/05/2026", confidence: 0.9 } },
+    });
+    expect(out.fields.scan_date.value).toBe("2026-05-10");
+  });
+
+  it("aceita variante BR DD-MM-YYYY e normaliza pra ISO", () => {
+    const out = normalizeDexaExtractionResponse({
+      fields: { scan_date: { value: "15-04-2025", confidence: 0.8 } },
+    });
+    expect(out.fields.scan_date.value).toBe("2025-04-15");
+  });
+
+  it("rejeita formato inválido (string lixo) → value=null", () => {
+    const out = normalizeDexaExtractionResponse({
+      fields: { scan_date: { value: "ontem", confidence: 0.5 } },
+    });
+    expect(out.fields.scan_date.value).toBeNull();
+  });
+
+  it("rejeita ano implausível (< 1900) → value=null", () => {
+    const out = normalizeDexaExtractionResponse({
+      fields: { scan_date: { value: "1800-01-01", confidence: 0.5 } },
+    });
+    expect(out.fields.scan_date.value).toBeNull();
+  });
+
+  it("rejeita data futura (cutoff: hoje UTC + 1 dia) → value=null", () => {
+    const farFuture = new Date();
+    farFuture.setFullYear(farFuture.getFullYear() + 5);
+    const iso = farFuture.toISOString().slice(0, 10);
+    const out = normalizeDexaExtractionResponse({
+      fields: { scan_date: { value: iso, confidence: 0.99 } },
+    });
+    expect(out.fields.scan_date.value).toBeNull();
+  });
+
+  it("aceita variante de chave: `exam_date` (sinônimo tolerante)", () => {
+    const out = normalizeDexaExtractionResponse({
+      fields: { exam_date: { value: "2026-03-15", confidence: 0.85 } },
+    });
+    expect(out.fields.scan_date.value).toBe("2026-03-15");
+  });
+
+  it("valor null/missing → defaultScanDateField (value=null, confidence=0)", () => {
+    const out = normalizeDexaExtractionResponse({
+      fields: { scan_date: { value: null, confidence: 0 } },
+    });
+    expect(out.fields.scan_date.value).toBeNull();
+    expect(out.fields.scan_date.confidence).toBe(0);
+  });
+
+  it("tipos não-string viram null (number, boolean, objeto)", () => {
+    expect(
+      normalizeDexaExtractionResponse({
+        fields: { scan_date: { value: 1234567890, confidence: 0.5 } },
+      }).fields.scan_date.value,
+    ).toBeNull();
+    expect(
+      normalizeDexaExtractionResponse({
+        fields: { scan_date: { value: true, confidence: 0.5 } },
+      }).fields.scan_date.value,
+    ).toBeNull();
+    expect(
+      normalizeDexaExtractionResponse({
+        fields: { scan_date: { value: { year: 2026 }, confidence: 0.5 } },
+      }).fields.scan_date.value,
+    ).toBeNull();
+  });
+});
+
+describe("applyDexaScanDateToAssessmentDate — non-overwrite rule", () => {
+  it("aplica scan_date válida quando assessment_date está VAZIO", () => {
+    const result = applyDexaScanDateToAssessmentDate("2026-05-10", "");
+    expect(result.applied).toBe(true);
+    expect(result.nextValue).toBe("2026-05-10");
+    expect(result.reason).toBe("applied");
+  });
+
+  it("aplica scan_date válida quando assessment_date é null/undefined", () => {
+    expect(applyDexaScanDateToAssessmentDate("2026-05-10", null).applied).toBe(true);
+    expect(applyDexaScanDateToAssessmentDate("2026-05-10", undefined).applied).toBe(true);
+  });
+
+  it("NÃO sobrescreve quando coach já digitou data DIFERENTE", () => {
+    const result = applyDexaScanDateToAssessmentDate("2026-05-10", "2026-04-20");
+    expect(result.applied).toBe(false);
+    expect(result.nextValue).toBe("2026-04-20");
+    expect(result.reason).toBe("skipped_manual_override");
+  });
+
+  it("idempotente: scan_date === assessment_date → no-op", () => {
+    const result = applyDexaScanDateToAssessmentDate("2026-05-10", "2026-05-10");
+    expect(result.applied).toBe(false);
+    expect(result.nextValue).toBe("2026-05-10");
+  });
+
+  it("scan_date ausente → no-op (mantém revisão manual)", () => {
+    const result = applyDexaScanDateToAssessmentDate(null, "");
+    expect(result.applied).toBe(false);
+    expect(result.reason).toBe("skipped_no_scan_date");
+  });
+
+  it("scan_date inválida (formato) → no-op (não corrompe assessment_date)", () => {
+    const result = applyDexaScanDateToAssessmentDate("ontem", "");
+    expect(result.applied).toBe(false);
+    expect(result.reason).toBe("skipped_invalid_format");
+  });
+
+  it("scan_date futura → no-op (não corrompe assessment_date)", () => {
+    const farFuture = new Date();
+    farFuture.setFullYear(farFuture.getFullYear() + 5);
+    const iso = farFuture.toISOString().slice(0, 10);
+    const result = applyDexaScanDateToAssessmentDate(iso, "");
+    expect(result.applied).toBe(false);
+    expect(result.reason).toBe("skipped_invalid_format");
+  });
+
+  it("scan_date BR DD/MM/YYYY válida + assessment_date vazio → aplica como ISO", () => {
+    const result = applyDexaScanDateToAssessmentDate("10/05/2026", "");
+    expect(result.applied).toBe(true);
+    expect(result.nextValue).toBe("2026-05-10");
+  });
+});
+
+describe("applyDexaExtractionToEmptyFields — scan_date NÃO é aplicado pelo apply clínico", () => {
+  it("scan_date no extraction NÃO aparece em appliedFields nem em values", () => {
+    const extraction = normalizeDexaExtractionResponse({
+      fields: {
+        fat_pct: { value: 22.5, confidence: 0.9 },
+        scan_date: { value: "2026-05-10", confidence: 0.95 },
+      },
+    });
+    const result = applyDexaExtractionToEmptyFields(
+      { fat_pct: null } as Record<string, unknown>,
+      extraction,
+    );
+    expect(result.appliedFields).toContain("fat_pct");
+    expect(result.appliedFields).not.toContain("scan_date");
+    expect(result.skippedFields).not.toContain("scan_date");
+    expect((result.values as Record<string, unknown>).scan_date).toBeUndefined();
   });
 });

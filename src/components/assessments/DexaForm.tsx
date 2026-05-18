@@ -73,11 +73,11 @@ import {
   assessmentBaseSchema,
   dexaRegionalDistributionSchema,
   dexaSchema,
-  localTodayIso,
 } from "@/utils/assessmentValidation";
 import {
   DEXA_EXTRACTION_FIELDS,
   applyDexaExtractionToEmptyFields,
+  applyDexaScanDateToAssessmentDate,
   normalizeDexaExtractionResponse,
   sanitizeDexaExtractionForStorage,
   type DexaExtraction,
@@ -195,7 +195,15 @@ export const DexaForm = ({
     resolver: zodResolver(formSchema),
     defaultValues: {
       student_id: studentId,
-      assessment_date: localTodayIso(),
+      // `assessment_date` propositalmente VAZIO no DEXA (não default
+      // pra `localTodayIso()` como nos outros forms). DEXA = data em
+      // que o EXAME foi REALIZADO, não data de inclusão no sistema.
+      // Coach precisa preencher manualmente, OU a IA preenche via
+      // `scan_date` extraído do laudo (ver `handleExtract` e
+      // `applyDexaScanDateToAssessmentDate`). Validação zod do
+      // assessmentBaseSchema (`min(1, "Data obrigatória")`) garante
+      // que o submit não passa em branco.
+      assessment_date: "",
       age_years: defaults?.age_years ?? null,
       weight_kg: defaults?.weight_kg ?? null,
       height_cm: defaults?.height_cm ?? null,
@@ -317,9 +325,25 @@ export const DexaForm = ({
           { shouldDirty: true, shouldValidate: true },
         );
       }
+      // scan_date → assessment_date: regra de non-overwrite. Se o
+      // coach já digitou uma data MANUALMENTE diferente, respeita.
+      // Se o campo está vazio (default agora é ""), aplica a data
+      // extraída do laudo.
+      const scanDateApply = applyDexaScanDateToAssessmentDate(
+        extraction.fields.scan_date?.value ?? null,
+        form.getValues("assessment_date"),
+      );
+      const appliedFields = [...result.appliedFields];
+      if (scanDateApply.applied && scanDateApply.nextValue) {
+        form.setValue("assessment_date", scanDateApply.nextValue, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+        appliedFields.push("scan_date");
+      }
       setExtractionState({
         extraction,
-        applied: result.appliedFields,
+        applied: appliedFields,
         skipped: result.skippedFields,
       });
       notify.success("Campos preenchidos automaticamente", {
@@ -472,9 +496,13 @@ export const DexaForm = ({
                 name="assessment_date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Data do scan</FormLabel>
+                    <FormLabel>Data do exame</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input
+                        type="date"
+                        data-testid="dexa-exam-date"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

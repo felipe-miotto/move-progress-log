@@ -581,6 +581,40 @@ describe("extract-dexa-pdf edge — failure_code + upstream_status (diagnóstico
   });
 });
 
+// ── extract-dexa-pdf — scan_date no schema + prompt ───────────────────────
+
+describe("extract-dexa-pdf edge — scan_date no schema strict + prompt", () => {
+  it("schema declara fields.scan_date com value string|null + confidence/source/page", () => {
+    // scan_date entra no `required` do fields (strict mode).
+    expect(edgeSource).toMatch(
+      /required:\s*\[\s*\.\.\.DEXA_NUMERIC_FIELDS\s*,\s*\n\s*"conclusion_text"\s*,\s*\n\s*"regional_distribution"\s*,\s*\n\s*"scan_date"\s*,\s*\n\s*\]/,
+    );
+    // E a entry tem o shape {value: string|null, confidence, source_text, page}.
+    const code = stripComments(edgeSource);
+    expect(code).toMatch(
+      /"scan_date"\s*,\s*\{[\s\S]*?value:\s*\{\s*type:\s*\[\s*"string"\s*,\s*"null"\s*\]\s*\}/,
+    );
+  });
+
+  it("prompt orienta extração da data DE REALIZAÇÃO (não emissão/impressão)", () => {
+    expect(edgeSource).toContain("scan_date");
+    expect(edgeSource).toMatch(/data\s+EM\s+QUE\s+O\s+EXAME\s+FOI\s+REALIZADO/i);
+    // E orienta explicitamente preferir realização sobre emissão/impressão.
+    expect(edgeSource).toMatch(/PREFIRA\s+SEMPRE\s+a\s+data\s+de\s+REALIZAÇÃO/i);
+    expect(edgeSource).toMatch(/nunca\s+a\s+data\s+de\s+emissão\/impressão/i);
+  });
+
+  it("edge normaliza scan_date com regex ISO + cutoff de ano", () => {
+    expect(edgeSource).toMatch(/function normalizeScanDateField\(/);
+    // Constante SCAN_DATE_ISO_RE declarada (regex específico inspecionado
+    // em outros testes — aqui só verifica a existência da constante).
+    expect(edgeSource).toMatch(/SCAN_DATE_ISO_RE\s*=/);
+    expect(edgeSource).toMatch(/year\s*>=\s*1900/);
+    // Edge normaliza scan_date como parte do pipeline:
+    expect(edgeSource).toMatch(/fields\.scan_date\s*=\s*normalizeScanDateField\(/);
+  });
+});
+
 // ── extract-dexa-pdf — schema strict (required em sub-objetos) ─────────────
 
 describe("extract-dexa-pdf edge — RESPONSE_JSON_SCHEMA strict-compatible", () => {
@@ -758,6 +792,50 @@ describe("extract-dexa-pdf edge — upstream_* sanitizado (code/type/param/messa
       expect(call).not.toMatch(/\berrBody\b/);
       expect(call).not.toMatch(/\brequestBody\b/);
     }
+  });
+});
+
+// ── DexaForm — data do exame (não default-hoje, scan_date extraído) ──────
+
+describe("DexaForm — Data do exame (não default-hoje, scan_date extraído)", () => {
+  it("label do campo de data é 'Data do exame' (não 'Data do scan')", () => {
+    expect(dexaFormSource).toMatch(/<FormLabel>Data do exame<\/FormLabel>/);
+    expect(dexaFormSource).not.toMatch(/<FormLabel>Data do scan<\/FormLabel>/);
+  });
+
+  it("default de assessment_date é VAZIO (não localTodayIso) — coach precisa preencher OU IA extrai", () => {
+    // Comentário inline documenta a decisão. Garantia hard:
+    expect(dexaFormSource).toMatch(/assessment_date:\s*""/);
+    // E NÃO chama localTodayIso() no default do DexaForm:
+    const code = stripComments(dexaFormSource);
+    expect(code).not.toMatch(/assessment_date:\s*localTodayIso\(\)/);
+  });
+
+  it("renderiza data-testid='dexa-exam-date' pra facilitar tests E2E", () => {
+    expect(dexaFormSource).toMatch(/data-testid="dexa-exam-date"/);
+  });
+
+  it("handleExtract chama applyDexaScanDateToAssessmentDate com (scan_date.value, form.getValues)", () => {
+    expect(dexaFormSource).toMatch(/applyDexaScanDateToAssessmentDate\(/);
+    expect(dexaFormSource).toMatch(
+      /extraction\.fields\.scan_date\?\.value\s*\?\?\s*null/,
+    );
+    expect(dexaFormSource).toMatch(/form\.getValues\("assessment_date"\)/);
+  });
+
+  it("aplica scan_date via form.setValue SÓ quando applied=true e nextValue não-vazio", () => {
+    const code = stripComments(dexaFormSource);
+    expect(code).toMatch(
+      /if\s*\(\s*scanDateApply\.applied\s*&&\s*scanDateApply\.nextValue\s*\)/,
+    );
+    expect(code).toMatch(
+      /form\.setValue\("assessment_date"\s*,\s*scanDateApply\.nextValue/,
+    );
+  });
+
+  it("scan_date aplicado entra em appliedFields (coach vê 'n campos preenchidos')", () => {
+    const code = stripComments(dexaFormSource);
+    expect(code).toMatch(/appliedFields\.push\("scan_date"\)/);
   });
 });
 
