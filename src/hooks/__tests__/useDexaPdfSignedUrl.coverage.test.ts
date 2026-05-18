@@ -180,18 +180,20 @@ describe("DexaPdfButton — UX/segurança", () => {
     expect(buttonSource).toContain('data-testid="dexa-pdf-empty"');
   });
 
-  it("abre o PDF em nova aba via Blob URL local (não navega direto pro signedUrl)", () => {
-    // Bugfix 2026-05-18: extensões de privacy/adblock disparam
-    // ERR_BLOCKED_BY_CLIENT ao navegar pra `*.supabase.co`. Hoje o
-    // botão baixa via fetch → Blob → URL.createObjectURL e abre o
-    // BLOB URL (mesma origem), com noopener,noreferrer.
-    expect(buttonSource).toMatch(
-      /window\.open\(\s*blobUrl\s*,\s*["']_blank["']\s*,\s*["']noopener,noreferrer["']\s*\)/,
-    );
-    // Guard explícito: nunca abrir o signedUrl direto.
-    expect(buttonSource).not.toMatch(
-      /window\.open\(\s*signedUrl\s*,/,
-    );
+  it("baixa o PDF via download explícito (<a download>), NUNCA usa window.open", () => {
+    // Histórico do bugfix:
+    //   PR #157 — window.open(signedUrl) → ERR_BLOCKED_BY_CLIENT em
+    //     `*.supabase.co` (Chrome com extensões de privacy/adblock).
+    //   PR #166 — window.open(blobUrl) → mesmo erro em aba `blob:` em
+    //     algumas configurações.
+    //   PR ATUAL — download programático via <a download>, sem aba,
+    //     sem URL exposta, sem filtro de host.
+    // Hard guard: NENHUM window.open pode aparecer no botão.
+    expect(buttonSource).not.toMatch(/window\.open\(/);
+    // Sinais positivos do fluxo de download explícito.
+    expect(buttonSource).toMatch(/document\.createElement\(\s*["']a["']\s*\)/);
+    expect(buttonSource).toMatch(/\.download\s*=\s*DEXA_PDF_DOWNLOAD_FILENAME/);
+    expect(buttonSource).toMatch(/\.click\(\)/);
   });
 
   it("nunca renderiza o storagePath técnico como texto da UI", () => {
@@ -202,10 +204,9 @@ describe("DexaPdfButton — UX/segurança", () => {
     expect(code).not.toMatch(/\{props\.storagePath\}/);
   });
 
-  it("aria-label descritivo no botão (acessibilidade)", () => {
-    expect(buttonSource).toContain(
-      'aria-label="Abrir laudo DEXA em nova aba"',
-    );
+  it("aria-label descritivo no botão (acessibilidade) — reflete download", () => {
+    expect(buttonSource).toContain('aria-label="Baixar laudo DEXA"');
+    expect(buttonSource).not.toMatch(/aria-label="Abrir laudo DEXA[^"]*"/);
   });
 
   it("não introduz mutation / persistência local / log de URL", () => {

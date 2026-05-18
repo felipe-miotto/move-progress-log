@@ -2,13 +2,33 @@
  * Hook: assina, sob demanda, uma URL de leitura curta (TTL curto) para o PDF
  * de laudo DEXA armazenado no bucket privado `dexa-pdfs`.
  *
- * Padrão de uso:
+ * Padrão de uso (download explícito — ver `DexaPdfButton.tsx`):
  *
  *   const { sign, isLoading, error, reset } = useDexaPdfSignedUrl();
  *   const handleClick = async () => {
  *     const url = await sign(storagePath);
- *     if (url) window.open(url, "_blank", "noopener,noreferrer");
+ *     if (!url) return;
+ *     const blob = await (await fetch(url)).blob();
+ *     const blobUrl = URL.createObjectURL(
+ *       new Blob([blob], { type: "application/pdf" }),
+ *     );
+ *     const a = document.createElement("a");
+ *     a.href = blobUrl;
+ *     a.download = "laudo-dexa.pdf";
+ *     document.body.appendChild(a);
+ *     a.click();
+ *     document.body.removeChild(a);
+ *     URL.revokeObjectURL(blobUrl);
  *   };
+ *
+ * Histórico de tentativas que NÃO funcionaram em Chrome com extensões
+ * de privacy/adblock:
+ *   - `window.open(signedUrl, ...)` (PR #157) → ERR_BLOCKED_BY_CLIENT
+ *     no host `supabase.co`.
+ *   - `window.open(blobUrl, ...)` (PR #166) → ERR_BLOCKED_BY_CLIENT em
+ *     aba `blob:` em algumas configurações.
+ *   - Download programático via `<a download>` (este PR) → robusto;
+ *     navegador trata como ação local, sem aba, sem filtro de host.
  *
  * Garantias de segurança:
  *   - bucket `dexa-pdfs` é privado (RLS por trainer dono + admin via
