@@ -674,27 +674,32 @@ FORMATO DE SAÍDA:
     
     // Função para normalizar load_breakdown com erros de formato
     function normalizeBreakdown(breakdown: string): string {
-      const hasEachSide = /de cada lado/i.test(breakdown);
+      // Tolera "de cada lado" E "cada lado" (sem "de") — o LLM às vezes
+      // omite a preposição e os usuários também. Regex única, alinhada
+      // com o cliente em `src/utils/loadCalculation.ts`.
+      const eachSidePattern = /(?:de\s*)?cada\s*lado/i;
+      const hasEachSide = eachSidePattern.test(breakdown);
       if (!hasEachSide) return breakdown;
-      
-      const match = breakdown.match(/\((.*?)\)\s*de cada lado(.*?)(?:barra|\+\s*barra|$)/i);
+
+      const match = breakdown.match(/\((.*?)\)\s*(?:de\s*)?cada\s*lado(.*?)(?:barra|\+\s*barra|$)/i);
       if (!match) return breakdown;
       
       const insideParens = match[1];
       const afterEachSide = match[2].trim();
       const barraMatch = breakdown.match(/(barra\s+\d+(?:\.\d+)?\s*kg)/i);
       const barra = barraMatch ? barraMatch[1] : '';
-      
+
       const looseWeights: string[] = [];
       const weightRegex = /(\d+(?:\.\d+)?)\s*(kg|lb)/gi;
       let weightMatch;
-      
+
       while ((weightMatch = weightRegex.exec(afterEachSide)) !== null) {
         looseWeights.push(`${weightMatch[1]} ${weightMatch[2]}`);
       }
-      
+
       if (looseWeights.length === 0) return breakdown;
-      
+
+      // Output canônico SEMPRE com "de cada lado".
       const newInsideParens = [insideParens, ...looseWeights].join(' + ');
       return `(${newInsideParens}) de cada lado${barra ? ' + ' + barra : ''}`;
     }
@@ -721,24 +726,54 @@ FORMATO DE SAÍDA:
         
         let total = 0;
         let processedEachSide = false;
-        
-        // 4. DETECTAR "DE CADA LADO" (multiplicar por 2)
-        const eachSideMatch = breakdown.match(/\((.*?)\)\s*de cada lado/i);
-        if (eachSideMatch) {
-          const content = eachSideMatch[1];
+
+        // 4. DETECTAR "CADA LADO" (com OU sem "de", com OU sem
+        //    parênteses) — tolerância alinhada com o cliente em
+        //    `src/utils/loadCalculation.ts`. Antes do fix, regex
+        //    `/de cada lado/i` estrito cancelava o multiplicador por 2
+        //    quando o LLM/usuário omitia o "de" (ex.: "70 lb cada lado
+        //    + barra 15kg" virava 46.8 em vez de 78.5).
+        const eachSidePattern = /(?:de\s*)?cada\s*lado/i;
+        if (eachSidePattern.test(breakdown)) {
           processedEachSide = true;
-          
-          const kgMatches = Array.from(content.matchAll(/(\d+(?:[.,]\d+)?)\s*kg/gi));
-          for (const m of kgMatches) {
-            total += parseFloat(m[1].replace(',', '.')) * 2;
-          }
-          
-          const lbMatches = Array.from(content.matchAll(/(\d+(?:[.,]\d+)?)\s*lb/gi));
-          for (const m of lbMatches) {
-            total += parseFloat(m[1].replace(',', '.')) * POUND_TO_KG_CONVERSION * 2;
+          const parenMatch = breakdown.match(/\((.*?)\)\s*(?:de\s*)?cada\s*lado/i);
+          if (parenMatch) {
+            // Formato canônico com parênteses: "(... + ...) de cada lado"
+            const content = parenMatch[1];
+
+            const kgMatches = Array.from(content.matchAll(/(\d+(?:[.,]\d+)?)\s*kg/gi));
+            for (const m of kgMatches) {
+              total += parseFloat(m[1].replace(',', '.')) * 2;
+            }
+
+            const lbMatches = Array.from(content.matchAll(/(\d+(?:[.,]\d+)?)\s*lb/gi));
+            for (const m of lbMatches) {
+              // Sem arredondamento intermediário — `roundToDecimal` só
+              // no return final pra evitar off-by-0.1 (ex.: 78.6 vs 78.5).
+              total += parseFloat(m[1].replace(',', '.')) * POUND_TO_KG_CONVERSION * 2;
+            }
+          } else {
+            // Formato sem parênteses: "70 lb cada lado + barra 15kg".
+            // Multiplica TUDO antes do "cada lado" por 2, exceto barra
+            // (extraída separadamente abaixo no passo 6).
+            const beforeEachSide = breakdown.split(eachSidePattern)[0] ?? '';
+            const contentWithoutBarra = beforeEachSide.replace(
+              /barra\s*(?:de\s*)?(\d+(?:[.,]\d+)?)\s*kg/gi,
+              '',
+            );
+
+            const kgMatches = Array.from(contentWithoutBarra.matchAll(/(\d+(?:[.,]\d+)?)\s*kg/gi));
+            for (const m of kgMatches) {
+              total += parseFloat(m[1].replace(',', '.')) * 2;
+            }
+
+            const lbMatches = Array.from(contentWithoutBarra.matchAll(/(\d+(?:[.,]\d+)?)\s*lb/gi));
+            for (const m of lbMatches) {
+              total += parseFloat(m[1].replace(',', '.')) * POUND_TO_KG_CONVERSION * 2;
+            }
           }
         }
-        
+
         // 5. DETECTAR KETTLEBELLS/HALTERES DUPLOS (multiplicar por 2)
         const multiKbMatch = breakdown.match(/(2\s*kettlebells?|duplo\s*kettlebell|kettlebell\s*duplo|dois\s*halteres|2\s*halteres).*?(\d+(?:[.,]\d+)?)\s*(kg|lb)/i);
         if (multiKbMatch && !processedEachSide) {
@@ -747,14 +782,14 @@ FORMATO DE SAÍDA:
           const kg = unit === 'lb' ? value * POUND_TO_KG_CONVERSION : value;
           total += kg * 2;
         }
-        
-        // 6. EXTRAIR PESO DA BARRA
+
+        // 6. EXTRAIR PESO DA BARRA (sempre soma direta, mesmo em "cada lado")
         const barraMatch = breakdown.match(/barra\s*(\d+(?:[.,]\d+)?)\s*kg/i);
         if (barraMatch) {
           total += parseFloat(barraMatch[1].replace(',', '.'));
         }
-        
-        // 7. PESOS SIMPLES (sem "de cada lado" nem "duplo")
+
+        // 7. PESOS SIMPLES (sem "cada lado" nem "duplo")
         if (!processedEachSide && !multiKbMatch) {
           const kgMatches = Array.from(breakdown.matchAll(/(\d+(?:[.,]\d+)?)\s*kg/gi));
           for (const m of kgMatches) {
@@ -763,13 +798,13 @@ FORMATO DE SAÍDA:
               total += parseFloat(m[1].replace(',', '.'));
             }
           }
-          
+
           const lbMatches = Array.from(breakdown.matchAll(/(\d+(?:[.,]\d+)?)\s*lb/gi));
           for (const m of lbMatches) {
             total += parseFloat(m[1].replace(',', '.')) * POUND_TO_KG_CONVERSION;
           }
         }
-        
+
         return total > 0 ? roundToDecimal(total) : null;
       } catch {
         return null;

@@ -3,7 +3,7 @@
  * Fonte única de verdade para conversão de descrições de carga para kg
  */
 
-import { poundsToKg, roundToDecimal } from "@/constants/units";
+import { POUND_TO_KG_CONVERSION, roundToDecimal } from "@/constants/units";
 
 /**
  * Calcula a carga total em kg baseada na descrição textual
@@ -48,12 +48,13 @@ export const calculateLoadFromBreakdown = (
       return null;
     }
 
-    // 4. DETECTAR "DE CADA LADO" - com ou sem parênteses
-    const hasEachSide = /de\s*cada\s*lado/i.test(normalizedBreakdown);
+    // 4. DETECTAR "CADA LADO" - com ou sem "de", com ou sem parênteses
+    const eachSidePattern = /(?:de\s*)?cada\s*lado/i;
+    const hasEachSide = eachSidePattern.test(normalizedBreakdown);
 
     if (hasEachSide) {
       // Verificar se usa parênteses: "(Xkg) de cada lado"
-      const parenMatch = normalizedBreakdown.match(/\((.*?)\)\s*de\s*cada\s*lado/i);
+      const parenMatch = normalizedBreakdown.match(/\((.*?)\)\s*(?:de\s*)?cada\s*lado/i);
       
       if (parenMatch) {
         // Formato com parênteses: (2kg + 5lb) de cada lado
@@ -67,14 +68,18 @@ export const calculateLoadFromBreakdown = (
         }
         
         // LB dentro dos parênteses (multiplicar por 2)
+        // Converte SEM arredondamento intermediário — `roundToDecimal`
+        // só roda no final (linha do return). Arredondar lb por item
+        // antes de somar causa off-by-0.1 (ex.: 70 lb por lado vira 78.6
+        // em vez de 78.5 quando combinado com barra).
         const lbMatches = Array.from(content.matchAll(/(\d+(?:[.,]\d+)?)\s*lb/gi));
         for (const m of lbMatches) {
           const value = parseFloat(m[1].replace(',', '.'));
-          total += poundsToKg(value) * 2;
+          total += value * POUND_TO_KG_CONVERSION * 2;
         }
         
         // Verificar se há barra FORA dos parênteses
-        const afterParen = normalizedBreakdown.split(/\)\s*de\s*cada\s*lado/i)[1] || '';
+        const afterParen = normalizedBreakdown.split(/\)\s*(?:de\s*)?cada\s*lado/i)[1] || '';
         const beforeParen = normalizedBreakdown.split(/\(/)[0] || '';
         const outsideContent = beforeParen + ' ' + afterParen;
         
@@ -83,9 +88,9 @@ export const calculateLoadFromBreakdown = (
           total += parseFloat(barraMatch[1].replace(',', '.'));
         }
       } else {
-        // Formato SEM parênteses: "15lb + 2kg de cada lado + barra 10kg"
+        // Formato SEM parênteses: "15lb + 2kg cada lado + barra 10kg"
         // Separar a parte "de cada lado" da parte da barra
-        const beforeEachSide = normalizedBreakdown.split(/de\s*cada\s*lado/i)[0];
+        const beforeEachSide = normalizedBreakdown.split(eachSidePattern)[0];
         
         // Extrair barra separadamente (não multiplica por 2)
         const barraMatch = normalizedBreakdown.match(/barra\s*(?:de\s*)?(\d+(?:[.,]\d+)?)\s*kg/i);
@@ -103,11 +108,12 @@ export const calculateLoadFromBreakdown = (
           total += value * 2;
         }
 
-        // Processar LB antes de "de cada lado" (multiplicar por 2)
+        // Processar LB antes de "de cada lado" (multiplicar por 2).
+        // Sem arredondamento intermediário (ver comentário acima).
         const lbMatches = Array.from(contentWithoutBarra.matchAll(/(\d+(?:[.,]\d+)?)\s*lb/gi));
         for (const m of lbMatches) {
           const value = parseFloat(m[1].replace(',', '.'));
-          total += poundsToKg(value) * 2;
+          total += value * POUND_TO_KG_CONVERSION * 2;
         }
       }
     } else {
@@ -116,7 +122,8 @@ export const calculateLoadFromBreakdown = (
       if (multiKbMatch) {
         const value = parseFloat(multiKbMatch[2].replace(',', '.'));
         const unit = multiKbMatch[3].toLowerCase();
-        const kg = unit === 'lb' ? poundsToKg(value) : value;
+        // Sem arredondamento intermediário em lb (ver comentário acima).
+        const kg = unit === 'lb' ? value * POUND_TO_KG_CONVERSION : value;
         total += kg * 2;
       }
 
@@ -139,11 +146,11 @@ export const calculateLoadFromBreakdown = (
           }
         }
 
-        // LB simples
+        // LB simples — sem arredondamento intermediário.
         const lbMatches = Array.from(normalizedBreakdown.matchAll(/(\d+(?:[.,]\d+)?)\s*lb/gi));
         for (const m of lbMatches) {
           const value = parseFloat(m[1].replace(',', '.'));
-          total += poundsToKg(value);
+          total += value * POUND_TO_KG_CONVERSION;
         }
       }
     }
