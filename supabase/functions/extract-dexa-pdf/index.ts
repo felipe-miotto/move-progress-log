@@ -126,12 +126,40 @@ const DEXA_REGION_KEYS = [
 // Helpers de resposta (NUNCA expor detalhes internos em error msg)
 // ────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Códigos de falha enumerados — seguros pra expor no body de erro 502.
+ * Servem APENAS pra triagem cega de produção quando os logs da edge não
+ * estão acessíveis. NUNCA carregar prompt/base64/path/token/raw response
+ * — só categoria + status HTTP do upstream.
+ */
+type FailureCode =
+  | "openai_http_error"
+  | "openai_no_text"
+  | "openai_bad_json"
+  | "openai_response_parse_error"
+  | "openai_exception"
+  | "unknown";
+
+interface ErrorMetadata {
+  failure_code?: FailureCode;
+  upstream_status?: number;
+}
+
 function jsonResponse(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), { headers: jsonHeaders, status });
 }
 
-function errorResponse(message: string, status: number): Response {
-  return jsonResponse({ ok: false, error: message }, status);
+function errorResponse(
+  message: string,
+  status: number,
+  metadata?: ErrorMetadata,
+): Response {
+  const body: Record<string, unknown> = { ok: false, error: message };
+  if (metadata?.failure_code) body.failure_code = metadata.failure_code;
+  if (typeof metadata?.upstream_status === "number") {
+    body.upstream_status = metadata.upstream_status;
+  }
+  return jsonResponse(body, status);
 }
 
 /** Log seguro: só mensagem curta + status, NUNCA path/token/PDF/body. */
@@ -311,11 +339,15 @@ const RESPONSE_JSON_SCHEMA = {
   strict: true,
 } as const;
 
+type CallOpenAiResult =
+  | { ok: true; parsed: Record<string, unknown> }
+  | { ok: false; failure_code: FailureCode; upstream_status: number };
+
 async function callOpenAiExtraction(
   base64Pdf: string,
   apiKey: string,
   model: string,
-): Promise<{ ok: true; parsed: Record<string, unknown> } | { ok: false; status: number }> {
+): Promise<CallOpenAiResult> {
   const requestBody = {
     model,
     instructions: EXTRACTION_INSTRUCTIONS,
@@ -349,22 +381,50 @@ async function callOpenAiExtraction(
     temperature: 0,
   };
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(requestBody),
-  });
+  // Wrap fetch — DNS/network/abort/timeout viram `openai_exception`,
+  // sem `err.message` nem stack pra não vazar detalhes internos.
+  let response: Response;
+  try {
+    response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(requestBody),
+    });
+  } catch {
+    logSafe("openai_exception", { status: 0 });
+    return {
+      ok: false,
+      failure_code: "openai_exception",
+      upstream_status: 0,
+    };
+  }
 
   if (!response.ok) {
     // NUNCA logar o body — pode incluir prompt ou path interno. Só status.
     logSafe("openai_error", { status: response.status });
-    return { ok: false, status: response.status };
+    return {
+      ok: false,
+      failure_code: "openai_http_error",
+      upstream_status: response.status,
+    };
   }
 
-  const data = (await response.json()) as Record<string, unknown>;
+  // Wrap response.json() — body corrompido/truncado vira
+  // `openai_response_parse_error` sem expor o conteúdo bruto.
+  let data: Record<string, unknown>;
+  try {
+    data = (await response.json()) as Record<string, unknown>;
+  } catch {
+    logSafe("openai_response_parse_error", { status: response.status });
+    return {
+      ok: false,
+      failure_code: "openai_response_parse_error",
+      upstream_status: response.status,
+    };
+  }
   // A Responses API devolve `output_text` (string) e/ou `output` (array de
   // mensagens). Tentamos `output_text` primeiro; fallback pra `output[0]
   // .content[0].text`.
@@ -391,7 +451,11 @@ async function callOpenAiExtraction(
   }
   if (!text) {
     logSafe("openai_no_text", { status: response.status });
-    return { ok: false, status: 502 };
+    return {
+      ok: false,
+      failure_code: "openai_no_text",
+      upstream_status: response.status,
+    };
   }
 
   try {
@@ -399,7 +463,11 @@ async function callOpenAiExtraction(
     return { ok: true, parsed };
   } catch {
     logSafe("openai_bad_json", { status: response.status });
-    return { ok: false, status: 502 };
+    return {
+      ok: false,
+      failure_code: "openai_bad_json",
+      upstream_status: response.status,
+    };
   }
 }
 
@@ -686,8 +754,14 @@ Deno.serve(async (req) => {
 
     const aiResult = await callOpenAiExtraction(base64Pdf, openAiKey, model);
     if (!aiResult.ok) {
-      // Status interno do OpenAI não é exposto. Mensagem genérica.
-      return errorResponse("Falha na extração automática", 502);
+      // Mensagem humana continua genérica (NUNCA expor detalhes internos
+      // ao coach). `failure_code` + `upstream_status` no body são apenas
+      // categorias enumeradas seguras pra triagem cega via Network tab —
+      // sem prompt, sem base64, sem path, sem raw OpenAI response.
+      return errorResponse("Falha na extração automática", 502, {
+        failure_code: aiResult.failure_code,
+        upstream_status: aiResult.upstream_status,
+      });
     }
 
     // 8. Devolve só o JSON estruturado + metadata. Passa pelo

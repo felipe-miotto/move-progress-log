@@ -416,3 +416,166 @@ describe("config.toml — extract-dexa-pdf registrada com verify_jwt=false", () 
     expect(edgeSource).toContain("await userClient.auth.getUser()");
   });
 });
+
+// ── extract-dexa-pdf — diagnóstico via failure_code/upstream_status ─────────
+
+describe("extract-dexa-pdf edge — failure_code + upstream_status (diagnóstico cego)", () => {
+  const code = stripComments(edgeSource);
+
+  it("declara FailureCode com TODOS os códigos enumerados permitidos", () => {
+    // Os 6 valores permitidos (5 categorias específicas + unknown).
+    // Cada um precisa ser parte do union literal type.
+    expect(code).toMatch(/type FailureCode\s*=/);
+    expect(code).toMatch(/"openai_http_error"/);
+    expect(code).toMatch(/"openai_no_text"/);
+    expect(code).toMatch(/"openai_bad_json"/);
+    expect(code).toMatch(/"openai_response_parse_error"/);
+    expect(code).toMatch(/"openai_exception"/);
+    expect(code).toMatch(/"unknown"/);
+  });
+
+  it("errorResponse aceita metadata opcional { failure_code, upstream_status }", () => {
+    expect(code).toMatch(
+      /function errorResponse\(\s*message:\s*string\s*,\s*status:\s*number\s*,\s*metadata\?:\s*ErrorMetadata\s*,?\s*\)/,
+    );
+    expect(code).toMatch(/interface ErrorMetadata/);
+    expect(code).toMatch(/failure_code\?:\s*FailureCode/);
+    expect(code).toMatch(/upstream_status\?:\s*number/);
+  });
+
+  it("errorResponse SÓ inclui failure_code/upstream_status quando passados (não vaza chaves vazias)", () => {
+    // Guard contra body com `failure_code: undefined` ou `null`.
+    expect(code).toMatch(
+      /if\s*\(\s*metadata\?\.failure_code\s*\)\s*body\.failure_code\s*=/,
+    );
+    expect(code).toMatch(
+      /if\s*\(\s*typeof\s+metadata\?\.upstream_status\s*===\s*"number"\s*\)/,
+    );
+  });
+
+  it("callOpenAiExtraction tem return type CallOpenAiResult com failure_code + upstream_status no branch !ok", () => {
+    expect(code).toMatch(/type CallOpenAiResult\s*=/);
+    expect(code).toMatch(
+      /\{\s*ok:\s*false\s*;\s*failure_code:\s*FailureCode\s*;\s*upstream_status:\s*number\s*\}/,
+    );
+  });
+
+  it("fetch da OpenAI está dentro de try/catch que retorna failure_code='openai_exception'", () => {
+    // O try envolve o fetch da Responses API; o catch retorna o código.
+    // Usa `edgeSource` (raw) e não `code` (stripped), porque o helper
+    // `stripComments` interpreta `//` dentro de URLs como início de
+    // comentário e mutila a string `"https://api.openai.com/..."`.
+    expect(edgeSource).toMatch(
+      /try\s*\{[\s\S]*?response\s*=\s*await\s+fetch\(\s*"https:\/\/api\.openai\.com\/v1\/responses"/,
+    );
+    expect(code).toMatch(
+      /failure_code:\s*"openai_exception"\s*,\s*\n\s*upstream_status:\s*0/,
+    );
+  });
+
+  it("response.json() está dentro de try/catch que retorna 'openai_response_parse_error' (sem expor body)", () => {
+    expect(code).toMatch(
+      /try\s*\{\s*\n\s*data\s*=\s*\(\s*await\s+response\.json\(\)\s*\)/,
+    );
+    expect(code).toMatch(/failure_code:\s*"openai_response_parse_error"/);
+  });
+
+  it("!response.ok retorna failure_code='openai_http_error' + upstream_status=response.status", () => {
+    expect(code).toMatch(
+      /if\s*\(\s*!response\.ok\s*\)\s*\{[\s\S]*?failure_code:\s*"openai_http_error"\s*,\s*\n\s*upstream_status:\s*response\.status/,
+    );
+  });
+
+  it("!text retorna failure_code='openai_no_text' + upstream_status=response.status", () => {
+    expect(code).toMatch(
+      /if\s*\(\s*!text\s*\)\s*\{[\s\S]*?failure_code:\s*"openai_no_text"\s*,\s*\n\s*upstream_status:\s*response\.status/,
+    );
+  });
+
+  it("JSON.parse(text) failure retorna 'openai_bad_json' + upstream_status=response.status", () => {
+    // Procura o último catch da função — o do JSON.parse(text).
+    expect(code).toMatch(
+      /JSON\.parse\(text\)[\s\S]*?catch\s*\{[\s\S]*?failure_code:\s*"openai_bad_json"\s*,\s*\n\s*upstream_status:\s*response\.status/,
+    );
+  });
+
+  it("handler propaga aiResult.failure_code + aiResult.upstream_status pro errorResponse", () => {
+    expect(code).toMatch(
+      /return errorResponse\(\s*"Falha na extração automática"\s*,\s*502\s*,\s*\{\s*\n\s*failure_code:\s*aiResult\.failure_code\s*,\s*\n\s*upstream_status:\s*aiResult\.upstream_status\s*,?\s*\n?\s*\}\s*\)/,
+    );
+  });
+
+  it("toast humano permanece genérico ('Falha na extração automática' — sem failure_code visível pro coach)", () => {
+    // A mensagem humana NÃO muda. O failure_code é metadata interna do body.
+    expect(code).toMatch(/"Falha na extração automática"/);
+    // O failure_code NUNCA aparece como string interpolada em error
+    // message humana.
+    expect(code).not.toMatch(/error:\s*`[^`]*\$\{[^}]*failure_code/);
+    expect(code).not.toMatch(/error:\s*"[^"]*failure_code/);
+  });
+
+  it("NÃO loga err.message, error.message, stack, ou body raw da OpenAI em lugar nenhum", () => {
+    // O catch precisa ser vazio (sem bind do err).
+    // Esperamos zero ocorrências de `err.message` / `error.message`.
+    expect(code).not.toMatch(/\berr\.message\b/);
+    expect(code).not.toMatch(/\berror\.message\b/);
+    expect(code).not.toMatch(/\.stack\b/);
+    // E nenhum log/body deve carregar `response.text()` (body cru da OpenAI).
+    expect(code).not.toMatch(/response\.text\(\)/);
+    // Defensivo extra: `data.error`, `data.output_text` etc. NÃO podem
+    // aparecer dentro do PAYLOAD do logSafe (segundo argumento). A tag
+    // string (1º argumento) tem liberdade pra usar `openai_no_text`,
+    // `openai_bad_json` etc. — checamos apenas o payload.
+    const logSafePayloads = [
+      ...code.matchAll(/logSafe\(\s*"[^"]+"\s*,\s*(\{[^}]*\})\s*\)/g),
+    ].map((m) => m[1]);
+    expect(logSafePayloads.length).toBeGreaterThan(0);
+    for (const payload of logSafePayloads) {
+      expect(payload).not.toMatch(/data\./);
+      // Bloqueia `text:` / `body:` / `parsed:` / `output:` como chaves,
+      // mas permite `status:` etc.
+      expect(payload).not.toMatch(/\btext\s*:/);
+      expect(payload).not.toMatch(/\bbody\s*:/);
+      expect(payload).not.toMatch(/\bparsed\s*:/);
+      expect(payload).not.toMatch(/\boutput\s*:/);
+      expect(payload).not.toMatch(/\bbase64\s*:/);
+      expect(payload).not.toMatch(/\bprompt\s*:/);
+    }
+  });
+
+  it("logSafe dos códigos de falha SÓ carrega status (zero detalhe adicional)", () => {
+    // Padrão único: `logSafe("<tag>", { status: ... })`.
+    expect(code).toMatch(
+      /logSafe\(\s*"openai_exception"\s*,\s*\{\s*status:\s*0\s*\}\s*\)/,
+    );
+    expect(code).toMatch(
+      /logSafe\(\s*"openai_error"\s*,\s*\{\s*status:\s*response\.status\s*\}\s*\)/,
+    );
+    expect(code).toMatch(
+      /logSafe\(\s*"openai_response_parse_error"\s*,\s*\{\s*status:\s*response\.status\s*\}\s*\)/,
+    );
+    expect(code).toMatch(
+      /logSafe\(\s*"openai_no_text"\s*,\s*\{\s*status:\s*response\.status\s*\}\s*\)/,
+    );
+    expect(code).toMatch(
+      /logSafe\(\s*"openai_bad_json"\s*,\s*\{\s*status:\s*response\.status\s*\}\s*\)/,
+    );
+  });
+});
+
+// ── DexaForm — toast permanece genérico (sem failure_code visível) ─────────
+
+describe("DexaForm — toast permanece genérico após introdução de failure_code", () => {
+  const code = stripComments(dexaFormSource);
+
+  it("DexaForm NÃO lê failure_code/upstream_status do response da edge (toast não muda)", () => {
+    // Hardening: o client não pode começar a EXIBIR esses códigos pro
+    // coach. Eles existem apenas pra triagem técnica via Network tab.
+    expect(code).not.toMatch(/\bfailure_code\b/);
+    expect(code).not.toMatch(/\bupstream_status\b/);
+  });
+
+  it("toast de erro de extração continua usando string fixa 'Não foi possível ler o PDF automaticamente'", () => {
+    expect(code).toContain("Não foi possível ler o PDF automaticamente");
+  });
+});
