@@ -80,4 +80,26 @@ describe("smoke-dexa-extraction.mjs — micro-hardening", () => {
     expect(scriptSource).not.toMatch(/DEXA Alex/i);
     expect(scriptSource).not.toMatch(/DEXA Ana Paula/i);
   });
+
+  it("file_data usa DATA URL (espelha o fix da edge — base64 puro foi rejeitado)", () => {
+    // Smoke real (2026-05-18) confirmou que `file_data: <base64 puro>`
+    // é rejeitado pela Responses API com HTTP 400 /
+    // error.code="invalid_value". Voltamos pra data URL.
+    expect(scriptSource).toMatch(
+      /file_data:\s*`data:application\/pdf;base64,\$\{base64\}`/,
+    );
+    // Guard: não pode reaparecer `file_data: base64` puro.
+    expect(scriptSource).not.toMatch(/file_data:\s*base64\s*,/);
+  });
+
+  it("schema tem `required` nos sub-objetos de regional_distribution.value (strict-compatible)", () => {
+    // OpenAI strict mode exige `required` cobrindo TODAS as properties
+    // quando `additionalProperties: false`. Espelha o fix da edge.
+    expect(scriptSource).toMatch(
+      /required:\s*\[\s*\.\.\.\s*DEXA_REGION_KEYS\s*\]/,
+    );
+    expect(scriptSource).toMatch(
+      /required:\s*\[\s*"fat_pct"\s*,\s*"lean_mass_g"\s*,\s*"fat_mass_g"\s*\]/,
+    );
+  });
 });
