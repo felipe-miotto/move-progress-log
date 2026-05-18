@@ -3,6 +3,7 @@ import {
   assessmentBaseSchema,
   cardiovascularBaselineSchema,
   computeSitToStandHemiScore,
+  dexaRegionalDistributionSchema,
   dexaSchema,
   emptySupports,
   handgripSchema,
@@ -133,6 +134,123 @@ describe("dexaSchema", () => {
         regional_distribution: {
           trunk: { fat_pct: 150, lean_mass_g: 28_300, fat_mass_g: 8_200 },
         },
+      }).success,
+    ).toBe(false);
+  });
+
+  // ── Bugfix: regional_distribution parcial NÃO bloqueia o submit ────────
+  // Laudos DEXA de clínicas diferentes preenchem subconjuntos diferentes
+  // dos campos por região (alguns só `fat_pct`, outros só `lean_mass_g`,
+  // alguns todos os 3). A IA extrai conforme o laudo. Antes deste fix,
+  // a IA sucesso na extração mas o submit do form falhava em silêncio
+  // (a seção "Distribuição regional (opcional)" fica colapsada).
+
+  it("regional: aceita região com SÓ fat_pct preenchido", () => {
+    expect(
+      dexaRegionalDistributionSchema.safeParse({
+        trunk: { fat_pct: 22.5 },
+      }).success,
+    ).toBe(true);
+    // Wrapper completo também passa.
+    expect(
+      dexaSchema.safeParse({
+        total_mass_kg: 92,
+        fat_pct: 11.4,
+        regional_distribution: { trunk: { fat_pct: 22.5 } },
+      }).success,
+    ).toBe(true);
+  });
+
+  it("regional: aceita região com SÓ lean_mass_g preenchido", () => {
+    expect(
+      dexaRegionalDistributionSchema.safeParse({
+        arms_right: { lean_mass_g: 3_200 },
+      }).success,
+    ).toBe(true);
+    expect(
+      dexaSchema.safeParse({
+        regional_distribution: {
+          arms_right: { lean_mass_g: 3_200 },
+          legs_left: { lean_mass_g: 9_800 },
+        },
+      }).success,
+    ).toBe(true);
+  });
+
+  it("regional: aceita região com SÓ fat_mass_g preenchido", () => {
+    expect(
+      dexaRegionalDistributionSchema.safeParse({
+        android: { fat_mass_g: 1_400 },
+      }).success,
+    ).toBe(true);
+  });
+
+  it("regional: aceita região com TODOS os campos null/undefined/vazios", () => {
+    // Todos null:
+    expect(
+      dexaRegionalDistributionSchema.safeParse({
+        trunk: { fat_pct: null, lean_mass_g: null, fat_mass_g: null },
+      }).success,
+    ).toBe(true);
+    // String vazia (vinda de input de form):
+    expect(
+      dexaRegionalDistributionSchema.safeParse({
+        trunk: { fat_pct: "", lean_mass_g: "", fat_mass_g: "" },
+      }).success,
+    ).toBe(true);
+    // Objeto vazio (a IA não preencheu nada dessa região):
+    expect(
+      dexaRegionalDistributionSchema.safeParse({
+        gynoid: {},
+      }).success,
+    ).toBe(true);
+  });
+
+  it("DEXA: campos principais preenchidos + regional PARCIAL passa (cenário Alex)", () => {
+    // Reproduz o cenário que estava bloqueado em produção: extração
+    // bem-sucedida, campos clínicos válidos, distribuição regional
+    // parcial (algumas regiões com 1 ou 2 campos, outras vazias).
+    expect(
+      dexaSchema.safeParse({
+        total_mass_kg: 92,
+        fat_mass_kg: 10.446,
+        fat_pct: 11.4,
+        lean_mass_kg: 78.025,
+        visceral_fat_g: 297,
+        android_gynoid_ratio: 0.64,
+        imma_baumgartner: 10.65,
+        fmi: 3.08,
+        fat_percentile: 1,
+        regional_distribution: {
+          trunk: { fat_pct: 14.2 },
+          arms_right: { lean_mass_g: 3_200 },
+          arms_left: { lean_mass_g: 3_100, fat_mass_g: 580 },
+          legs_right: {},
+          android: { fat_pct: 18.0, fat_mass_g: 1_400 },
+        },
+        extraction_method: "hybrid",
+        extraction_confidence: 0.93,
+      }).success,
+    ).toBe(true);
+  });
+
+  it("regional: valores ABSURDOS continuam falhando quando o campo está presente", () => {
+    // fat_pct > 100 ainda inválido:
+    expect(
+      dexaRegionalDistributionSchema.safeParse({
+        trunk: { fat_pct: 150 },
+      }).success,
+    ).toBe(false);
+    // lean_mass_g negativo ainda inválido:
+    expect(
+      dexaRegionalDistributionSchema.safeParse({
+        legs_left: { lean_mass_g: -10 },
+      }).success,
+    ).toBe(false);
+    // fat_mass_g acima do max (100_000) ainda inválido:
+    expect(
+      dexaRegionalDistributionSchema.safeParse({
+        android: { fat_mass_g: 200_000 },
       }).success,
     ).toBe(false);
   });

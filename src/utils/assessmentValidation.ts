@@ -167,10 +167,29 @@ export type HandgripInput = z.infer<typeof handgripSchema>;
 // 3. DEXA — campos clínicos + jsonb regional_distribution
 // ---------------------------------------------------------------------------
 
+/**
+ * Cada sub-campo regional é INDIVIDUALMENTE opcional / nullable.
+ *
+ * Por que: a IA extrai `regional_distribution` por região anatômica
+ * a partir do laudo DEXA, mas laudos de clínicas diferentes preenchem
+ * subconjuntos diferentes — algumas trazem só `fat_pct` por região,
+ * outras só `lean_mass_g`, outras todas as 3. Exigir as 3 chaves via
+ * `requiredNumber` bloqueava o submit quando a IA preenchia regiões
+ * parciais, e como a seção "Distribuição regional (opcional)" do form
+ * fica colapsada, o erro de validação ficava escondido — o coach via
+ * "não salva" sem dica de onde estava o problema.
+ *
+ * Garantias mantidas:
+ *   - Ranges (0-100 pra %, 0-100_000 pra gramas) continuam aplicados
+ *     QUANDO o valor está presente — valores absurdos seguem falhando.
+ *   - A região inteira continua `optional()` (omissão da chave OK).
+ *   - O wrapper `dexaRegionalDistributionSchema` continua
+ *     `nullable().optional()` no `dexaSchema` (toda a seção opcional).
+ */
 const dexaRegionSchema = z.object({
-  fat_pct: requiredNumber(z.number().min(0).max(100)),
-  lean_mass_g: requiredNumber(z.number().min(0).max(100_000)),
-  fat_mass_g: requiredNumber(z.number().min(0).max(100_000)),
+  fat_pct: nullableNumber(z.number().min(0).max(100)),
+  lean_mass_g: nullableNumber(z.number().min(0).max(100_000)),
+  fat_mass_g: nullableNumber(z.number().min(0).max(100_000)),
 });
 
 export const dexaRegionalDistributionSchema = z.object({

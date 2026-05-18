@@ -761,6 +761,52 @@ describe("extract-dexa-pdf edge — upstream_* sanitizado (code/type/param/messa
   });
 });
 
+// ── DexaForm — regional_distribution é OPCIONAL (não bloqueia submit) ─────
+
+describe("DexaForm — regional_distribution opcional / não-bloqueante", () => {
+  const validationPath = resolve(__dirname, "../../../utils/assessmentValidation.ts");
+  const validationSource = readFileSync(validationPath, "utf-8");
+
+  it("regional_distribution é nullable+optional no dexaSchema (toda a seção opcional)", () => {
+    expect(validationSource).toMatch(
+      /regional_distribution:\s*dexaRegionalDistributionSchema\.nullable\(\)\.optional\(\)/,
+    );
+  });
+
+  it("cada sub-campo regional (fat_pct/lean_mass_g/fat_mass_g) usa nullableNumber (não requiredNumber)", () => {
+    // Bugfix: se um dos 3 sub-campos usar `requiredNumber`, a IA
+    // extraindo região parcial faz o submit do form falhar em silêncio
+    // (a seção "Distribuição regional (opcional)" é colapsada e o
+    // erro de validação fica escondido). Bloqueio explícito:
+    const dexaRegionBlock = validationSource.match(
+      /const dexaRegionSchema\s*=\s*z\.object\(\{[\s\S]*?\n\}\);/,
+    )?.[0] ?? "";
+    expect(dexaRegionBlock.length).toBeGreaterThan(0);
+    expect(dexaRegionBlock).toMatch(/fat_pct:\s*nullableNumber\(/);
+    expect(dexaRegionBlock).toMatch(/lean_mass_g:\s*nullableNumber\(/);
+    expect(dexaRegionBlock).toMatch(/fat_mass_g:\s*nullableNumber\(/);
+    expect(dexaRegionBlock).not.toMatch(/fat_pct:\s*requiredNumber\(/);
+    expect(dexaRegionBlock).not.toMatch(/lean_mass_g:\s*requiredNumber\(/);
+    expect(dexaRegionBlock).not.toMatch(/fat_mass_g:\s*requiredNumber\(/);
+  });
+
+  it("DexaForm rotula a seção regional como 'opcional' (sinal pro coach + alinhamento de UX)", () => {
+    expect(dexaFormSource).toMatch(/Distribuição regional \(opcional\)/);
+  });
+
+  it("DexaForm default state inicializa regional_distribution como null (não objeto vazio)", () => {
+    // Defaults novos abrem com `regional_distribution: null`, não com
+    // sub-objetos vazios que ativariam validação por região acidentalmente.
+    expect(dexaFormSource).toMatch(/regional_distribution:\s*null/);
+  });
+
+  it("onSubmit passa regional_distribution como ?? null (nunca undefined que falharia type-check)", () => {
+    expect(dexaFormSource).toMatch(
+      /regional_distribution:\s*data\.regional_distribution\s*\?\?\s*null/,
+    );
+  });
+});
+
 // ── DexaForm — toast permanece genérico (sem failure_code/upstream_* visível) ─
 
 describe("DexaForm — toast permanece genérico após introdução de failure_code/upstream_*", () => {
