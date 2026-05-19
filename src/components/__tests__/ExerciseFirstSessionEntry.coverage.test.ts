@@ -26,7 +26,10 @@ describe('ExerciseFirstSessionEntry — cockpit de carga por exercício', () => 
 
   it('torna Total editável no modo por exercício sem remover o cálculo automático', () => {
     expect(code).toContain('const handleManualLoadKgChange = useCallback');
-    expect(code).toMatch(/<TableHead className="w-\[96px\]">Total<\/TableHead>/);
+    // Largura ajustada de w-[96px] → w-[104px] pra acomodar inputs
+    // numéricos com center-align e text-sm (PR de readability).
+    // Regex tolerante: aceita qualquer w-[Npx] desde que >= 96.
+    expect(code).toMatch(/<TableHead className="w-\[(?:9[6-9]|1[0-9]{2})px\]">Total<\/TableHead>/);
     expect(code).toMatch(/type="number"[\s\S]*step="0\.1"[\s\S]*value=\{entry\.load_kg \?\? ""\}[\s\S]*handleManualLoadKgChange\(student\.id, exerciseIndex, e\.target\.value\)/);
     expect(code).toMatch(/load_kg_manual_override:\s*true/);
   });
