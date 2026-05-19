@@ -520,7 +520,7 @@ export const DexaForm = ({
             scan_pdf_url: null,
             regional_distribution: data.regional_distribution ?? null,
             conclusion_text: data.conclusion_text || null,
-            raw_extracted_json: sanitizedExtraction,
+            raw_extracted_json: sanitizedExtraction as unknown as Record<string, unknown> | null,
             extraction_confidence: usedExtraction
               ? sanitizedExtraction?.overall_confidence ?? null
               : null,

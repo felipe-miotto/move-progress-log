@@ -56,10 +56,8 @@ describe("parseBrazilianNumber — formatos numéricos de laudo BR", () => {
   });
 
   it("input null/undefined/objeto → null (defensivo)", () => {
-    // @ts-expect-error — input intencionalmente inválido para testar guard
-    expect(parseBrazilianNumber(null)).toBeNull();
-    // @ts-expect-error — input intencionalmente inválido para testar guard
-    expect(parseBrazilianNumber({})).toBeNull();
+    expect(parseBrazilianNumber(null as unknown as string)).toBeNull();
+    expect(parseBrazilianNumber({} as unknown as string)).toBeNull();
   });
 });
 
@@ -372,7 +370,7 @@ describe("sanitizeDexaExtractionForStorage", () => {
     (dirty as Record<string, unknown>).storage_path = "s/1/2.pdf";
     (dirty.fields as Record<string, unknown>).prompt = "do not include";
 
-    const out = sanitizeDexaExtractionForStorage(dirty as DexaExtraction);
+    const out = sanitizeDexaExtractionForStorage(dirty as unknown as DexaExtraction);
     const serialized = JSON.stringify(out);
     for (const forbidden of DEXA_FORBIDDEN_RAW_KEYS) {
       expect(serialized).not.toContain(`"${forbidden}"`);
