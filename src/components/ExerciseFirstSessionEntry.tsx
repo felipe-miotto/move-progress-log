@@ -112,7 +112,12 @@ export function ExerciseFirstSessionEntry({
           exercise_name: ex.exercise_name,
           sets: parseInt(ex.sets) || 0,
           reps: parseInt(ex.reps) || 0,
-          reserve_reps: ex.rir || "",
+          // Pre-fill da coluna PSE (Percepção Subjetiva de Esforço) vem
+          // de `prescription_exercises.pse`. Coluna DB continua sendo
+          // `reserve_reps` (string livre) — sem migration; a semântica
+          // visual é PSE, não Reserva. Reserva/RIR continua aparecendo
+          // no badge do título prescrito (`currentPrescribed.rir`).
+          reserve_reps: ex.pse || "",
           load_kg: null,
           load_breakdown: "",
           observations: "",
@@ -459,7 +464,7 @@ export function ExerciseFirstSessionEntry({
               <div className="min-w-0">
                 <p className="font-medium text-foreground">
                   Última: {last.load_breakdown ? compressLoadShorthand(last.load_breakdown) : "—"} = {last.load_kg ?? "—"}kg ×{last.reps ?? "—"}
-                  {last.reserve_reps && ` · Res. ${last.reserve_reps}`}
+                  {last.reserve_reps && ` · PSE ${last.reserve_reps}`}
                 </p>
                 {last.date && (
                   <p className="mt-0.5 text-muted-foreground">
@@ -529,12 +534,12 @@ export function ExerciseFirstSessionEntry({
 
           <div>
             <label className="mb-1 block text-xs font-medium text-muted-foreground">
-              Reserva
+              PSE
             </label>
             <Input
               value={entry.reserve_reps}
               onChange={(e) => updateField(student.id, exerciseIndex, "reserve_reps", e.target.value)}
-              placeholder="2-3, 0, RM"
+              placeholder="7-8, em barra, leve"
               className="min-h-11 text-base"
             />
           </div>
@@ -654,7 +659,7 @@ export function ExerciseFirstSessionEntry({
                   <TableHead className="w-[140px]">Carga parcial</TableHead>
                   <TableHead className="w-[104px]">Total</TableHead>
                   <TableHead className="w-[88px]">Reps</TableHead>
-                  <TableHead className="w-[96px]">Reserva</TableHead>
+                  <TableHead className="w-[104px]">PSE</TableHead>
                   <TableHead>Obs</TableHead>
                 </TableRow>
               </TableHeader>
@@ -685,7 +690,7 @@ export function ExerciseFirstSessionEntry({
                                 </p>
                                 <p className="text-[10px] text-muted-foreground">
                                   {last.load_kg ?? "—"} kg · {last.reps ?? "—"} reps
-                                  {last.reserve_reps && ` · Res. ${last.reserve_reps}`}
+                                  {last.reserve_reps && ` · PSE ${last.reserve_reps}`}
                                   {last.date && (
                                     <span className="ml-1">
                                       · {formatDistanceToNow(new Date(last.date), {

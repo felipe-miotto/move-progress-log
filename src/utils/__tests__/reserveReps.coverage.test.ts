@@ -73,34 +73,40 @@ describe("reserve_reps — DB e tipos compartilhados", () => {
 
 // ── ExerciseFirstSessionEntry — inicialização + UI + submit ───────────────
 
-describe("ExerciseFirstSessionEntry — UI da Reserva (manual por exercício)", () => {
+describe("ExerciseFirstSessionEntry — UI da coluna PSE (manual por exercício)", () => {
   const code = stripComments(exerciseFirstSource);
 
-  it("declara reserve_reps em ExerciseData e PrescriptionExercise.rir", () => {
+  it("declara reserve_reps em ExerciseData e PrescriptionExercise.pse", () => {
     expect(code).toMatch(/reserve_reps:\s*string/);
-    // PrescriptionExercise precisa receber `rir` da prescrição.
-    expect(code).toMatch(/\brir\??:\s*(string|null)/);
+    // PrescriptionExercise precisa receber `pse` da prescrição (pre-fill).
+    expect(code).toMatch(/\bpse:\s*string\s*\|\s*null/);
   });
 
-  it("inicializa reserve_reps com ex.rir || '' (sem inferir)", () => {
-    expect(code).toMatch(/reserve_reps:\s*ex\.rir\s*\|\|\s*""/);
+  it("inicializa reserve_reps com ex.pse || '' (pre-fill vem do PSE prescrito, NÃO do rir)", () => {
+    expect(code).toMatch(/reserve_reps:\s*ex\.pse\s*\|\|\s*""/);
+    // Bloqueia regressão: NÃO usar mais ex.rir como pre-fill da coluna.
+    expect(code).not.toMatch(/reserve_reps:\s*ex\.rir\s*\|\|\s*""/);
   });
 
-  it("renderiza label 'Reserva' (não 'RR', não 'RIR') no header e no campo", () => {
-    expect(exerciseFirstSource).toMatch(/>\s*Reserva\s*</);
+  it("renderiza label 'PSE' (não 'Reserva', 'RR' ou 'RIR') no header e no campo", () => {
+    expect(exerciseFirstSource).toMatch(/>\s*PSE\s*</);
+    expect(exerciseFirstSource).toMatch(/<TableHead[^>]*>PSE<\/TableHead>/);
+    // Bloqueia regressão de naming.
+    expect(exerciseFirstSource).not.toMatch(/<TableHead[^>]*>Reserva</);
+    expect(exerciseFirstSource).not.toMatch(/<label[^>]*>\s*Reserva\s*</);
     expect(exerciseFirstSource).not.toMatch(/>\s*RR\s*</);
     expect(exerciseFirstSource).not.toMatch(/<TableHead[^>]*>RIR</);
-    expect(exerciseFirstSource).not.toMatch(/<FormLabel[^>]*>RIR</);
   });
 
-  it("renderiza campo editável Reserva tanto no mobile quanto no desktop", () => {
+  it("renderiza campo editável PSE tanto no mobile quanto no desktop", () => {
     // Pelo menos 2 inputs/textfields ligados a reserve_reps (mobile + desktop).
     const reserveInputs = code.match(/value=\{entry\.reserve_reps[^}]*\}/g) ?? [];
     expect(reserveInputs.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("mostra reserve_reps da última carga quando existe (Res. X)", () => {
-    expect(code).toMatch(/last\.reserve_reps\s*&&\s*` ·\s*Res\.\s*\$\{last\.reserve_reps\}/);
+  it("mostra reserve_reps da última carga como 'PSE X' (não mais 'Res. X')", () => {
+    expect(code).toMatch(/last\.reserve_reps\s*&&\s*` ·\s*PSE\s*\$\{last\.reserve_reps\}/);
+    expect(code).not.toMatch(/Res\.\s*\$\{last\.reserve_reps\}/);
   });
 
   it('botão "Usar/Repetir última carga" copia também reserve_reps', () => {
@@ -133,8 +139,11 @@ describe("RecordGroupSessionDialog — persistência da Reserva (manual + voz)",
     expect(code).toMatch(/reserve_reps:\s*ex\.reserve_reps\s*\|\|\s*null/);
   });
 
-  it("exercícios prescritos NÃO mencionados pré-preenchem reserve_reps com prescribed.rir || null", () => {
-    expect(code).toMatch(/reserve_reps:\s*prescribed\.rir\s*\|\|\s*null/);
+  it("exercícios prescritos NÃO mencionados pré-preenchem reserve_reps com prescribed.pse || null", () => {
+    // A coluna visualmente é PSE — pre-fill vem do PSE prescrito.
+    expect(code).toMatch(/reserve_reps:\s*prescribed\.pse\s*\|\|\s*null/);
+    // Bloqueia regressão pra `prescribed.rir`.
+    expect(code).not.toMatch(/reserve_reps:\s*prescribed\.rir\s*\|\|\s*null/);
   });
 });
 
@@ -154,12 +163,14 @@ describe("EditSessionDialog / EditGroupSessionDialog — preservam Reserva", () 
   });
 });
 
-// ── PreviewCard mostra Reserva sem substituir Reps ─────────────────────────
+// ── PreviewCard mostra PSE sem substituir Reps ─────────────────────────────
 
-describe("ExercisePreviewCard — exibe Reserva ao lado de Reps (não substitui)", () => {
-  it("renderiza coluna 'Reserva' separada de 'Reps'", () => {
-    expect(previewCardSource).toMatch(/>\s*Reserva:\s*</);
+describe("ExercisePreviewCard — exibe PSE ao lado de Reps (não substitui)", () => {
+  it("renderiza coluna 'PSE' separada de 'Reps'", () => {
+    expect(previewCardSource).toMatch(/>\s*PSE:\s*</);
     expect(previewCardSource).toMatch(/>\s*Reps:\s*</);
+    // Bloqueia regressão pra 'Reserva' em PreviewCard.
+    expect(previewCardSource).not.toMatch(/>\s*Reserva:\s*</);
   });
 
   it("usa grid de 4 colunas (Séries/Reps/Reserva/Carga), preservando layout original", () => {

@@ -922,7 +922,7 @@ export function RecordGroupSessionDialog({
         prescribed_exercise_name: prescribed.exercise_name || prescribed.exercises_library?.name,
         exercise_library_id: prescribed.exercise_library_id ?? null,
         executed_exercise_name: prescribed.exercise_name || prescribed.exercises_library?.name || '',
-        sets: parseInt(prescribed.sets) || null, reps: null, reserve_reps: prescribed.rir || null, load_kg: null, load_breakdown: '',
+        sets: parseInt(prescribed.sets) || null, reps: null, reserve_reps: prescribed.pse || null, load_kg: null, load_breakdown: '',
         observations: '⚠️ Exercício prescrito mas não mencionado - preencher manualmente', is_best_set: false,
       }));
       return { ...student, exercises: [...student.exercises, ...newExercises] };

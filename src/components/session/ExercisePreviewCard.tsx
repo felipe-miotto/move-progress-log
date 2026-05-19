@@ -65,8 +65,11 @@ export function ExercisePreviewCard({ exercise: ex }: ExercisePreviewCardProps) 
           </span>
         </div>
         <div>
-          {/* Reserva (texto livre: 0, 2-3, RM, 4+ etc.). NÃO substitui Reps. */}
-          <span className="text-muted-foreground">Reserva: </span>
+          {/* PSE (Percepção Subjetiva de Esforço). Coluna DB segue
+              sendo `reserve_reps` (texto livre); a semântica visual é
+              PSE — vem de `prescription_exercises.pse` quando há
+              pré-preenchimento. NÃO substitui Reps. */}
+          <span className="text-muted-foreground">PSE: </span>
           <span className="font-semibold">
             {ex.reserve_reps && ex.reserve_reps.trim().length > 0 ? ex.reserve_reps : '-'}
           </span>
