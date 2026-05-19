@@ -22,6 +22,7 @@ export interface SessionExercise {
   executed_exercise_name: string;
   sets?: number | null;
   reps: number | null;
+  reserve_reps?: string | null;
   load_kg?: number | null;
   load_breakdown: string;
   observations?: string | null;

@@ -34,6 +34,7 @@ export interface Exercise {
   exercise_name: string;
   sets?: number;
   reps?: number;
+  reserve_reps?: string;
   load_kg?: number;
   load_description?: string;
   load_breakdown?: string;
@@ -49,6 +50,7 @@ type SessionExercisePayload = {
   exercise_name: string;
   sets?: number | null;
   reps?: number | null;
+  reserve_reps?: string | null;
   load_kg?: number | null;
   load_description?: string | null;
   load_breakdown?: string | null;
@@ -90,6 +92,7 @@ const mapExercise = (row: ExerciseRow): Exercise => ({
   exercise_name: row.exercise_name,
   sets: row.sets ?? undefined,
   reps: row.reps ?? undefined,
+  reserve_reps: row.reserve_reps ?? undefined,
   load_kg: row.load_kg ?? undefined,
   load_description: row.load_description ?? undefined,
   load_breakdown: row.load_breakdown ?? undefined,
@@ -129,6 +132,7 @@ const mapExercisesToInsert = (
     exercise_name: exercise.exercise_name,
     sets: exercise.sets ?? null,
     reps: exercise.reps ?? null,
+    reserve_reps: exercise.reserve_reps ?? null,
     load_kg: exercise.load_kg ?? null,
     load_description: exercise.load_description ?? null,
     load_breakdown: exercise.load_breakdown ?? null,
@@ -243,7 +247,7 @@ export const useSessionExercises = (sessionId: string | null) => {
 
       const { data, error } = await supabase
         .from("exercises")
-        .select("id, session_id, exercise_library_id, exercise_name, sets, reps, load_kg, load_description, load_breakdown, observations, created_at")
+        .select("id, session_id, exercise_library_id, exercise_name, sets, reps, reserve_reps, load_kg, load_description, load_breakdown, observations, created_at")
         .eq("session_id", sessionId)
         .order("created_at");
 
@@ -267,6 +271,7 @@ export const useCreateWorkoutSession = () => {
         exercise_name: string;
         sets?: number;
         reps?: number;
+        reserve_reps?: string;
         load_kg?: number;
         load_description?: string;
         load_breakdown?: string;
@@ -278,6 +283,7 @@ export const useCreateWorkoutSession = () => {
         exercise_name: ex.exercise_name,
         sets: ex.sets ?? null,
         reps: ex.reps ?? null,
+        reserve_reps: ex.reserve_reps ?? null,
         load_kg: ex.load_kg ?? null,
         load_description: ex.load_description ?? null,
         load_breakdown: ex.load_breakdown ?? null,
@@ -361,6 +367,7 @@ export const useCreateGroupWorkoutSessions = () => {
           sets?: number | null;
           prescribed_sets?: number;
           reps: number;
+          reserve_reps?: string | null;
           load_kg?: number | null;
           load_breakdown: string;
           observations?: string | null;
@@ -392,6 +399,7 @@ export const useCreateGroupWorkoutSessions = () => {
               exercise_library_id: ex.exercise_library_id ?? null,
               sets: finalSets,
               reps: ex.reps,
+              reserve_reps: ex.reserve_reps ?? null,
               load_kg: ex.load_kg,
               load_breakdown: ex.load_breakdown,
               observations: finalObservations || null,

@@ -14,11 +14,14 @@ interface RawObservation {
 }
 
 interface RawExercise {
-  name: string;
+  name?: string;
+  executed_exercise_name?: string;
   exercise_library_id?: string | null;
-  reps?: number;
-  load_kg?: number;
-  observations?: string;
+  reps?: number | null;
+  reserve_reps?: string | null;
+  load_kg?: number | null;
+  load_breakdown?: string | null;
+  observations?: string | null;
 }
 
 interface AudioSegment {

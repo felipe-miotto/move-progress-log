@@ -103,6 +103,33 @@ describe('calculateLoadFromBreakdown', () => {
     expect(calculateLoadFromBreakdown('70 lb + barra 15kg')).toBe(46.8);
   });
 
+  it('handles explicit plate multiplier "2x70lb" without requiring cada lado — REGRESSION GUARD', () => {
+    // Bug observado em registro manual: "(2x70lb+2kg)+ barra 15kg"
+    // era calculado como 48.8 porque o parser ignorava o "2x" e lia
+    // apenas "70lb + 2kg + barra 15kg".
+    // 2×70lb = 63.504kg; +2kg + barra 15kg = 80.504 → 80.5
+    expect(calculateLoadFromBreakdown('(2x70lb+2kg)+ barra 15kg')).toBe(80.5);
+  });
+
+  it('handles spaced explicit multiplier "2 x 70 lb"', () => {
+    expect(calculateLoadFromBreakdown('(2 x 70 lb + 2kg) + barra 15kg')).toBe(80.5);
+  });
+
+  it('handles multiplication sign "2×70lb"', () => {
+    expect(calculateLoadFromBreakdown('(2×70lb + 2kg)+ barra 15kg')).toBe(80.5);
+  });
+
+  it('handles multiple explicit multipliers in the same breakdown', () => {
+    // 2×70lb = 63.504kg; 2×2kg = 4kg; + barra 15kg = 82.504 → 82.5
+    expect(calculateLoadFromBreakdown('2x70lb + 2x2kg + barra 15kg')).toBe(82.5);
+  });
+
+  it('combines explicit multipliers with cada lado when the whole group is per-side', () => {
+    // (2×25lb + 5kg) cada lado + barra 20kg
+    // ((50lb × 0.4536) + 5kg) × 2 + 20kg = 75.36 → 75.4
+    expect(calculateLoadFromBreakdown('(2x25lb + 5kg) cada lado + barra 20kg')).toBe(75.4);
+  });
+
   it('handles parenthesized "cada lado" without requiring "de"', () => {
     // 20kg*2 + 10lb*0.4536*2 + barra 15 = 40 + 9.072 + 15 = 64.072 → 64.1
     expect(calculateLoadFromBreakdown('(20kg + 10lb) cada lado + barra 15kg')).toBe(64.1);

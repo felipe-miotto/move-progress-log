@@ -59,6 +59,29 @@ const roundToDecimal = (value: number, decimals: number = DECIMAL_PLACES): numbe
   return Math.round(value * multiplier) / multiplier;
 };
 
+const WEIGHT_TERM_PATTERN = /(?:(\d+(?:[.,]\d+)?)\s*[x×]\s*)?(\d+(?:[.,]\d+)?)\s*(kg|lbs?)/gi;
+
+const parseNumeric = (value: string) => parseFloat(value.replace(',', '.'));
+
+const addWeightTerms = (
+  content: string,
+  multiplier = 1,
+  options: { ignoreBarra?: boolean } = {},
+): number => {
+  let subtotal = 0;
+  for (const match of content.matchAll(WEIGHT_TERM_PATTERN)) {
+    const beforeMatch = content.substring(Math.max(0, (match.index ?? 0) - 12), match.index ?? 0);
+    if (options.ignoreBarra && /barra\s*(?:de\s*)?$/i.test(beforeMatch)) continue;
+
+    const quantity = match[1] ? parseNumeric(match[1]) : 1;
+    const value = parseNumeric(match[2]);
+    const unit = match[3].toLowerCase();
+    const kg = unit.startsWith('lb') ? value * POUND_TO_KG_CONVERSION : value;
+    subtotal += quantity * kg * multiplier;
+  }
+  return subtotal;
+};
+
 // V-04: Max audio size validation (20M chars ≈ 15MB audio)
 const MAX_AUDIO_SIZE_CHARS = 20_000_000;
 
@@ -595,7 +618,26 @@ n) **Sandbag (carga direta):**
    - Substituição por limitação
    - Curto. Técnico. Objetivo. Sem diagnóstico médico.
 
-9. **prescribed_exercise_name** (IMPORTANTE):
+9. **reserve_reps** (Reserva — repetições em reserva):
+   - Campo de TEXTO LIVRE (não número). Exemplos válidos:
+     * "2-3"   → reserva de 2 a 3 repetições
+     * "0"     → falhou na repetição alvo / atingiu o limite
+     * "RM"    → repetições máximas (sinônimo de reserva 0)
+     * "4+"    → reserva alta
+   - **MAPEAMENTOS OBRIGATÓRIOS** (vindo do áudio → reserve_reps):
+     * "RM" / "repetições máximas" / "máximas" / "falha técnica"
+       / "até a falha" → reserve_reps: "0"
+     * "2 a 3 de reserva" / "duas a três de reserva" → reserve_reps: "2-3"
+     * "zero de reserva" / "sem reserva" → reserve_reps: "0"
+     * número solto após "reserva" / "RIR" → reserve_reps com aquele número
+   - **NÃO INFERIR** a partir de "submáxima" sozinho:
+     * "carga submáxima" → reserve_reps: null + observations: "Submáxima"
+     * "fez submáxima" → reserve_reps: null + observations: "Submáxima"
+   - Se o coach não mencionar reserva, repetições máximas ou falha
+     técnica explicitamente → reserve_reps: null (NÃO inventar).
+   - Reserva NUNCA substitui o campo reps: ambos coexistem.
+
+10. **prescribed_exercise_name** (IMPORTANTE):
    - Tente SEMPRE associar o exercício executado com um dos exercícios prescritos
    - Compare o nome executado com a lista de exercícios prescritos
    - Se houver correspondência (mesmo que parcial), use o nome prescrito
@@ -624,6 +666,7 @@ FORMATO DE SAÍDA:
           "executed_exercise_name": "nome executado (com pegada)",
           "sets": número ou null,
           "reps": número ou null,
+          "reserve_reps": "texto livre da reserva (ou null) — ex: 2-3, 0, RM, 4+",
           "load_kg": número com 1 casa decimal (ex: 25.0) ou null,
           "load_breakdown": "descrição EXATA ou null",
           "observations": "observações técnicas ou null",
@@ -741,17 +784,9 @@ FORMATO DE SAÍDA:
             // Formato canônico com parênteses: "(... + ...) de cada lado"
             const content = parenMatch[1];
 
-            const kgMatches = Array.from(content.matchAll(/(\d+(?:[.,]\d+)?)\s*kg/gi));
-            for (const m of kgMatches) {
-              total += parseFloat(m[1].replace(',', '.')) * 2;
-            }
-
-            const lbMatches = Array.from(content.matchAll(/(\d+(?:[.,]\d+)?)\s*lb/gi));
-            for (const m of lbMatches) {
-              // Sem arredondamento intermediário — `roundToDecimal` só
-              // no return final pra evitar off-by-0.1 (ex.: 78.6 vs 78.5).
-              total += parseFloat(m[1].replace(',', '.')) * POUND_TO_KG_CONVERSION * 2;
-            }
+            // Suporta "70 lb", "2x70lb" e "2 x 70 lb". Sem
+            // arredondamento intermediário — `roundToDecimal` só no return.
+            total += addWeightTerms(content, 2);
           } else {
             // Formato sem parênteses: "70 lb cada lado + barra 15kg".
             // Multiplica TUDO antes do "cada lado" por 2, exceto barra
@@ -762,15 +797,7 @@ FORMATO DE SAÍDA:
               '',
             );
 
-            const kgMatches = Array.from(contentWithoutBarra.matchAll(/(\d+(?:[.,]\d+)?)\s*kg/gi));
-            for (const m of kgMatches) {
-              total += parseFloat(m[1].replace(',', '.')) * 2;
-            }
-
-            const lbMatches = Array.from(contentWithoutBarra.matchAll(/(\d+(?:[.,]\d+)?)\s*lb/gi));
-            for (const m of lbMatches) {
-              total += parseFloat(m[1].replace(',', '.')) * POUND_TO_KG_CONVERSION * 2;
-            }
+            total += addWeightTerms(contentWithoutBarra, 2);
           }
         }
 
@@ -791,18 +818,7 @@ FORMATO DE SAÍDA:
 
         // 7. PESOS SIMPLES (sem "cada lado" nem "duplo")
         if (!processedEachSide && !multiKbMatch) {
-          const kgMatches = Array.from(breakdown.matchAll(/(\d+(?:[.,]\d+)?)\s*kg/gi));
-          for (const m of kgMatches) {
-            const matchText = breakdown.substring(Math.max(0, (m.index || 0) - 6), (m.index || 0) + m[0].length);
-            if (!/barra/i.test(matchText)) {
-              total += parseFloat(m[1].replace(',', '.'));
-            }
-          }
-
-          const lbMatches = Array.from(breakdown.matchAll(/(\d+(?:[.,]\d+)?)\s*lb/gi));
-          for (const m of lbMatches) {
-            total += parseFloat(m[1].replace(',', '.')) * POUND_TO_KG_CONVERSION;
-          }
+          total += addWeightTerms(breakdown, 1, { ignoreBarra: true });
         }
 
         return total > 0 ? roundToDecimal(total) : null;

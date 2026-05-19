@@ -34,6 +34,9 @@ interface Exercise {
   exercise_name: string;
   sets: number;
   reps: number;
+  // Reserva — texto livre por design (ex.: 0, 2-3, RM, 4+).
+  // Persistido em `public.exercises.reserve_reps`.
+  reserve_reps: string | null;
   load_kg: number | null;
   load_breakdown: string;
   observations: string | null;
@@ -99,6 +102,7 @@ export function EditGroupSessionDialog({
           exercise_name,
           sets,
           reps,
+          reserve_reps,
           load_kg,
           load_breakdown,
           observations,
@@ -119,6 +123,8 @@ export function EditGroupSessionDialog({
           exercise_name: exercise.exercise_name,
           sets: exercise.sets ?? 0,
           reps: exercise.reps ?? 0,
+          // Preserva valor salvo (não inferir).
+          reserve_reps: (exercise as { reserve_reps?: string | null }).reserve_reps ?? null,
           load_kg: exercise.load_kg,
           load_breakdown: exercise.load_breakdown ?? "",
           observations: exercise.observations,
@@ -237,6 +243,8 @@ export function EditGroupSessionDialog({
               exercise_name: exercise.exercise_name,
               sets: exercise.sets,
               reps: exercise.reps,
+              // Preserva Reserva no update — sem isso, edição zerava o campo.
+              reserve_reps: exercise.reserve_reps ?? null,
               load_kg: exercise.load_kg,
               load_breakdown: exercise.load_breakdown,
               observations: exercise.observations,
@@ -255,6 +263,7 @@ export function EditGroupSessionDialog({
               exercise_name: exercise.exercise_name,
               sets: exercise.sets,
               reps: exercise.reps,
+              reserve_reps: exercise.reserve_reps ?? null,
               load_kg: exercise.load_kg,
               load_breakdown: exercise.load_breakdown,
               observations: exercise.observations,

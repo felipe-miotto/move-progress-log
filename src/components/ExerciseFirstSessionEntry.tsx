@@ -44,6 +44,7 @@ interface PrescriptionExercise {
   reps: string;
   interval_seconds: number | null;
   pse: string | null;
+  rir?: string | null;
   training_method: string | null;
   observations: string | null;
   category?: string | null;
@@ -60,9 +61,11 @@ interface ExerciseData {
   exercise_name: string;
   sets: number;
   reps: number;
+  reserve_reps: string;
   load_kg: number | null;
   load_breakdown: string;
   observations: string;
+  load_kg_manual_override?: boolean;
 }
 
 interface ExerciseFirstSessionEntryProps {
@@ -81,6 +84,13 @@ interface ExerciseFirstSessionEntryProps {
   onCancel?: () => void;
   onAddStudent?: () => void;
 }
+
+const parseManualLoadKg = (value: string): number | null => {
+  const normalized = value.trim().replace(",", ".");
+  if (!normalized) return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+};
 
 export function ExerciseFirstSessionEntry({
   prescriptionExercises,
@@ -102,6 +112,7 @@ export function ExerciseFirstSessionEntry({
           exercise_name: ex.exercise_name,
           sets: parseInt(ex.sets) || 0,
           reps: parseInt(ex.reps) || 0,
+          reserve_reps: ex.rir || "",
           load_kg: null,
           load_breakdown: "",
           observations: "",
@@ -124,7 +135,7 @@ export function ExerciseFirstSessionEntry({
   // Library lookup for exercise metadata
   const { data: exercisesLibrary } = useExercisesLibrary();
 
-  // Input refs for keyboard navigation: [studentIdx][field] where field: 0=load, 1=reps, 2=obs
+  // Input refs for keyboard navigation: [studentIdx][field] where field: 0=load, 1=total, 2=reps, 3=reserve, 4=obs
   const inputRefs = useRef<(HTMLInputElement | null)[][]>([]);
 
   // Last session history
@@ -144,7 +155,7 @@ export function ExerciseFirstSessionEntry({
 
   // Ensure refs array matches student count
   useEffect(() => {
-    inputRefs.current = selectedStudents.map(() => [null, null, null]);
+    inputRefs.current = selectedStudents.map(() => [null, null, null, null, null]);
   }, [selectedStudents]);
 
   const getLastSession = useCallback(
@@ -198,11 +209,30 @@ export function ExerciseFirstSessionEntry({
             ...prev[studentId][exIdx],
             load_breakdown: expanded,
             load_kg: loadKg,
+            load_kg_manual_override: false,
           },
         },
       }));
     },
     [data, selectedStudents]
+  );
+
+  const handleManualLoadKgChange = useCallback(
+    (studentId: string, exIdx: number, value: string) => {
+      const loadKg = parseManualLoadKg(value);
+      setData((prev) => ({
+        ...prev,
+        [studentId]: {
+          ...prev[studentId],
+          [exIdx]: {
+            ...prev[studentId]?.[exIdx],
+            load_kg: loadKg,
+            load_kg_manual_override: true,
+          },
+        },
+      }));
+    },
+    []
   );
 
   // Keyboard flow: Enter → next field → next student
@@ -211,8 +241,8 @@ export function ExerciseFirstSessionEntry({
       if (e.key !== "Enter") return;
       e.preventDefault();
 
-      // field 0=load, 1=reps, 2=obs
-      if (fieldIdx < 2) {
+      // field 0=load, 1=total, 2=reps, 3=reserve, 4=obs
+      if (fieldIdx < 4) {
         // Move to next field same student
         inputRefs.current[studentIdx]?.[fieldIdx + 1]?.focus();
       } else {
@@ -260,6 +290,7 @@ export function ExerciseFirstSessionEntry({
               ...current,
               load_breakdown: source.load_breakdown,
               load_kg: source.load_kg,
+              load_kg_manual_override: source.load_kg_manual_override,
             },
           };
         }
@@ -284,7 +315,9 @@ export function ExerciseFirstSessionEntry({
             ...prev[studentId][exerciseIndex],
             load_breakdown: compressLoadShorthand(last.load_breakdown || ""),
             load_kg: last.load_kg,
+            load_kg_manual_override: false,
             reps: last.reps || prev[studentId][exerciseIndex].reps,
+            reserve_reps: last.reserve_reps || prev[studentId][exerciseIndex].reserve_reps,
             observations: last.observations || prev[studentId][exerciseIndex].observations,
           },
         },
@@ -353,6 +386,7 @@ export function ExerciseFirstSessionEntry({
             exercise_library_id: entry?.exercise_library_id ?? null,
             sets: entry?.sets || 0,
             reps: entry?.reps || 0,
+            reserve_reps: entry?.reserve_reps || "",
             load_kg: entry?.load_kg ?? null,
             load_breakdown: entry?.load_breakdown || "",
             observations: entry?.observations || "",
@@ -421,6 +455,7 @@ export function ExerciseFirstSessionEntry({
               <div className="min-w-0">
                 <p className="font-medium text-foreground">
                   Última: {last.load_breakdown ? compressLoadShorthand(last.load_breakdown) : "—"} = {last.load_kg ?? "—"}kg ×{last.reps ?? "—"}
+                  {last.reserve_reps && ` · Res. ${last.reserve_reps}`}
                 </p>
                 {last.date && (
                   <p className="mt-0.5 text-muted-foreground">
@@ -488,11 +523,32 @@ export function ExerciseFirstSessionEntry({
 
           <div>
             <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              Reserva
+            </label>
+            <Input
+              value={entry.reserve_reps}
+              onChange={(e) => updateField(student.id, exerciseIndex, "reserve_reps", e.target.value)}
+              placeholder="2-3, 0, RM"
+              className="min-h-11 text-base"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
               Total
             </label>
-            <div className="flex min-h-11 items-center rounded-md border bg-muted/40 px-3 font-mono text-base">
-              {entry.load_kg !== null ? `${entry.load_kg} kg` : "—"}
-            </div>
+            <Input
+              type="number"
+              step="0.1"
+              inputMode="decimal"
+              value={entry.load_kg ?? ""}
+              onChange={(e) => handleManualLoadKgChange(student.id, exerciseIndex, e.target.value)}
+              placeholder="—"
+              className="min-h-11 font-mono text-base"
+            />
+            {entry.load_kg_manual_override && (
+              <p className="mt-1 text-xs text-muted-foreground">editado manualmente</p>
+            )}
           </div>
 
           <div className="col-span-2">
@@ -543,6 +599,7 @@ export function ExerciseFirstSessionEntry({
           <p className="text-xs text-muted-foreground">
             Prescrito: {currentPrescribed.sets}x{currentPrescribed.reps}
             {currentPrescribed.pse && ` · PSE ${currentPrescribed.pse}`}
+            {currentPrescribed.rir && ` · Reserva ${currentPrescribed.rir}`}
             {currentPrescribed.training_method && ` · ${currentPrescribed.training_method}`}
           </p>
         </div>
@@ -586,10 +643,12 @@ export function ExerciseFirstSessionEntry({
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[120px]">Aluno</TableHead>
+                  <TableHead className="w-[180px]">Última carga</TableHead>
                   <TableHead className="w-[140px]">Exercício</TableHead>
                   <TableHead className="w-[140px]">Carga parcial</TableHead>
-                  <TableHead className="w-[80px]">Total</TableHead>
+                  <TableHead className="w-[96px]">Total</TableHead>
                   <TableHead className="w-[80px]">Reps</TableHead>
+                  <TableHead className="w-[96px]">Reserva</TableHead>
                   <TableHead>Obs</TableHead>
                 </TableRow>
               </TableHeader>
@@ -607,42 +666,54 @@ export function ExerciseFirstSessionEntry({
                           <p className="font-medium text-sm truncate max-w-[110px]">
                             {student.name.split(" ")[0]}
                           </p>
-                          {last && (
-                            <div className="mt-1 space-y-0.5">
-                              <div className="flex items-center gap-1">
+                        </div>
+                      </TableCell>
+
+                      <TableCell className="py-2">
+                        {last ? (
+                          <div className="space-y-1 rounded-md bg-muted/45 p-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="truncate text-[11px] font-medium">
+                                  {last.load_breakdown ? compressLoadShorthand(last.load_breakdown) : "—"}
+                                </p>
                                 <p className="text-[10px] text-muted-foreground">
-                                  últ: {last.load_breakdown ? compressLoadShorthand(last.load_breakdown) : "—"} = {last.load_kg ?? "—"}kg ×{last.reps ?? "—"}
+                                  {last.load_kg ?? "—"} kg · {last.reps ?? "—"} reps
+                                  {last.reserve_reps && ` · Res. ${last.reserve_reps}`}
                                   {last.date && (
-                                    <span className="ml-0.5">
-                                      {formatDistanceToNow(new Date(last.date), {
+                                    <span className="ml-1">
+                                      · {formatDistanceToNow(new Date(last.date), {
                                         addSuffix: false,
                                         locale: ptBR,
                                       })}
                                     </span>
                                   )}
                                 </p>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-4 w-4 p-0"
-                                      onClick={() => handleRepeatLastLoad(student.id)}
-                                    >
-                                      <RefreshCw className="h-2.5 w-2.5" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>Repetir carga anterior</TooltipContent>
-                                </Tooltip>
                               </div>
-                              {last.observations && (
-                                <p className="text-[9px] text-muted-foreground/70 italic truncate max-w-[110px]" title={last.observations}>
-                                  {last.observations}
-                                </p>
-                              )}
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 px-1.5 text-[10px]"
+                                    onClick={() => handleRepeatLastLoad(student.id)}
+                                  >
+                                    <RefreshCw className="mr-1 h-3 w-3" />
+                                    Usar
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Usar última carga deste aluno</TooltipContent>
+                              </Tooltip>
                             </div>
-                          )}
-                        </div>
+                            {last.observations && (
+                              <p className="truncate text-[9px] italic text-muted-foreground/70" title={last.observations}>
+                                {last.observations}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
                       </TableCell>
 
                       <TableCell className="py-2">
@@ -678,7 +749,7 @@ export function ExerciseFirstSessionEntry({
                         <Input
                           ref={(el) => {
                             if (!inputRefs.current[studentIdx])
-                              inputRefs.current[studentIdx] = [null, null, null];
+                              inputRefs.current[studentIdx] = [null, null, null, null, null];
                             inputRefs.current[studentIdx][0] = el;
                           }}
                           value={entry.load_breakdown}
@@ -705,17 +776,32 @@ export function ExerciseFirstSessionEntry({
                       </TableCell>
 
                       <TableCell className="py-2">
-                        <span className="text-sm font-mono">
-                          {entry.load_kg !== null ? `${entry.load_kg}` : "—"}
-                        </span>
+                        <Input
+                          ref={(el) => {
+                            if (!inputRefs.current[studentIdx])
+                              inputRefs.current[studentIdx] = [null, null, null, null, null];
+                            inputRefs.current[studentIdx][1] = el;
+                          }}
+                          type="number"
+                          step="0.1"
+                          inputMode="decimal"
+                          value={entry.load_kg ?? ""}
+                          onChange={(e) => handleManualLoadKgChange(student.id, exerciseIndex, e.target.value)}
+                          onKeyDown={(e) => handleKeyDown(e, studentIdx, 1)}
+                          placeholder="—"
+                          className="h-8 font-mono text-xs"
+                        />
+                        {entry.load_kg_manual_override && (
+                          <p className="mt-0.5 text-[9px] text-muted-foreground">manual</p>
+                        )}
                       </TableCell>
 
                       <TableCell className="py-2">
                         <Input
                           ref={(el) => {
                             if (!inputRefs.current[studentIdx])
-                              inputRefs.current[studentIdx] = [null, null, null];
-                            inputRefs.current[studentIdx][1] = el;
+                              inputRefs.current[studentIdx] = [null, null, null, null, null];
+                            inputRefs.current[studentIdx][2] = el;
                           }}
                           type="number"
                           value={entry.reps || ""}
@@ -727,7 +813,7 @@ export function ExerciseFirstSessionEntry({
                               parseInt(e.target.value) || 0
                             )
                           }
-                          onKeyDown={(e) => handleKeyDown(e, studentIdx, 1)}
+                          onKeyDown={(e) => handleKeyDown(e, studentIdx, 2)}
                           min={1}
                           className={`h-8 text-xs ${entry.reps <= 0 ? "border-destructive/50" : ""}`}
                         />
@@ -735,16 +821,28 @@ export function ExerciseFirstSessionEntry({
 
                       <TableCell className="py-2">
                         <Input
+                          value={entry.reserve_reps}
+                          onChange={(e) =>
+                            updateField(student.id, exerciseIndex, "reserve_reps", e.target.value)
+                          }
+                          onKeyDown={(e) => handleKeyDown(e, studentIdx, 3)}
+                          placeholder="2-3"
+                          className="h-8 text-xs"
+                        />
+                      </TableCell>
+
+                      <TableCell className="py-2">
+                        <Input
                           ref={(el) => {
                             if (!inputRefs.current[studentIdx])
-                              inputRefs.current[studentIdx] = [null, null, null];
-                            inputRefs.current[studentIdx][2] = el;
+                              inputRefs.current[studentIdx] = [null, null, null, null, null];
+                            inputRefs.current[studentIdx][4] = el;
                           }}
                           value={entry.observations}
                           onChange={(e) =>
                             updateField(student.id, exerciseIndex, "observations", e.target.value)
                           }
-                          onKeyDown={(e) => handleKeyDown(e, studentIdx, 2)}
+                          onKeyDown={(e) => handleKeyDown(e, studentIdx, 4)}
                           placeholder="obs..."
                           className="h-8 text-xs"
                         />

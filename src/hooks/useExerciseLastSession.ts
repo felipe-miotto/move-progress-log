@@ -9,6 +9,7 @@ export interface LastSessionData {
   load_kg: number | null;
   load_breakdown: string | null;
   reps: number | null;
+  reserve_reps: string | null;
   date: string | null;
   observations: string | null;
 }
@@ -86,6 +87,7 @@ export const useExerciseLastSession = (
             load_kg: number | null;
             load_breakdown: string | null;
             reps: number | null;
+            reserve_reps: string | null;
             observations: string | null;
           }>
         >();
@@ -94,7 +96,7 @@ export const useExerciseLastSession = (
           const chunk = sessionIds.slice(index, index + CHUNK_SIZE);
           const { data: exercises, error: exError } = await supabase
             .from("exercises")
-            .select("session_id, exercise_library_id, exercise_name, load_kg, load_breakdown, reps, observations")
+            .select("session_id, exercise_library_id, exercise_name, load_kg, load_breakdown, reps, reserve_reps, observations")
             .in("session_id", chunk);
           if (exError) throw exError;
           if (!exercises || exercises.length === 0) continue;
@@ -133,6 +135,7 @@ export const useExerciseLastSession = (
               load_kg: exercise.load_kg ?? null,
               load_breakdown: exercise.load_breakdown ?? null,
               reps: exercise.reps ?? null,
+              reserve_reps: exercise.reserve_reps ?? null,
               date: session.date,
               observations: exercise.observations ?? null,
             });

@@ -712,6 +712,7 @@ export type Database = {
           load_description: string | null
           load_kg: number | null
           observations: string | null
+          reserve_reps: string | null
           reps: number | null
           session_id: string
           sets: number | null
@@ -726,6 +727,7 @@ export type Database = {
           load_description?: string | null
           load_kg?: number | null
           observations?: string | null
+          reserve_reps?: string | null
           reps?: number | null
           session_id: string
           sets?: number | null
@@ -740,6 +742,7 @@ export type Database = {
           load_description?: string | null
           load_kg?: number | null
           observations?: string | null
+          reserve_reps?: string | null
           reps?: number | null
           session_id?: string
           sets?: number | null

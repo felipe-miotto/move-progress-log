@@ -71,13 +71,7 @@ describe("process-voice-session — regras de carga alinhadas com o cliente", ()
 
   it("converte lb usando POUND_TO_KG_CONVERSION SEM arredondamento intermediário", () => {
     expect(code).toMatch(/const POUND_TO_KG_CONVERSION\s*=\s*0\.4536/);
-    // Cada multiplicação de lb deve ser `value * POUND_TO_KG_CONVERSION`
-    // (eventualmente `* 2` em "cada lado"), nunca `roundToDecimal(value *
-    // POUND_TO_KG_CONVERSION)` por item.
-    const lbMultiplications = [
-      ...code.matchAll(/POUND_TO_KG_CONVERSION/g),
-    ];
-    expect(lbMultiplications.length).toBeGreaterThanOrEqual(3);
+    expect(code).toMatch(/unit\.startsWith\('lb'\)\s*\?\s*value\s*\*\s*POUND_TO_KG_CONVERSION\s*:\s*value/);
     // Bloqueia padrões de arredondamento intermediário em lb.
     expect(code).not.toMatch(
       /roundToDecimal\(\s*[\w.]+\s*\*\s*POUND_TO_KG_CONVERSION\s*\)\s*\*\s*2/,
@@ -85,6 +79,15 @@ describe("process-voice-session — regras de carga alinhadas com o cliente", ()
     expect(code).not.toMatch(
       /Math\.round\(\s*[\w.]+\s*\*\s*POUND_TO_KG_CONVERSION/,
     );
+  });
+
+  it('suporta multiplicador explícito "2x70lb" na calculadora da edge', () => {
+    expect(edgeSource).toContain('const WEIGHT_TERM_PATTERN');
+    expect(edgeSource).toContain('[x×]');
+    expect(edgeSource).toContain('lbs?');
+    expect(code).toMatch(/function\s+addWeightTerms|const\s+addWeightTerms/);
+    expect(code).toMatch(/quantity\s*=\s*match\[1\]\s*\?\s*parseNumeric\(match\[1\]\)\s*:\s*1/);
+    expect(code).toMatch(/subtotal\s*\+=\s*quantity\s*\*\s*kg\s*\*\s*multiplier/);
   });
 
   it("roundToDecimal só é chamado uma vez (no return final do calculator)", () => {

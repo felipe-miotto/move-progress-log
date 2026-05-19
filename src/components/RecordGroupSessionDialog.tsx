@@ -59,6 +59,7 @@ interface PrescriptionExerciseDetail {
   exercise_name?: string;
   sets: string;
   reps: string;
+  rir?: string | null;
   interval_seconds: number | null;
   pse: string | null;
   training_method: string | null;
@@ -83,6 +84,7 @@ interface ManualSavePayload {
         exercise_name: string;
       sets: number;
       reps: number;
+      reserve_reps?: string | null;
       load_kg: number | null;
       load_breakdown: string;
       observations: string;
@@ -102,6 +104,7 @@ interface ExerciseRow {
   exercise_name: string;
   sets: number | null;
   reps: number | null;
+  reserve_reps: string | null;
   load_kg: number | null;
   load_breakdown: string | null;
   observations: string | null;
@@ -198,6 +201,7 @@ function ManualEntryWithToggle({
   const exercises = prescriptionDetails?.exercises?.filter((ex) => ex.should_track !== false).map((ex) => ({
     id: ex.id, exercise_name: ex.exercise_name, sets: ex.sets, reps: ex.reps,
     exercise_library_id: ex.exercise_library_id ?? null,
+    rir: ex.rir ?? null,
     interval_seconds: ex.interval_seconds, pse: ex.pse, training_method: ex.training_method, observations: ex.observations,
     category: ex.category || null,
   })) || [];
@@ -355,7 +359,7 @@ export function RecordGroupSessionDialog({
           typedSessions.map(async (session) => {
             const { data: exercises, error: exercisesError } = await supabase
               .from('exercises')
-              .select('id, session_id, exercise_library_id, exercise_name, sets, reps, load_kg, load_breakdown, observations, is_best_set')
+              .select('id, session_id, exercise_library_id, exercise_name, sets, reps, reserve_reps, load_kg, load_breakdown, observations, is_best_set')
               .eq('session_id', session.id);
             if (exercisesError) {
               throw exercisesError;
@@ -367,7 +371,7 @@ export function RecordGroupSessionDialog({
           student_name: data.student_name, recording_numbers: [0], clinical_observations: [],
           exercises: data.exercises.map((ex) => ({
             prescribed_exercise_name: null, executed_exercise_name: ex.exercise_name,
-            sets: ex.sets, reps: ex.reps, load_kg: ex.load_kg, load_breakdown: ex.load_breakdown || '',
+            sets: ex.sets, reps: ex.reps, reserve_reps: ex.reserve_reps || null, load_kg: ex.load_kg, load_breakdown: ex.load_breakdown || '',
             observations: ex.observations, is_best_set: ex.is_best_set || false,
           })),
         }));
@@ -796,14 +800,14 @@ export function RecordGroupSessionDialog({
         const student = selectedStudents.find(s => s.id === se.studentId);
         return {
           student_id: se.studentId, student_name: student?.name || '',
-          exercises: se.exercises.map(ex => ({ exercise_library_id: ex.exercise_library_id ?? null, executed_exercise_name: ex.exercise_name, sets: ex.sets, reps: ex.reps, load_kg: ex.load_kg, load_breakdown: ex.load_breakdown, observations: ex.observations, is_best_set: false }))
+          exercises: se.exercises.map(ex => ({ exercise_library_id: ex.exercise_library_id ?? null, executed_exercise_name: ex.exercise_name, sets: ex.sets, reps: ex.reps, reserve_reps: ex.reserve_reps || null, load_kg: ex.load_kg, load_breakdown: ex.load_breakdown, observations: ex.observations, is_best_set: false }))
         };
       });
 
       for (const session of sessionsToCreate) {
         const { data: workoutSession, error: sessionError } = await supabase.from("workout_sessions").insert({ student_id: session.student_id, prescription_id: effectivePrescriptionId, date, time, session_type: 'group', trainer_name: trainer, is_finalized: true, can_reopen: true }).select("id").single();
         if (sessionError) throw sessionError;
-        const exercisesToInsert = session.exercises.map((ex) => ({ session_id: workoutSession.id, exercise_library_id: ex.exercise_library_id ?? null, exercise_name: ex.executed_exercise_name, sets: ex.sets, reps: ex.reps, load_kg: ex.load_kg, load_breakdown: ex.load_breakdown, observations: ex.observations || null }));
+        const exercisesToInsert = session.exercises.map((ex) => ({ session_id: workoutSession.id, exercise_library_id: ex.exercise_library_id ?? null, exercise_name: ex.executed_exercise_name, sets: ex.sets, reps: ex.reps, reserve_reps: ex.reserve_reps || null, load_kg: ex.load_kg, load_breakdown: ex.load_breakdown, observations: ex.observations || null }));
         const { error: exercisesError } = await supabase.from("exercises").insert(exercisesToInsert);
         if (exercisesError) throw exercisesError;
       }
@@ -918,7 +922,7 @@ export function RecordGroupSessionDialog({
         prescribed_exercise_name: prescribed.exercise_name || prescribed.exercises_library?.name,
         exercise_library_id: prescribed.exercise_library_id ?? null,
         executed_exercise_name: prescribed.exercise_name || prescribed.exercises_library?.name || '',
-        sets: parseInt(prescribed.sets) || null, reps: null, load_kg: null, load_breakdown: '',
+        sets: parseInt(prescribed.sets) || null, reps: null, reserve_reps: prescribed.rir || null, load_kg: null, load_breakdown: '',
         observations: '⚠️ Exercício prescrito mas não mencionado - preencher manualmente', is_best_set: false,
       }));
       return { ...student, exercises: [...student.exercises, ...newExercises] };
@@ -1064,11 +1068,22 @@ export function RecordGroupSessionDialog({
                   date={date} time={time}
                   onComplete={(segments) => {
                     // Map raw audio data to typed SessionExercise/GroupObservation
-                    const mapRawExercise = (raw: { name: string; reps?: number; load_kg?: number; observations?: string }): SessionExercise => ({
-                      executed_exercise_name: raw.name,
+                    const mapRawExercise = (raw: {
+                      name?: string;
+                      executed_exercise_name?: string;
+                      exercise_library_id?: string | null;
+                      reps?: number | null;
+                      reserve_reps?: string | null;
+                      load_kg?: number | null;
+                      load_breakdown?: string | null;
+                      observations?: string | null;
+                    }): SessionExercise => ({
+                      executed_exercise_name: raw.executed_exercise_name ?? raw.name ?? '',
+                      exercise_library_id: raw.exercise_library_id ?? null,
                       reps: raw.reps ?? null,
+                      reserve_reps: raw.reserve_reps ?? null,
                       load_kg: raw.load_kg ?? null,
-                      load_breakdown: '',
+                      load_breakdown: raw.load_breakdown ?? '',
                       observations: raw.observations ?? null,
                       is_best_set: false,
                     });

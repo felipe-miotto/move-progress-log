@@ -5,6 +5,29 @@
 
 import { POUND_TO_KG_CONVERSION, roundToDecimal } from "@/constants/units";
 
+const WEIGHT_TERM_PATTERN = /(?:(\d+(?:[.,]\d+)?)\s*[x×]\s*)?(\d+(?:[.,]\d+)?)\s*(kg|lbs?)/gi;
+
+const parseNumeric = (value: string) => parseFloat(value.replace(',', '.'));
+
+const addWeightTerms = (
+  content: string,
+  multiplier = 1,
+  options: { ignoreBarra?: boolean } = {},
+) => {
+  let subtotal = 0;
+  for (const match of content.matchAll(WEIGHT_TERM_PATTERN)) {
+    const beforeMatch = content.substring(Math.max(0, match.index! - 12), match.index!);
+    if (options.ignoreBarra && /barra\s*(?:de\s*)?$/i.test(beforeMatch)) continue;
+
+    const quantity = match[1] ? parseNumeric(match[1]) : 1;
+    const value = parseNumeric(match[2]);
+    const unit = match[3].toLowerCase();
+    const kg = unit.startsWith('lb') ? value * POUND_TO_KG_CONVERSION : value;
+    subtotal += quantity * kg * multiplier;
+  }
+  return subtotal;
+};
+
 /**
  * Calcula a carga total em kg baseada na descrição textual
  * 
@@ -60,23 +83,10 @@ export const calculateLoadFromBreakdown = (
         // Formato com parênteses: (2kg + 5lb) de cada lado
         const content = parenMatch[1];
         
-        // KG dentro dos parênteses (multiplicar por 2)
-        const kgMatches = Array.from(content.matchAll(/(\d+(?:[.,]\d+)?)\s*kg/gi));
-        for (const m of kgMatches) {
-          const value = parseFloat(m[1].replace(',', '.'));
-          total += value * 2;
-        }
-        
-        // LB dentro dos parênteses (multiplicar por 2)
-        // Converte SEM arredondamento intermediário — `roundToDecimal`
-        // só roda no final (linha do return). Arredondar lb por item
-        // antes de somar causa off-by-0.1 (ex.: 70 lb por lado vira 78.6
-        // em vez de 78.5 quando combinado com barra).
-        const lbMatches = Array.from(content.matchAll(/(\d+(?:[.,]\d+)?)\s*lb/gi));
-        for (const m of lbMatches) {
-          const value = parseFloat(m[1].replace(',', '.'));
-          total += value * POUND_TO_KG_CONVERSION * 2;
-        }
+        // Pesos dentro dos parênteses (multiplicar por 2). Suporta
+        // "70 lb", "2x70lb" e "2 x 70 lb". Converte lb sem
+        // arredondamento intermediário — `roundToDecimal` só roda no final.
+        total += addWeightTerms(content, 2);
         
         // Verificar se há barra FORA dos parênteses
         const afterParen = normalizedBreakdown.split(/\)\s*(?:de\s*)?cada\s*lado/i)[1] || '';
@@ -101,20 +111,9 @@ export const calculateLoadFromBreakdown = (
         // Remover a parte da barra do conteúdo para não contar duas vezes
         const contentWithoutBarra = beforeEachSide.replace(/barra\s*(?:de\s*)?(\d+(?:[.,]\d+)?)\s*kg/gi, '');
         
-        // Processar KG antes de "de cada lado" (multiplicar por 2)
-        const kgMatches = Array.from(contentWithoutBarra.matchAll(/(\d+(?:[.,]\d+)?)\s*kg/gi));
-        for (const m of kgMatches) {
-          const value = parseFloat(m[1].replace(',', '.'));
-          total += value * 2;
-        }
-
-        // Processar LB antes de "de cada lado" (multiplicar por 2).
-        // Sem arredondamento intermediário (ver comentário acima).
-        const lbMatches = Array.from(contentWithoutBarra.matchAll(/(\d+(?:[.,]\d+)?)\s*lb/gi));
-        for (const m of lbMatches) {
-          const value = parseFloat(m[1].replace(',', '.'));
-          total += value * POUND_TO_KG_CONVERSION * 2;
-        }
+        // Processar pesos antes de "de cada lado" (multiplicar por 2).
+        // Suporta multiplicadores explícitos como "2x70lb".
+        total += addWeightTerms(contentWithoutBarra, 2);
       }
     } else {
       // 5. KETTLEBELLS/HALTERES DUPLOS (multiplicar por 2)
@@ -135,23 +134,9 @@ export const calculateLoadFromBreakdown = (
 
       // 7. PESOS SIMPLES (se não processou kettlebells duplos)
       if (!multiKbMatch) {
-        // KG simples
-        const kgMatches = Array.from(normalizedBreakdown.matchAll(/(\d+(?:[.,]\d+)?)\s*kg/gi));
-        for (const m of kgMatches) {
-          // Ignorar se faz parte de "barra X kg"
-          const beforeMatch = normalizedBreakdown.substring(Math.max(0, m.index! - 10), m.index!);
-          if (!/barra\s*(?:de\s*)?$/i.test(beforeMatch)) {
-            const value = parseFloat(m[1].replace(',', '.'));
-            total += value;
-          }
-        }
-
-        // LB simples — sem arredondamento intermediário.
-        const lbMatches = Array.from(normalizedBreakdown.matchAll(/(\d+(?:[.,]\d+)?)\s*lb/gi));
-        for (const m of lbMatches) {
-          const value = parseFloat(m[1].replace(',', '.'));
-          total += value * POUND_TO_KG_CONVERSION;
-        }
+        // Pesos simples — sem arredondamento intermediário.
+        // Suporta "2x70lb" sem exigir "cada lado".
+        total += addWeightTerms(normalizedBreakdown, 1, { ignoreBarra: true });
       }
     }
 

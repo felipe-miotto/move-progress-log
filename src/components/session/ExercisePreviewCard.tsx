@@ -47,7 +47,7 @@ export function ExercisePreviewCard({ exercise: ex }: ExercisePreviewCardProps) 
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-2 text-sm">
+      <div className="grid grid-cols-4 gap-2 text-sm">
         <div>
           <span className="text-muted-foreground">Séries: </span>
           <span className={`font-semibold ${needsManualInput ? 'text-amber-700 dark:text-amber-400' : ''}`}>
@@ -62,6 +62,13 @@ export function ExercisePreviewCard({ exercise: ex }: ExercisePreviewCardProps) 
           <span className="text-muted-foreground">Reps: </span>
           <span className={`font-semibold ${needsManualInput ? 'text-amber-700 dark:text-amber-400' : ''}`}>
             {ex.reps || '-'}
+          </span>
+        </div>
+        <div>
+          {/* Reserva (texto livre: 0, 2-3, RM, 4+ etc.). NÃO substitui Reps. */}
+          <span className="text-muted-foreground">Reserva: </span>
+          <span className="font-semibold">
+            {ex.reserve_reps && ex.reserve_reps.trim().length > 0 ? ex.reserve_reps : '-'}
           </span>
         </div>
         <div>

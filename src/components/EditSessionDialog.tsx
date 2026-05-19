@@ -43,6 +43,9 @@ interface Exercise {
   exercise_name: string;
   sets: number;
   reps: number;
+  // Reserva (repetições em reserva) — texto livre por design (ex.: 0, 2-3, RM, 4+).
+  // Persistido em `public.exercises.reserve_reps`. Não substitui `reps`.
+  reserve_reps: string | null;
   load_kg: number | null;
   load_breakdown: string;
   observations: string | null;
@@ -111,7 +114,7 @@ export function EditSessionDialog({
 
       const { data: exercisesData, error: exercisesError } = await supabase
         .from('exercises')
-        .select('id, exercise_library_id, exercise_name, sets, reps, load_kg, load_breakdown, observations, is_best_set')
+        .select('id, exercise_library_id, exercise_name, sets, reps, reserve_reps, load_kg, load_breakdown, observations, is_best_set')
         .eq('session_id', sessionId)
         .order('created_at', { ascending: true });
 
@@ -207,6 +210,9 @@ export function EditSessionDialog({
           exercise_name: exercise.exercise_name,
           sets: exercise.sets,
           reps: exercise.reps,
+          // Preserva `reserve_reps` no update — sem isso, reabrir uma
+          // sessão e salvar zerava silenciosamente a Reserva.
+          reserve_reps: exercise.reserve_reps ?? null,
           load_kg: exercise.load_kg,
           load_breakdown: exercise.load_breakdown,
           observations: exercise.observations,

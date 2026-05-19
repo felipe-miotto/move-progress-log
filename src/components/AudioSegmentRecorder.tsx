@@ -15,7 +15,7 @@ interface AudioSegment {
     sessions: Array<{
       student_name: string;
       clinical_observations: Array<{ observation: string }>;
-      exercises: Array<{ name: string; exercise_library_id?: string | null; reps?: number; load_kg?: number; observations?: string }>;
+      exercises: Array<{ name?: string; executed_exercise_name?: string; exercise_library_id?: string | null; reps?: number | null; reserve_reps?: string | null; load_kg?: number | null; load_breakdown?: string | null; observations?: string | null }>;
     }>;
   };
 }

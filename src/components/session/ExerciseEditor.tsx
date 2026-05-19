@@ -43,6 +43,8 @@ export function ExerciseEditor({
         executed_exercise_name: '',
         sets: null,
         reps: null,
+        // Reserva inicia vazia — coach preenche manualmente; nunca inferido.
+        reserve_reps: null,
         load_kg: null,
         load_breakdown: '',
         observations: null,
