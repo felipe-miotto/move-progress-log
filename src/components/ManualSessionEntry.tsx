@@ -491,7 +491,7 @@ export function ManualSessionEntry({
                         value={exercise.sets}
                         onChange={(e) => updateExercise(currentStudent.id, idx, 'sets', parseInt(e.target.value) || 0)}
                         min="1"
-                        className={exercise.sets <= 0 ? "border-destructive" : ""}
+                        className={`number-input-clean text-center ${exercise.sets <= 0 ? "border-destructive" : ""}`}
                       />
                     </div>
 
@@ -502,7 +502,7 @@ export function ManualSessionEntry({
                         value={exercise.reps}
                         onChange={(e) => updateExercise(currentStudent.id, idx, 'reps', parseInt(e.target.value) || 0)}
                         min="1"
-                        className={exercise.reps <= 0 ? "border-destructive" : ""}
+                        className={`number-input-clean text-center ${exercise.reps <= 0 ? "border-destructive" : ""}`}
                       />
                     </div>
 
@@ -548,7 +548,9 @@ export function ManualSessionEntry({
                           updateExercise(currentStudent.id, idx, 'load_kg', value);
                         }}
                         disabled={exercise.load_breakdown.toLowerCase().includes('peso corporal')}
-                        className={requiresReview ? 'border-amber-500 focus-visible:ring-amber-500' : ''}
+                        className={`number-input-clean text-center font-mono ${
+                          requiresReview ? 'border-amber-500 focus-visible:ring-amber-500' : ''
+                        }`}
                       />
                       {requiresReview && (
                         <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">

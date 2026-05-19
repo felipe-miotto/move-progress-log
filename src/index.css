@@ -10,6 +10,17 @@
   .scrollbar-none::-webkit-scrollbar {
     display: none;
   }
+
+  .number-input-clean {
+    appearance: textfield;
+    -moz-appearance: textfield;
+  }
+
+  .number-input-clean::-webkit-inner-spin-button,
+  .number-input-clean::-webkit-outer-spin-button {
+    margin: 0;
+    -webkit-appearance: none;
+  }
 }
 
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 

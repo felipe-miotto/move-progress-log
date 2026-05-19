@@ -120,8 +120,8 @@ export function ExerciseEditor({
                   placeholder="Obrigatório"
                   className={
                     ex.reps === 0 || ex.reps === null
-                      ? 'border-destructive focus:border-destructive'
-                      : ''
+                      ? 'number-input-clean border-destructive text-center focus:border-destructive'
+                      : 'number-input-clean text-center'
                   }
                 />
               </div>
@@ -142,8 +142,8 @@ export function ExerciseEditor({
                   placeholder={requireSets ? 'Obrigatório' : 'Auto'}
                   className={
                     requireSets && (ex.sets === null || ex.sets === 0)
-                      ? 'border-destructive focus:border-destructive'
-                      : ''
+                      ? 'number-input-clean border-destructive text-center focus:border-destructive'
+                      : 'number-input-clean text-center'
                   }
                 />
               </div>
@@ -159,6 +159,7 @@ export function ExerciseEditor({
                       load_kg: e.target.value ? parseFloat(e.target.value) : null,
                     })
                   }
+                  className="number-input-clean text-center font-mono"
                 />
               </div>
             </div>

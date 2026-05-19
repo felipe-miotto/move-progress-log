@@ -517,7 +517,9 @@ export function ExerciseFirstSessionEntry({
               }
               min={1}
               inputMode="numeric"
-              className={`min-h-11 text-base ${entry.reps <= 0 ? "border-destructive/50" : ""}`}
+              className={`number-input-clean min-h-11 text-center text-base ${
+                entry.reps <= 0 ? "border-destructive/50" : ""
+              }`}
             />
           </div>
 
@@ -544,7 +546,7 @@ export function ExerciseFirstSessionEntry({
               value={entry.load_kg ?? ""}
               onChange={(e) => handleManualLoadKgChange(student.id, exerciseIndex, e.target.value)}
               placeholder="—"
-              className="min-h-11 font-mono text-base"
+              className="number-input-clean min-h-11 text-center font-mono text-base"
             />
             {entry.load_kg_manual_override && (
               <p className="mt-1 text-xs text-muted-foreground">editado manualmente</p>
@@ -646,8 +648,8 @@ export function ExerciseFirstSessionEntry({
                   <TableHead className="w-[180px]">Última carga</TableHead>
                   <TableHead className="w-[140px]">Exercício</TableHead>
                   <TableHead className="w-[140px]">Carga parcial</TableHead>
-                  <TableHead className="w-[96px]">Total</TableHead>
-                  <TableHead className="w-[80px]">Reps</TableHead>
+                  <TableHead className="w-[104px]">Total</TableHead>
+                  <TableHead className="w-[88px]">Reps</TableHead>
                   <TableHead className="w-[96px]">Reserva</TableHead>
                   <TableHead>Obs</TableHead>
                 </TableRow>
@@ -789,7 +791,7 @@ export function ExerciseFirstSessionEntry({
                           onChange={(e) => handleManualLoadKgChange(student.id, exerciseIndex, e.target.value)}
                           onKeyDown={(e) => handleKeyDown(e, studentIdx, 1)}
                           placeholder="—"
-                          className="h-8 font-mono text-xs"
+                          className="number-input-clean h-8 min-w-[82px] px-2 text-center font-mono text-sm"
                         />
                         {entry.load_kg_manual_override && (
                           <p className="mt-0.5 text-[9px] text-muted-foreground">manual</p>
@@ -815,7 +817,9 @@ export function ExerciseFirstSessionEntry({
                           }
                           onKeyDown={(e) => handleKeyDown(e, studentIdx, 2)}
                           min={1}
-                          className={`h-8 text-xs ${entry.reps <= 0 ? "border-destructive/50" : ""}`}
+                          className={`number-input-clean h-8 min-w-[64px] px-2 text-center text-sm ${
+                            entry.reps <= 0 ? "border-destructive/50" : ""
+                          }`}
                         />
                       </TableCell>
 
