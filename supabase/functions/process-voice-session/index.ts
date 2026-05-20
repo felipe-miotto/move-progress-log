@@ -1,7 +1,36 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai@0.21.0";
+
+// ═══════════════════════════════════════════════════════════════
+// IA: OpenAI (migrado de Gemini em 2026-05 — GEMINI_API_KEY estava
+// sem cota: 429 FreeTier limit=0). Centraliza IA na OpenAI, mesma
+// usada no fluxo DEXA (`extract-dexa-pdf`).
+//   - Transcrição: POST /v1/audio/transcriptions (whisper-1)
+//   - Extração:    POST /v1/chat/completions (gpt-4.1, JSON mode)
+// ═══════════════════════════════════════════════════════════════
+
+const OPENAI_API_BASE = "https://api.openai.com/v1";
+/** Modelo de transcrição de áudio (Whisper — aceita webm, estável). */
+const OPENAI_TRANSCRIPTION_MODEL = "whisper-1";
+/** Modelo de extração estruturada (mesmo do fluxo DEXA). */
+const OPENAI_EXTRACTION_MODEL = "gpt-4.1";
+
+/**
+ * Detecta erro de quota/billing/rate-limit numa resposta da OpenAI e
+ * devolve mensagem humana SEGURA (sem body bruto, sem prompt).
+ * Retorna `null` se não for esse tipo de erro.
+ */
+function describeOpenAiQuotaError(status: number, bodyText: string): string | null {
+  const lower = bodyText.toLowerCase();
+  if (status === 429 || lower.includes("insufficient_quota") || lower.includes("billing")) {
+    return "O serviço de IA está sem cota disponível no momento. Verifique o plano/billing da OpenAI e tente novamente.";
+  }
+  if (status === 401 || status === 403) {
+    return "Falha de autenticação com o serviço de IA. Verifique a OPENAI_API_KEY.";
+  }
+  return null;
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -126,8 +155,18 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
-    const GOOGLE_AI_API_KEY = Deno.env.get('GOOGLE_AI_API_KEY')!;
-    const genAI = new GoogleGenerativeAI(GOOGLE_AI_API_KEY);
+
+    // IA via OpenAI. Falha cedo + clara se a chave não estiver configurada.
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Serviço de IA indisponível: OPENAI_API_KEY não configurada.',
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
 
     // Processing voice session
     
@@ -232,53 +271,64 @@ serve(async (req) => {
 
     
     
-    // 1️⃣ Transcrever áudio usando Gemini
+    // 1️⃣ Transcrever áudio via OpenAI (Whisper).
     const binaryAudio = processBase64Chunks(audio);
-    
-    // Converter para base64 sem prefixo data URL
-    let audioBase64 = '';
-    const bytes = new Uint8Array(binaryAudio);
-    const len = bytes.length;
-    for (let i = 0; i < len; i++) {
-      audioBase64 += String.fromCharCode(bytes[i]);
-    }
-    audioBase64 = btoa(audioBase64);
 
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.0-flash" 
-    });
-
-    const terminologyCorrectionsPrompt = Object.entries(TERMINOLOGY_CORRECTIONS)
-      .map(([k, v]) => `- "${k}" → "${v}"`)
-      .join('\n');
+    /**
+     * Dica de vocabulário para o Whisper (campo `prompt`, máx ~224
+     * tokens). Lista termos técnicos de treino com a grafia CORRETA
+     * para reduzir transcrição errada. Correções determinísticas de
+     * termos mal-transcritos são aplicadas DEPOIS via
+     * TERMINOLOGY_CORRECTIONS (string replace no resultado).
+     */
+    const whisperVocabularyHint =
+      'Termos de treino: halteres, kettlebell, sandbag, landmine, ' +
+      'supino, agachamento, barra, anilha, libras, quilos.';
 
     // V-06: AbortController with 30s timeout for transcription
     const transcriptionController = new AbortController();
     const transcriptionTimeout = setTimeout(() => transcriptionController.abort(), 30_000);
 
-    let transcriptionResult;
+    let transcription: string;
     try {
-      transcriptionResult = await model.generateContent([
+      const audioBlob = new Blob([binaryAudio], { type: 'audio/webm' });
+      const transcriptionForm = new FormData();
+      transcriptionForm.append('file', audioBlob, 'audio.webm');
+      transcriptionForm.append('model', OPENAI_TRANSCRIPTION_MODEL);
+      transcriptionForm.append('language', 'pt');
+      transcriptionForm.append('prompt', whisperVocabularyHint);
+      transcriptionForm.append('response_format', 'json');
+
+      const transcriptionResponse = await fetch(
+        `${OPENAI_API_BASE}/audio/transcriptions`,
         {
-          inlineData: {
-            mimeType: "audio/webm",
-            data: audioBase64
-          }
+          method: 'POST',
+          headers: { Authorization: `Bearer ${OPENAI_API_KEY}` },
+          body: transcriptionForm,
+          signal: transcriptionController.signal,
         },
-        `Transcreva este áudio em português brasileiro sobre treino físico.
-Tolere ruído, interrupções, correções e comentários paralelos.
+      );
 
-CORREÇÕES OBRIGATÓRIAS:
-${terminologyCorrectionsPrompt}
-- "supino" (manter assim)
-- "agachamento" (manter assim)
+      if (!transcriptionResponse.ok) {
+        // Lê o body só para classificar quota/billing — NUNCA expõe
+        // o corpo bruto ao client (pode conter detalhes internos).
+        const errText = await transcriptionResponse.text().catch(() => '');
+        const quotaMsg = describeOpenAiQuotaError(transcriptionResponse.status, errText);
+        clearTimeout(transcriptionTimeout);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: quotaMsg ?? 'Falha ao transcrever o áudio. Tente novamente.',
+          }),
+          {
+            status: transcriptionResponse.status === 429 ? 429 : 502,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
+        );
+      }
 
-CORREÇÕES NO MEIO DO ÁUDIO:
-- Se houver correção ("não é 17,5, é 20", "anota 20 em vez de 15"), transcreva AMBAS as versões fielmente.
-- O sistema de extração usará apenas a carga final corrigida.
-
-Retorne APENAS a transcrição corrigida, sem adicionar comentários.`
-      ]);
+      const transcriptionJson = (await transcriptionResponse.json()) as { text?: string };
+      transcription = typeof transcriptionJson.text === 'string' ? transcriptionJson.text : '';
     } catch (err) {
       clearTimeout(transcriptionTimeout);
       if ((err as Error).name === 'AbortError') {
@@ -291,8 +341,16 @@ Retorne APENAS a transcrição corrigida, sem adicionar comentários.`
     }
     clearTimeout(transcriptionTimeout);
 
-    const transcription = transcriptionResult.response.text();
-    
+    // Correções terminológicas determinísticas — aplica os pares de
+    // TERMINOLOGY_CORRECTIONS como substituição case-insensitive no
+    // texto transcrito. Mais robusto que depender só do modelo.
+    for (const [wrong, right] of Object.entries(TERMINOLOGY_CORRECTIONS)) {
+      transcription = transcription.replace(
+        new RegExp(wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
+        right,
+      );
+    }
+
 
     // 2️⃣ Buscar detalhes completos da prescrição (se fornecida)
     let prescriptionDetails = null;
@@ -323,7 +381,7 @@ Retorne APENAS a transcrição corrigida, sem adicionar comentários.`
           .join('\n')
       : '  (Sessão livre - sem prescrição definida)';
 
-    // 3️⃣ Processar com Gemini para extrair dados estruturados
+    // 3️⃣ Processar com OpenAI para extrair dados estruturados
     
     
     const systemPrompt = `Você é o sistema oficial de consolidação de cargas da Fabrik.
@@ -677,19 +735,61 @@ FORMATO DE SAÍDA:
   ]
 }`;
 
-    const extractionModel = genAI.getGenerativeModel({ 
-      model: "gemini-2.0-flash",
-      generationConfig: {
-        responseMimeType: "application/json"
-      }
+    // 3️⃣ Extração estruturada via OpenAI Chat Completions em JSON mode.
+    // `response_format: json_object` garante JSON válido — o systemPrompt
+    // já descreve o contrato detalhado e menciona "JSON" (requisito do
+    // modo). `temperature: 0` para extração determinística.
+    const extractionResponse = await fetch(`${OPENAI_API_BASE}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: OPENAI_EXTRACTION_MODEL,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          {
+            role: 'user',
+            content: `Transcrição da sessão:\n\n${transcription}`,
+          },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0,
+      }),
     });
 
-    const extractionResult = await extractionModel.generateContent([
-      systemPrompt,
-      `\n\nTranscrição da sessão:\n\n${transcription}`
-    ]);
+    if (!extractionResponse.ok) {
+      const errText = await extractionResponse.text().catch(() => '');
+      const quotaMsg = describeOpenAiQuotaError(extractionResponse.status, errText);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: quotaMsg ?? 'Falha ao extrair os dados da sessão. Tente novamente.',
+        }),
+        {
+          status: extractionResponse.status === 429 ? 429 : 502,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      );
+    }
 
-    const extractedData = JSON.parse(extractionResult.response.text());
+    const extractionJson = (await extractionResponse.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const extractionContent = extractionJson.choices?.[0]?.message?.content ?? '';
+    let extractedData: { sessions?: Array<Record<string, unknown>> };
+    try {
+      extractedData = JSON.parse(extractionContent) as { sessions?: Array<Record<string, unknown>> };
+    } catch {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'A IA retornou um formato inesperado. Tente gravar novamente.',
+        }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
     
     // Preservar exercícios mencionados sem reps e marcá-los para input manual
     if (extractedData.sessions) {
@@ -1025,7 +1125,7 @@ FORMATO DE SAÍDA:
       if (calculatedLoadKg !== null) {
         const diff = Math.abs((exercise.load_kg as number) - calculatedLoadKg);
         if (diff > 0.1) {
-          // Usar valor calculado (mais confiável que o Gemini)
+          // Usar valor calculado (mais confiável que o output do LLM)
           exercise.load_kg = calculatedLoadKg;
         } else {
           exercise.load_kg = Math.round((exercise.load_kg as number) * 10) / 10;
