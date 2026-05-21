@@ -1148,6 +1148,7 @@ export type Database = {
           refresh_token: string
           student_id: string
           token_expires_at: string
+          updated_at: string
         }
         Insert: {
           access_token: string
@@ -1158,6 +1159,7 @@ export type Database = {
           refresh_token: string
           student_id: string
           token_expires_at: string
+          updated_at?: string
         }
         Update: {
           access_token?: string
@@ -1168,6 +1170,7 @@ export type Database = {
           refresh_token?: string
           student_id?: string
           token_expires_at?: string
+          updated_at?: string
         }
         Relationships: [
           {
