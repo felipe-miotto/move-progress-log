@@ -4,6 +4,15 @@ import { notify } from "@/lib/notify";
 import i18n from "@/i18n/pt-BR.json";
 import { buildErrorDescription } from "@/utils/errorParsing";
 
+/**
+ * Maximum folder nesting depth (0-based `depth_level`).
+ *
+ * Mirrors the `check_max_depth` constraint and the `update_folder_full_path()`
+ * limit in the database. A folder can hold subfolders only while its
+ * `depth_level` is strictly below this value.
+ */
+export const MAX_FOLDER_DEPTH = 5;
+
 export interface PrescriptionFolder {
   id: string;
   name: string;

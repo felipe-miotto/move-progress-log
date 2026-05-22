@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useCreateFolder, PrescriptionFolder } from "@/hooks/useFolders";
+import { MAX_FOLDER_DEPTH, useCreateFolder, PrescriptionFolder } from "@/hooks/useFolders";
 import { Loader2, FolderPlus } from "lucide-react";
 import { buildErrorDescription } from "@/utils/errorParsing";
 
@@ -28,14 +28,14 @@ interface CreateSubfolderDialogProps {
   defaultParentId?: string | null;
 }
 
-// Flatten folder tree for selection (only folders with depth < 3 can have children)
+// Flatten folder tree for selection (only folders below MAX_FOLDER_DEPTH can have children)
 const getEligibleParentFolders = (
   folders: PrescriptionFolder[],
   level = 0
 ): Array<{ id: string; name: string; level: number; fullPath: string }> => {
   return folders.reduce((acc, folder) => {
-    // Only folders at depth 0, 1, or 2 can have children (limit is 3 levels: 0,1,2,3)
-    if (folder.depth_level < 3) {
+    // Only folders with depth_level < MAX_FOLDER_DEPTH can have children.
+    if (folder.depth_level < MAX_FOLDER_DEPTH) {
       acc.push({
         id: folder.id,
         name: folder.name,
@@ -94,7 +94,7 @@ export function CreateSubfolderDialog({
     } catch (err: unknown) {
       const msg = buildErrorDescription(err) || String(err);
       if (msg.includes("Maximum folder depth")) {
-        setError("Limite de profundidade atingido (máximo 3 níveis)");
+        setError("Limite de profundidade atingido (máximo 5 níveis)");
       } else {
         setError(msg);
       }
@@ -142,7 +142,7 @@ export function CreateSubfolderDialog({
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Limite: 3 níveis de profundidade (pasta → subpasta → subpasta → subpasta)
+              Limite: 5 níveis de profundidade
             </p>
           </div>
 

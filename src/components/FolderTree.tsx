@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ChevronRight, ChevronDown, Folder, FolderOpen, FolderPlus, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PrescriptionFolder } from "@/hooks/useFolders";
+import { MAX_FOLDER_DEPTH, PrescriptionFolder } from "@/hooks/useFolders";
 import { WorkoutPrescription } from "@/hooks/usePrescriptions";
 import { DraggablePrescriptionCard } from "./DraggablePrescriptionCard";
 import { useDroppable, DndContext, closestCenter, DragEndEvent } from "@dnd-kit/core";
@@ -136,7 +136,7 @@ function FolderTreeNode({
     },
   });
 
-  const canHaveSubfolders = folder.depth_level < 3;
+  const canHaveSubfolders = folder.depth_level < MAX_FOLDER_DEPTH;
   const hasPrescriptions = prescriptions.length > 0;
   const hasChildren = folder.children && folder.children.length > 0;
 
@@ -191,7 +191,7 @@ function FolderTreeNode({
 
         {/* Actions */}
         <div className="flex items-center gap-1">
-          {/* Create subfolder button (only if depth < 3) */}
+          {/* Create subfolder button (only while depth_level allows nesting) */}
           {canHaveSubfolders && (
             <Button
               variant="ghost"
