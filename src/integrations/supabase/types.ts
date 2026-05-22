@@ -3392,14 +3392,6 @@ export type Database = {
         }[]
       }
       migrate_oura_tokens_to_vault: { Args: never; Returns: undefined }
-      move_prescription_folder: {
-        Args: {
-          p_folder_id: string
-          p_new_parent_id?: string
-          p_order_index?: number
-        }
-        Returns: undefined
-      }
       normalize_objective: { Args: { obj: string }; Returns: string }
       search_exercises_by_name: {
         Args: { p_limit?: number; p_movement_pattern?: string; p_query: string }
