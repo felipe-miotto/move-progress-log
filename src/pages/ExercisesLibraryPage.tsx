@@ -37,6 +37,8 @@ import {
   useDeleteExercise,
   ExerciseLibrary,
   MOVEMENT_PATTERNS,
+  getMovementPatternLabel,
+  isLegacyMovementPattern,
   LATERALITY_OPTIONS,
   MOVEMENT_PLANES,
   CONTRACTION_TYPES,
@@ -459,7 +461,10 @@ export default function ExercisesLibraryPage() {
                     <div className="flex flex-wrap gap-1">
                       {exercise.movement_pattern && (
                         <Badge variant="outline" className="text-xs">
-                          {MOVEMENT_PATTERNS[exercise.movement_pattern as keyof typeof MOVEMENT_PATTERNS] || exercise.movement_pattern}
+                          {getMovementPatternLabel(exercise.movement_pattern)}
+                          {isLegacyMovementPattern(exercise.movement_pattern) && (
+                            <span className="ml-1 text-[10px] opacity-60">(legado)</span>
+                          )}
                         </Badge>
                       )}
                       {exercise.risk_level && (

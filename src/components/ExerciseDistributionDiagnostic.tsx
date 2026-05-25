@@ -4,7 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BarChart3, AlertTriangle, CheckCircle2 } from "lucide-react";
-import { EXERCISE_CATEGORIES, MOVEMENT_PATTERNS } from "@/constants/backToBasics";
+import {
+  EXERCISE_CATEGORIES,
+  getMovementPatternLabel,
+} from "@/constants/backToBasics";
 
 interface DistributionRow {
   category: string | null;
@@ -85,8 +88,7 @@ const useExerciseDistribution = () => {
 const categoryLabel = (key: string) =>
   EXERCISE_CATEGORIES[key as keyof typeof EXERCISE_CATEGORIES] || key;
 
-const patternLabel = (key: string) =>
-  MOVEMENT_PATTERNS[key as keyof typeof MOVEMENT_PATTERNS] || key;
+const patternLabel = (key: string) => getMovementPatternLabel(key) ?? key;
 
 export const ExerciseDistributionDiagnostic = () => {
   const { data, isLoading } = useExerciseDistribution();
