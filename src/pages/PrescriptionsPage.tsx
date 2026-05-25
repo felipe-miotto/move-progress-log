@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { usePrescriptions, useDeletePrescription } from "@/hooks/usePrescriptions";
-import { useFolders, useMovePrescription, useReorderPrescriptions, useDeleteFolder, useMoveFolder, getDescendantFolderIds, PrescriptionFolder } from "@/hooks/useFolders";
+import { useFolders, useMovePrescription, useReorderPrescriptions, useDeleteFolder, useMoveFolder, getDescendantFolderIds, getFolderSubtreeHeight, MAX_FOLDER_DEPTH, PrescriptionFolder } from "@/hooks/useFolders";
 import { usePrescriptionSearch } from "@/hooks/usePrescriptionSearch";
 import { usePrescriptionsStagnantFilter } from "@/hooks/usePrescriptionsStagnantFilter";
 import { CreatePrescriptionDialog } from "@/components/CreatePrescriptionDialog";
@@ -32,6 +32,7 @@ import EmptyState from "@/components/EmptyState";
 import { NAV_LABELS } from "@/constants/navigation";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useSEOHead, SEO_PRESETS } from "@/hooks/useSEOHead";
+import { notify } from "@/lib/notify";
 import { getWebPageSchema, getBreadcrumbSchema } from "@/utils/structuredData";
 import { DndContext, DragEndEvent, DragStartEvent, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
@@ -291,18 +292,43 @@ export default function PrescriptionsPage() {
       if (!folderId || overData?.type !== 'folder') return;
 
       const newParentId = (overData.folderId as string | null) ?? null;
-      // No-op: dropped on itself.
-      if (newParentId === folderId) return;
 
-      // UX guard: skip an obviously-invalid drop into a descendant. The
-      // move_prescription_folder RPC re-validates server-side regardless.
+      // No-op: dropped on itself.
+      if (newParentId === folderId) {
+        notify.info("Movimento ignorado", {
+          description: "Não é possível mover uma pasta para dentro dela mesma.",
+        });
+        return;
+      }
+
       const draggedFolder = allFoldersFlat.find(f => f.id === folderId);
+
+      // Drop on a descendant -> would create a cycle. The RPC blocks this
+      // server-side too; we short-circuit here to give a friendly toast.
       if (
         newParentId &&
         draggedFolder &&
         getDescendantFolderIds(draggedFolder).includes(newParentId)
       ) {
+        notify.info("Movimento ignorado", {
+          description: "Não é possível mover uma pasta para dentro de uma subpasta dela mesma.",
+        });
         return;
+      }
+
+      // Drop that would push some leaf past MAX_FOLDER_DEPTH.
+      if (newParentId && draggedFolder) {
+        const targetParent = allFoldersFlat.find(f => f.id === newParentId);
+        if (targetParent) {
+          const newMaxDepth =
+            targetParent.depth_level + 1 + getFolderSubtreeHeight(draggedFolder);
+          if (newMaxDepth > MAX_FOLDER_DEPTH) {
+            notify.info("Movimento ignorado", {
+              description: `Movimentação ultrapassaria o limite de ${MAX_FOLDER_DEPTH} níveis de profundidade.`,
+            });
+            return;
+          }
+        }
       }
 
       await moveFolder.mutateAsync({ folderId, newParentId });
@@ -507,41 +533,46 @@ export default function PrescriptionsPage() {
             onDragCancel={() => setActiveDragType(null)}
           >
             <div className="space-y-lg">
-              {/* Hierarchical folder tree */}
+              {/* Hierarchical folder tree.
+                  overflow-x-auto here (NOT on the body) absorbs the
+                  per-level indentation when the tree gets deep (up to 5
+                  levels). */}
               {folders && folders.length > 0 && (
-                <FolderTree
-                  folders={folders}
-                  prescriptionsByFolder={groupedPrescriptions}
-                  expandedFolders={expandedFolders}
-                  onToggleFolder={handleToggleFolder}
-                  onCreateSubfolder={handleCreateSubfolder}
-                  onRenameFolder={handleRenameFolder}
-                  onDeleteFolder={handleDeleteFolderClick}
-                  onEditPrescription={handleEdit}
-                  onAssignPrescription={handleAssign}
-                  onAddSession={handleAddSession}
-                  onMoveToFolder={handleMoveToFolder}
-                  onRemoveFromFolder={handleRemoveFromFolder}
-                  onDeletePrescription={handleDeletePrescription}
-                />
+                <div className="overflow-x-auto">
+                  <FolderTree
+                    folders={folders}
+                    prescriptionsByFolder={groupedPrescriptions}
+                    expandedFolders={expandedFolders}
+                    onToggleFolder={handleToggleFolder}
+                    onCreateSubfolder={handleCreateSubfolder}
+                    onRenameFolder={handleRenameFolder}
+                    onDeleteFolder={handleDeleteFolderClick}
+                    onEditPrescription={handleEdit}
+                    onAssignPrescription={handleAssign}
+                    onAddSession={handleAddSession}
+                    onMoveToFolder={handleMoveToFolder}
+                    onRemoveFromFolder={handleRemoveFromFolder}
+                    onDeletePrescription={handleDeletePrescription}
+                  />
+                </div>
               )}
 
               {/* Prescriptions without folder — also the root drop target
-                  while a folder is being dragged. */}
-              {(noFolderPrescriptions.length > 0 || activeDragType === 'folder') && (
-                <FolderSection
-                  folder={null}
-                  prescriptions={noFolderPrescriptions}
-                  isExpanded={expandedFolders.has('no-folder')}
-                  onToggleExpand={() => handleToggleFolder('no-folder')}
-                  onEdit={handleEdit}
-                  onAssign={handleAssign}
-                  onAddSession={handleAddSession}
-                  onMoveToFolder={handleMoveToFolder}
-                  onRemoveFromFolder={handleRemoveFromFolder}
-                  onDeletePrescription={handleDeletePrescription}
-                />
-              )}
+                  for folders. Rendered unconditionally so users always see
+                  a clear root destination for both prescription and folder
+                  drags. */}
+              <FolderSection
+                folder={null}
+                prescriptions={noFolderPrescriptions}
+                isExpanded={expandedFolders.has('no-folder')}
+                onToggleExpand={() => handleToggleFolder('no-folder')}
+                onEdit={handleEdit}
+                onAssign={handleAssign}
+                onAddSession={handleAddSession}
+                onMoveToFolder={handleMoveToFolder}
+                onRemoveFromFolder={handleRemoveFromFolder}
+                onDeletePrescription={handleDeletePrescription}
+              />
             </div>
           </DndContext>
         ) : hasActiveSearch ? (

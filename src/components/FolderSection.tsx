@@ -136,7 +136,7 @@ export function FolderSection({
               {isNoFolder
                 ? isFolderDrag
                   ? "Solte aqui para mover a pasta para a raiz"
-                  : "Nenhuma prescrição sem pasta"
+                  : "Sem prescrições fora de pasta"
                 : "Arraste prescrições para esta pasta"}
             </p>
           ) : (

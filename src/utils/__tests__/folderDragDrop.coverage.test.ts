@@ -136,8 +136,11 @@ describe("PR2 — drag-and-drop de pastas", () => {
       expect(prescriptionsPageSrc).toContain("reorderPrescriptions.mutateAsync");
     });
 
-    it("renderiza o destino raiz durante o drag de pasta", () => {
-      expect(prescriptionsPageSrc).toMatch(/activeDragType\s*===\s*'folder'/);
+    it("renderiza o destino raiz para drops de pasta", () => {
+      // FolderSection folder={null} é o drop target da raiz tanto para
+      // prescrição quanto para folder drag. O UX hardening tornou-o sempre
+      // visível (sem gate condicional); este teste cobre o invariante geral.
+      expect(prescriptionsPageSrc).toMatch(/<FolderSection\s+folder=\{null\}/);
     });
   });
 

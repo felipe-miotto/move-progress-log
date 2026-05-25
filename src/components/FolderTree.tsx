@@ -67,7 +67,7 @@ export function FolderTree({
   if (folders.length === 0) return null;
 
   return (
-    <div className="space-y-2" style={{ paddingLeft: level > 0 ? '20px' : '0' }}>
+    <div className="space-y-2" style={{ paddingLeft: level > 0 ? '12px' : '0' }}>
       {folders.map((folder) => (
         <FolderTreeNode
           key={folder.id}
@@ -214,8 +214,8 @@ function FolderTreeNode({
         ref={setDropRef}
         className={cn(
           "rounded-lg border bg-card transition-smooth",
-          dropAccepted && "bg-accent border-primary",
-          dropRejected && "bg-destructive/10 border-destructive"
+          dropAccepted && "bg-accent border-primary ring-2 ring-primary/40",
+          dropRejected && "bg-destructive/10 border-destructive ring-2 ring-destructive/40 cursor-not-allowed"
         )}
       >
         {/* Inner element is the drag node (follows the pointer while dragging) */}
@@ -279,8 +279,9 @@ function FolderTreeNode({
 
           {/* Actions */}
           <div className="flex items-center gap-1">
-            {/* Create subfolder button (only while depth_level allows nesting) */}
-            {canHaveSubfolders && (
+            {/* Create subfolder button — or a discrete disabled affordance
+                when the folder already sits at MAX_FOLDER_DEPTH. */}
+            {canHaveSubfolders ? (
               <Button
                 variant="ghost"
                 size="sm"
@@ -290,6 +291,14 @@ function FolderTreeNode({
               >
                 <FolderPlus className="h-4 w-4" />
               </Button>
+            ) : (
+              <span
+                className="inline-flex items-center justify-center h-8 w-8 p-0 opacity-30 cursor-not-allowed"
+                title="Limite de 5 níveis atingido"
+                aria-label="Limite de 5 níveis atingido"
+              >
+                <FolderPlus className="h-4 w-4" />
+              </span>
             )}
 
             {/* More options */}
@@ -323,7 +332,7 @@ function FolderTreeNode({
 
       {/* Expanded content */}
       {isExpanded && (
-        <div className="ml-8 space-y-2 animate-accordion-down">
+        <div className="ml-4 space-y-2 animate-accordion-down">
           {/* Prescriptions in this folder */}
           {hasPrescriptions && (
             <SortableContext
