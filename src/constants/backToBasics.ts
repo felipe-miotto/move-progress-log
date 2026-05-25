@@ -103,6 +103,24 @@ export const POTENCIA_SUBCATEGORIES = {
   locomocao: "Locomoção",
 } as const;
 
+/**
+ * Subcategorias controladas para Core & Ativação.
+ *
+ * Responde: "qual é a função principal deste exercício na prescrição?".
+ * Nuances secundárias (ex.: equipamento, postura) continuam em observações.
+ * As chaves em snake_case são persistidas em `exercises_library.subcategory`;
+ * as labels são exibidas na UI.
+ */
+export const CORE_ATIVACAO_SUBCATEGORIES = {
+  anti_extensao: "Anti-extensão",
+  anti_rotacao: "Anti-rotação",
+  anti_flexao_lateral: "Anti-flexão lateral",
+  ativacao_gluteos: "Ativação de glúteos",
+  cintura_escapular_serratil: "Cintura escapular / serrátil",
+  controle_motor_tecnica: "Controle motor / técnica",
+  respiracao_pressao_iap: "Respiração / pressão intra-abdominal",
+} as const;
+
 // Categorias elegíveis para condicionamento metabólico
 export const CONDICIONAMENTO_ELIGIBLE_CATEGORIES: ExerciseCategory[] = [
   "core_ativacao",

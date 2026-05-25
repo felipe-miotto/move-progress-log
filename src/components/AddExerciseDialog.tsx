@@ -32,6 +32,7 @@ import {
   PATTERN_TO_CATEGORY,
   STABILITY_POSITION_OPTIONS,
   SURFACE_MODIFIER_OPTIONS,
+  CORE_ATIVACAO_SUBCATEGORIES,
 } from "@/hooks/useExercisesLibrary";
 import { useDuplicateExerciseCheck } from "@/hooks/useDuplicateExerciseCheck";
 import { normalizeExerciseName } from "@/hooks/duplicateExerciseUtils";
@@ -625,12 +626,43 @@ export const AddExerciseDialog = ({
 
                 <div className="space-y-2 col-span-2">
                   <Label htmlFor="subcategory">Subcategoria</Label>
-                  <Input
-                    id="subcategory"
-                    value={subcategory}
-                    onChange={(e) => setSubcategory(e.target.value)}
-                    placeholder="Ex: Agachamentos, Flexões"
-                  />
+                  {category === "core_ativacao" ? (
+                    <>
+                      <Select
+                        value={subcategory || "__none__"}
+                        onValueChange={(v) => setSubcategory(v === "__none__" ? "" : v)}
+                      >
+                        <SelectTrigger id="subcategory">
+                          <SelectValue placeholder="Selecione a função principal" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">— (sem subcategoria)</SelectItem>
+                          {Object.entries(CORE_ATIVACAO_SUBCATEGORIES).map(([key, label]) => (
+                            <SelectItem key={key} value={key}>
+                              {label}
+                            </SelectItem>
+                          ))}
+                          {/* Preserva valor legado fora da lista controlada (ex.: dados antigos). */}
+                          {subcategory &&
+                            !(subcategory in CORE_ATIVACAO_SUBCATEGORIES) && (
+                              <SelectItem value={subcategory}>
+                                {subcategory} (legado)
+                              </SelectItem>
+                            )}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Use a função principal do exercício na prescrição.
+                      </p>
+                    </>
+                  ) : (
+                    <Input
+                      id="subcategory"
+                      value={subcategory}
+                      onChange={(e) => setSubcategory(e.target.value)}
+                      placeholder="Ex: Agachamentos, Flexões"
+                    />
+                  )}
                 </div>
               </div>
                 </div>
