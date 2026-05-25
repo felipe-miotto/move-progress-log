@@ -22,6 +22,16 @@ import { AddExerciseDialog, type ExerciseDefaultValues } from "@/components/AddE
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface ParsedExercise {
   name: string;
@@ -65,6 +75,9 @@ export function ImportPrescriptionFromWordDialog({ open, onOpenChange }: Props) 
   // Destination folder applied to every prescription saved from this batch.
   // null = root (no folder).
   const [folderId, setFolderId] = useState<string | null>(null);
+  // Confirmation dialog shown when the user tries to dismiss the import
+  // mid-review (ESC / click outside / X / Cancel). Prevents losing work.
+  const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
   const createPrescription = useCreatePrescription();
   const { data: exercisesLibrary } = useExercisesLibrary();
   const { data: folders } = useFolders();
@@ -81,9 +94,24 @@ export function ImportPrescriptionFromWordDialog({ open, onOpenChange }: Props) 
     setFolderId(null);
   };
 
+  const hasWorkInProgress = step === "review" && prescriptions.length > 0;
+
   const handleClose = (open: boolean) => {
+    // Guard against accidental dismiss (ESC, click outside, X, Cancel)
+    // while the user is mid-review. Initial/parsing steps close normally
+    // because there is nothing to lose yet.
+    if (!open && hasWorkInProgress) {
+      setConfirmDiscardOpen(true);
+      return;
+    }
     if (!open) resetState();
     onOpenChange(open);
+  };
+
+  const handleConfirmDiscard = () => {
+    setConfirmDiscardOpen(false);
+    resetState();
+    onOpenChange(false);
   };
 
   const processFile = async (file: File) => {
@@ -523,6 +551,28 @@ size="sm"
           setAddExerciseDefaultValues(undefined);
         }}
       />
+
+      {/* Confirm-before-discard when work is in progress. */}
+      <AlertDialog open={confirmDiscardOpen} onOpenChange={setConfirmDiscardOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Descartar importação?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Você tem prescrições importadas em revisão. Se descartar, o
+              trabalho de vinculação será perdido.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Continuar revisando</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDiscard}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Descartar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

@@ -15,6 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { matchesSearch } from "@/utils/searchNormalize";
 
 interface Exercise {
   id: string;
@@ -52,11 +53,13 @@ export function ExerciseCombobox({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[400px] p-0">
-        <Command filter={(value, search) => {
-            const searchTokens = search.toLowerCase().split(/\s+/).filter(Boolean);
-            const nameTokens = value.toLowerCase().split(/\s+/);
-            return searchTokens.every(st => nameTokens.some(nt => nt.startsWith(st))) ? 1 : 0;
-          }}>
+        <Command
+          // Case- and accent-insensitive substring match. Uses the shared
+          // matchesSearch helper so "pigeon" finds "Pigeon Pose" and
+          // "gluteo" finds "Glúteo médio" — the previous token-startsWith
+          // filter was too strict for users who type mid-word.
+          filter={(value, search) => (matchesSearch(value, search) ? 1 : 0)}
+        >
           <CommandInput placeholder={placeholder} />
           <CommandList>
             <CommandEmpty>Nenhum exercício encontrado.</CommandEmpty>
