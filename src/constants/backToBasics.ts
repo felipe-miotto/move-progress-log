@@ -135,7 +135,7 @@ export const LATERALITY_OPTIONS = {
 } as const;
 
 // ============================================================================
-// ESCALA BOYLE (1-5) — substitui numeric_level (1-9)
+// ESCALA FABRIK (1-5) — armazenada em boyle_score por compatibilidade
 // ============================================================================
 
 export const BOYLE_SCORE_SCALE = {

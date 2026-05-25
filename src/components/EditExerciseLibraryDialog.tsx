@@ -260,7 +260,7 @@ export const EditExerciseLibraryDialog = ({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="edit-boyle-score">Nível Boyle (1-5)</Label>
+                  <Label htmlFor="edit-boyle-score">Nível Fabrik</Label>
                   <Select value={boyleScore} onValueChange={setBoyleScore}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione (opcional)" />
@@ -274,6 +274,9 @@ export const EditExerciseLibraryDialog = ({
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Nível mínimo recomendado. Exercícios de níveis menores também podem ser usados por alunos mais avançados.
+                  </p>
                 </div>
 
                 <div className="space-y-2">

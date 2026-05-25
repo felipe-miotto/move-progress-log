@@ -506,7 +506,7 @@ export default function ExercisesLibraryPage() {
                     {/* Scores */}
                     {exercise.boyle_score != null && (
                       <div className="flex flex-wrap gap-1">
-                        <Badge variant="outline" className="text-xs font-mono">B{exercise.boyle_score}</Badge>
+                        <Badge variant="outline" className="text-xs font-mono" title={`Nível Fabrik ${exercise.boyle_score}`}>F{exercise.boyle_score}</Badge>
                         {exercise.axial_load != null && <Badge variant="outline" className="text-xs font-mono">AX{exercise.axial_load}</Badge>}
                         {exercise.lumbar_demand != null && <Badge variant="outline" className="text-xs font-mono">LOM{exercise.lumbar_demand}</Badge>}
                         {exercise.technical_complexity != null && <Badge variant="outline" className="text-xs font-mono">TEC{exercise.technical_complexity}</Badge>}
