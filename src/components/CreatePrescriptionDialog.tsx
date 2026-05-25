@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCreatePrescription } from "@/hooks/usePrescriptions";
 import { useExercisesLibrary } from "@/hooks/useExercisesLibrary";
 import { usePrescriptionDraft } from "@/hooks/usePrescriptionDraft";
-import { Plus, Save, History, Trash2 } from "lucide-react";
+import { Plus, Save, History, Trash2, Folder } from "lucide-react";
+import { useFolders, flattenFolderTree } from "@/hooks/useFolders";
 import { PrescriptionDraftHistoryDialog } from "@/components/PrescriptionDraftHistoryDialog";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -93,6 +94,13 @@ export function CreatePrescriptionDialog({ open, onOpenChange }: CreatePrescript
   const { data: exercisesLibrary } = useExercisesLibrary();
   const createPrescription = useCreatePrescription();
   const { draft, saveDraft, clearDraft, restoreDraft, isSaving, lastSaved } = usePrescriptionDraft();
+  // Destination folder. null = root (no folder). Not persisted in the draft.
+  const [folderId, setFolderId] = useState<string | null>(null);
+  const { data: folders } = useFolders();
+  const flatFolders = useMemo(
+    () => (folders ? flattenFolderTree(folders) : []),
+    [folders],
+  );
 
   // Carregar rascunho ao abrir dialog — apenas uma vez por abertura
   useEffect(() => {
@@ -360,6 +368,7 @@ export function CreatePrescriptionDialog({ open, onOpenChange }: CreatePrescript
         name,
         objective,
         prescription_type: prescriptionType,
+        folder_id: folderId,
         exercises: validExercises.map((ex, index) => ({
           exercise_library_id: ex.exercise_library_id,
           sets: ex.sets,
@@ -381,6 +390,7 @@ export function CreatePrescriptionDialog({ open, onOpenChange }: CreatePrescript
 
       setName("");
       setObjective("");
+      setFolderId(null);
       setExercises([
         {
           id: crypto.randomUUID(),
@@ -499,6 +509,35 @@ export function CreatePrescriptionDialog({ open, onOpenChange }: CreatePrescript
                     <SelectContent>
                       <SelectItem value="group">Grupo (PSE)</SelectItem>
                       <SelectItem value="individual">Individual (Carga)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-sm">
+                  <Label
+                    htmlFor="create-prescription-folder"
+                    className="flex items-center gap-1.5"
+                  >
+                    <Folder className="h-3.5 w-3.5" />
+                    Pasta destino
+                  </Label>
+                  <Select
+                    value={folderId ?? "root"}
+                    onValueChange={(value) => setFolderId(value === "root" ? null : value)}
+                  >
+                    <SelectTrigger id="create-prescription-folder">
+                      <SelectValue placeholder="Raiz (sem pasta)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="root">📁 Raiz (sem pasta)</SelectItem>
+                      {flatFolders.map((f) => (
+                        <SelectItem key={f.id} value={f.id}>
+                          <span style={{ paddingLeft: `${f.level * 12}px` }}>
+                            {f.level > 0 && "└ "}
+                            {f.full_path || f.name}
+                          </span>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

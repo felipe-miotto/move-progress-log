@@ -36,6 +36,11 @@ export interface CreatePrescriptionInput {
   name: string;
   objective?: string;
   prescription_type?: "group" | "individual";
+  /**
+   * Optional destination folder. `null` / omitted = root (no folder).
+   * Mirrors workout_prescriptions.folder_id (FK to prescription_folders).
+   */
+  folder_id?: string | null;
   exercises: CreatePrescriptionExerciseInput[];
 }
 
@@ -113,6 +118,7 @@ export const createPrescriptionWithRelations = async (
     name: data.name,
     objective: data.objective ?? null,
     prescription_type: data.prescription_type ?? "group",
+    folder_id: data.folder_id ?? null,
     trainer_id: trainerId,
   };
 

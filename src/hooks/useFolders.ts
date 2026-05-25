@@ -77,6 +77,28 @@ export const getDescendantFolderIds = (folder: PrescriptionFolder): string[] => 
   ]);
 };
 
+/**
+ * Flatten a hierarchical folder list into a depth-first array with each
+ * node's indentation level and full path. Useful for rendering folder
+ * pickers (Select) where every folder — at any depth — is a valid target.
+ */
+export const flattenFolderTree = (
+  folders: PrescriptionFolder[],
+  level = 0,
+): Array<{ id: string; name: string; level: number; full_path: string | null }> =>
+  folders.reduce((acc, folder) => {
+    acc.push({
+      id: folder.id,
+      name: folder.name,
+      level,
+      full_path: folder.full_path,
+    });
+    if (folder.children && folder.children.length > 0) {
+      acc.push(...flattenFolderTree(folder.children, level + 1));
+    }
+    return acc;
+  }, [] as Array<{ id: string; name: string; level: number; full_path: string | null }>);
+
 // Fetch all folders for current trainer (returns hierarchical structure)
 export const useFolders = () => {
   return useQuery({

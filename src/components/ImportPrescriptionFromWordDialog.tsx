@@ -9,16 +9,19 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Upload, FileText, CheckCircle2, AlertTriangle, XCircle, ChevronDown, ChevronRight, PlusCircle } from "lucide-react";
+import { Loader2, Upload, FileText, CheckCircle2, AlertTriangle, XCircle, ChevronDown, ChevronRight, PlusCircle, Folder } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCreatePrescription } from "@/hooks/usePrescriptions";
 import { useExercisesLibrary } from "@/hooks/useExercisesLibrary";
+import { useFolders, flattenFolderTree } from "@/hooks/useFolders";
 import { notify } from "@/lib/notify";
 import { logger } from "@/utils/logger";
 import { buildErrorDescription } from "@/utils/errorParsing";
 import { ExerciseCombobox } from "@/components/ExerciseCombobox";
 import { AddExerciseDialog, type ExerciseDefaultValues } from "@/components/AddExerciseDialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 interface ParsedExercise {
   name: string;
@@ -59,14 +62,23 @@ export function ImportPrescriptionFromWordDialog({ open, onOpenChange }: Props) 
   const [addExerciseDefaultName, setAddExerciseDefaultName] = useState("");
   const [addExerciseDefaultValues, setAddExerciseDefaultValues] = useState<ExerciseDefaultValues | undefined>();
   const [addExerciseTargetIdx, setAddExerciseTargetIdx] = useState<number | null>(null);
+  // Destination folder applied to every prescription saved from this batch.
+  // null = root (no folder).
+  const [folderId, setFolderId] = useState<string | null>(null);
   const createPrescription = useCreatePrescription();
   const { data: exercisesLibrary } = useExercisesLibrary();
+  const { data: folders } = useFolders();
+  const flatFolders = useMemo(
+    () => (folders ? flattenFolderTree(folders) : []),
+    [folders],
+  );
 
   const resetState = () => {
     setStep("upload");
     setPrescriptions([]);
     setSelectedIndex(0);
     setExpandedExercises(new Set());
+    setFolderId(null);
   };
 
   const handleClose = (open: boolean) => {
@@ -164,6 +176,7 @@ export function ImportPrescriptionFromWordDialog({ open, onOpenChange }: Props) 
       await createPrescription.mutateAsync({
         name: prescription.name,
         objective: prescription.objective,
+        folder_id: folderId,
         exercises: validExercises.map(ex => ({
           exercise_library_id: ex.matched_exercise_id!,
           sets: ex.sets,
@@ -262,6 +275,37 @@ export function ImportPrescriptionFromWordDialog({ open, onOpenChange }: Props) 
                 ))}
               </div>
             )}
+
+            {/* Folder destination — applies to every prescription saved
+                from this import batch. */}
+            <div className="space-y-1.5 shrink-0">
+              <Label
+                htmlFor="import-folder"
+                className="text-xs font-medium flex items-center gap-1.5"
+              >
+                <Folder className="h-3.5 w-3.5" />
+                Pasta destino
+              </Label>
+              <Select
+                value={folderId ?? "root"}
+                onValueChange={(value) => setFolderId(value === "root" ? null : value)}
+              >
+                <SelectTrigger id="import-folder">
+                  <SelectValue placeholder="Raiz (sem pasta)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="root">📁 Raiz (sem pasta)</SelectItem>
+                  {flatFolders.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>
+                      <span style={{ paddingLeft: `${f.level * 12}px` }}>
+                        {f.level > 0 && "└ "}
+                        {f.full_path || f.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             {/* Prescription info */}
             <div className="bg-muted/50 rounded-lg p-3 space-y-1 shrink-0">
