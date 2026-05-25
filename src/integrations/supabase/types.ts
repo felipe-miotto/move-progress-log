@@ -14,24 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      _codex_taxonomy_credential: {
-        Row: {
-          created_at: string
-          generated_password: string
-          id: number
-        }
-        Insert: {
-          created_at?: string
-          generated_password: string
-          id?: number
-        }
-        Update: {
-          created_at?: string
-          generated_password?: string
-          id?: number
-        }
-        Relationships: []
-      }
       adaptation_rules: {
         Row: {
           action_type: string
