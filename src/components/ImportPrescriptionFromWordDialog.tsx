@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -78,6 +78,12 @@ export function ImportPrescriptionFromWordDialog({ open, onOpenChange }: Props) 
   // Confirmation dialog shown when the user tries to dismiss the import
   // mid-review (ESC / click outside / X / Cancel). Prevents losing work.
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
+  // Indexes of prescription tabs already saved in this session — used to
+  // prevent duplicate creates, mark tabs as "Salva", and tailor the close
+  // confirmation to the partial/all-saved/none-saved states.
+  const [savedIndexes, setSavedIndexes] = useState<Set<number>>(new Set());
+  // Re-entry guard against double-submit between click and state flush.
+  const submittingRef = useRef(false);
   const createPrescription = useCreatePrescription();
   const { data: exercisesLibrary } = useExercisesLibrary();
   const { data: folders } = useFolders();
@@ -92,15 +98,27 @@ export function ImportPrescriptionFromWordDialog({ open, onOpenChange }: Props) 
     setSelectedIndex(0);
     setExpandedExercises(new Set());
     setFolderId(null);
+    setSavedIndexes(new Set());
+    submittingRef.current = false;
   };
 
-  const hasWorkInProgress = step === "review" && prescriptions.length > 0;
+  // "Trabalho a perder" considera apenas abas que ainda não foram salvas.
+  // Se o usuário já salvou todas, hasUnsavedWork == false e o close passa
+  // direto sem confirmação. Se salvou algumas e ainda há pendentes, a
+  // confirmação muda de texto (ver AlertDialog).
+  const hasUnsavedWork =
+    step === "review" && prescriptions.length > savedIndexes.size;
+  const hasAnySaved = savedIndexes.size > 0;
+  const allSaved =
+    step === "review" &&
+    prescriptions.length > 0 &&
+    savedIndexes.size === prescriptions.length;
 
   const handleClose = (open: boolean) => {
     // Guard against accidental dismiss (ESC, click outside, X, Cancel)
-    // while the user is mid-review. Initial/parsing steps close normally
-    // because there is nothing to lose yet.
-    if (!open && hasWorkInProgress) {
+    // while there is still unsaved work. Initial / parsing / all-saved
+    // states close normally because there is nothing to lose.
+    if (!open && hasUnsavedWork) {
       setConfirmDiscardOpen(true);
       return;
     }
@@ -190,6 +208,11 @@ export function ImportPrescriptionFromWordDialog({ open, onOpenChange }: Props) 
   };
 
   const handleConfirm = async (index: number) => {
+    // Anti-duplicação: nunca criar a mesma aba duas vezes nesta sessão e
+    // bloquear cliques duplos enquanto o save em curso ainda não resolveu.
+    if (submittingRef.current) return;
+    if (savedIndexes.has(index)) return;
+
     const prescription = prescriptions[index];
     const validExercises = prescription.exercises.filter(ex => ex.matched_exercise_id);
 
@@ -200,6 +223,7 @@ export function ImportPrescriptionFromWordDialog({ open, onOpenChange }: Props) 
       return;
     }
 
+    submittingRef.current = true;
     try {
       await createPrescription.mutateAsync({
         name: prescription.name,
@@ -217,17 +241,25 @@ export function ImportPrescriptionFromWordDialog({ open, onOpenChange }: Props) 
         })),
       });
 
-      // Mark as created
-      setPrescriptions(prev => {
-        const updated = [...prev];
-        updated[index] = { ...updated[index], name: `✅ ${updated[index].name}` };
-        return updated;
-      });
-
       notify.success(`Prescrição "${prescription.name}" criada com sucesso!`);
+
+      // Marca a aba como salva e, se houver pendente, avança para ela.
+      const newSaved = new Set(savedIndexes);
+      newSaved.add(index);
+      setSavedIndexes(newSaved);
+
+      const remaining = prescriptions
+        .map((_, i) => i)
+        .filter(i => !newSaved.has(i));
+      if (remaining.length > 0) {
+        const next = remaining.find(i => i > index) ?? remaining[0];
+        setSelectedIndex(next);
+      }
     } catch (err: unknown) {
       const message = buildErrorDescription(err) || "Erro desconhecido ao criar prescrição.";
       notify.error("Erro ao criar prescrição", { description: message });
+    } finally {
+      submittingRef.current = false;
     }
   };
 
@@ -287,20 +319,49 @@ export function ImportPrescriptionFromWordDialog({ open, onOpenChange }: Props) 
 
         {step === "review" && currentPrescription && (
           <div className="flex flex-col min-h-0 flex-1 space-y-3">
-            {/* Prescription selector tabs */}
+            {/* Prescription selector tabs — cada aba é uma prescrição
+                separada; cada uma é salva individualmente. */}
             {prescriptions.length > 1 && (
-              <div className="flex gap-2 flex-wrap shrink-0">
-                {prescriptions.map((p, i) => (
-                  <Button
-                    key={i}
-                    size="sm"
-                    variant={i === selectedIndex ? "default" : "outline"}
-                    onClick={() => setSelectedIndex(i)}
-                    className="text-xs"
-                  >
-                    {p.name.replace("✅ ", "")}
-                  </Button>
-                ))}
+              <div className="flex flex-col gap-1.5 shrink-0">
+                <p className="text-xs text-muted-foreground">
+                  Cada aba é uma prescrição separada. Revise e salve uma de cada vez.
+                </p>
+                <div className="flex gap-2 flex-wrap">
+                  {prescriptions.map((p, i) => {
+                    const isSaved = savedIndexes.has(i);
+                    return (
+                      <Button
+                        key={i}
+                        size="sm"
+                        variant={i === selectedIndex ? "default" : "outline"}
+                        onClick={() => setSelectedIndex(i)}
+                        className="text-xs gap-1.5"
+                      >
+                        {isSaved && (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                        )}
+                        <span>{p.name}</span>
+                        <span
+                          className={`text-[10px] uppercase tracking-wide ${
+                            isSaved ? "text-emerald-600 dark:text-emerald-400" : "opacity-60"
+                          }`}
+                        >
+                          {isSaved ? "Salva" : "Pendente"}
+                        </span>
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Completion banner when every tab has been saved. */}
+            {allSaved && (
+              <div className="rounded-lg border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/20 p-3 text-sm flex items-center gap-2 shrink-0">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                <span className="font-medium">
+                  Importação concluída — todas as prescrições foram criadas.
+                </span>
               </div>
             )}
 
@@ -523,14 +584,22 @@ size="sm"
             </Button>
             <Button
               onClick={() => handleConfirm(selectedIndex)}
-              disabled={createPrescription.isPending || matchedCount === 0}
+              disabled={
+                createPrescription.isPending ||
+                matchedCount === 0 ||
+                savedIndexes.has(selectedIndex)
+              }
             >
               {createPrescription.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : savedIndexes.has(selectedIndex) ? (
+                <CheckCircle2 className="h-4 w-4 mr-2" />
               ) : (
                 <FileText className="h-4 w-4 mr-2" />
               )}
-              Criar Prescrição ({matchedCount}/{totalCount} exercícios)
+              {savedIndexes.has(selectedIndex)
+                ? "Prescrição já criada"
+                : `Criar treino atual (${matchedCount}/${totalCount} exercícios)`}
             </Button>
           </DialogFooter>
         )}
@@ -556,10 +625,15 @@ size="sm"
       <AlertDialog open={confirmDiscardOpen} onOpenChange={setConfirmDiscardOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Descartar importação?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {hasAnySaved
+                ? "Existem treinos não salvos"
+                : "Descartar importação?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Você tem prescrições importadas em revisão. Se descartar, o
-              trabalho de vinculação será perdido.
+              {hasAnySaved
+                ? `Você salvou ${savedIndexes.size} de ${prescriptions.length} treino(s). Os outros ${prescriptions.length - savedIndexes.size} ainda não foram criados. Deseja sair mesmo assim?`
+                : "Você tem prescrições importadas em revisão. Se descartar, o trabalho de vinculação será perdido."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -568,7 +642,7 @@ size="sm"
               onClick={handleConfirmDiscard}
               className="bg-destructive hover:bg-destructive/90"
             >
-              Descartar
+              {hasAnySaved ? "Sair mesmo assim" : "Descartar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

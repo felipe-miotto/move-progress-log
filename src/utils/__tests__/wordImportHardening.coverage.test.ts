@@ -43,22 +43,26 @@ describe("PR — Word import hardening", () => {
       );
     });
 
-    it("declara state confirmDiscardOpen e const hasWorkInProgress", () => {
+    it("declara state confirmDiscardOpen e const de trabalho não salvo", () => {
+      // Nome original era hasWorkInProgress; agora é hasUnsavedWork
+      // (mais preciso — só conta abas ainda não salvas neste lote).
       expect(wordDialogSrc).toMatch(
         /\[confirmDiscardOpen,\s*setConfirmDiscardOpen\]/,
       );
-      expect(wordDialogSrc).toMatch(/const\s+hasWorkInProgress\s*=/);
+      expect(wordDialogSrc).toMatch(/const\s+hasUnsavedWork\s*=/);
     });
 
-    it("hasWorkInProgress detecta review com prescrições extraídas", () => {
+    it("o indicador de trabalho não salvo detecta abas pendentes (não só length>0)", () => {
+      // Antes: prescriptions.length > 0. Depois do multi-save fix:
+      // prescriptions.length > savedIndexes.size (ignora abas já criadas).
       expect(wordDialogSrc).toMatch(
-        /hasWorkInProgress\s*=\s*step\s*===\s*"review"\s*&&\s*prescriptions\.length\s*>\s*0/,
+        /hasUnsavedWork\s*=[\s\S]*?step\s*===\s*"review"[\s\S]*?prescriptions\.length\s*>\s*savedIndexes\.size/,
       );
     });
 
-    it("handleClose intercepta o close quando hasWorkInProgress é true", () => {
+    it("handleClose intercepta o close quando há trabalho NÃO salvo", () => {
       expect(wordDialogSrc).toMatch(
-        /if\s*\(!open\s*&&\s*hasWorkInProgress\)\s*\{\s*setConfirmDiscardOpen\(true\)/,
+        /if\s*\(!open\s*&&\s*hasUnsavedWork\)\s*\{\s*setConfirmDiscardOpen\(true\)/,
       );
     });
 
@@ -71,14 +75,21 @@ describe("PR — Word import hardening", () => {
       );
     });
 
-    it("AlertDialog mostra 'Descartar importação?' com Continuar/Descartar", () => {
+    it("AlertDialog mostra 'Descartar importação?' (e variante 'Existem treinos não salvos') com Continuar/Descartar", () => {
+      // O título agora é condicional (varia conforme há ou não abas
+      // salvas), mas os dois textos coexistem no source via ternário.
       expect(wordDialogSrc).toContain("Descartar importação?");
+      expect(wordDialogSrc).toContain("Existem treinos não salvos");
       expect(wordDialogSrc).toMatch(
         /<AlertDialogCancel>\s*Continuar revisando\s*<\/AlertDialogCancel>/,
       );
+      // A ação do confirm aparece com label condicional:
+      // {hasAnySaved ? "Sair mesmo assim" : "Descartar"}.
       expect(wordDialogSrc).toMatch(
-        /<AlertDialogAction[\s\S]*?>\s*Descartar\s*<\/AlertDialogAction>/,
+        /<AlertDialogAction[\s\S]*?onClick=\{handleConfirmDiscard\}[\s\S]*?<\/AlertDialogAction>/,
       );
+      expect(wordDialogSrc).toContain('"Descartar"');
+      expect(wordDialogSrc).toContain('"Sair mesmo assim"');
     });
 
     it("'Continuar revisando' é AlertDialogCancel (não chama reset; preserva estado)", () => {

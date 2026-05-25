@@ -692,28 +692,34 @@ export default function PrescriptionsPage() {
             </AlertDialogContent>
           </AlertDialog>
 
-          {/* Delete Prescription Confirmation */}
-          <AlertDialog open={deletePrescriptionDialogOpen} onOpenChange={setDeletePrescriptionDialogOpen}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Excluir prescrição</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Tem certeza que deseja excluir esta prescrição? Esta ação não pode ser desfeita.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleConfirmDeletePrescription}
-                  className="bg-destructive hover:bg-destructive/90"
-                >
-                  Excluir
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
         </>
       )}
+
+      {/* Delete Prescription Confirmation — rendered independently of
+          selectedFolder so it works for deletions from ANY prescription
+          card (inside a folder or in "Sem Pasta"). Previously this lived
+          inside the selectedFolder block, which made the menu's Excluir
+          item appear to do nothing because the AlertDialog was never
+          mounted when selectedFolder was null. */}
+      <AlertDialog open={deletePrescriptionDialogOpen} onOpenChange={setDeletePrescriptionDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir prescrição</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta prescrição? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDeletePrescription}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageLayout>
   );
 }
