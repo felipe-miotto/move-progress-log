@@ -42,10 +42,44 @@ export type ExerciseCategory = keyof typeof EXERCISE_CATEGORIES;
 
 // ============================================================================
 // PADRÕES DE MOVIMENTO (somente Força/Hipertrofia)
-// Os 6 padrões reais. Demais categorias usam o campo `category` diretamente.
+// Taxonomia refinada (v2): 11 padrões que separam padrão motor, base e
+// variação. Decisões de produto:
+//   - Lunge não é mais guarda-chuva. Se a base fica FIXA → base_assimetrica
+//     (split squat, búlgaro, afundo parado). Se a base SE DESLOCA →
+//     passada_deslocamento (frente, reversa, lateral, walking, curtsy).
+//   - Cadeia posterior foi separada em dobradica_quadril (RDL, stiff, good
+//     morning, hip thrust, ponte) e flexao_joelho (nórdica, leg curl,
+//     sliding curl).
+//   - Empurrar/puxar passam a ser sempre horizontal ou vertical.
+//   - Step-up e step-down entram em agachamento_unilateral (base fixa).
+// Demais categorias (mobilidade, LMF, core, etc.) usam `category` direto.
 // ============================================================================
 
 export const MOVEMENT_PATTERNS = {
+  agachamento_bilateral: "Agachamento bilateral",
+  agachamento_unilateral: "Agachamento unilateral",
+  base_assimetrica: "Base assimétrica",
+  passada_deslocamento: "Passada / deslocamento",
+  dobradica_quadril: "Dobradiça de quadril",
+  flexao_joelho: "Flexão de joelho",
+  empurrar_horizontal: "Empurrar horizontal",
+  empurrar_vertical: "Empurrar vertical",
+  puxar_horizontal: "Puxar horizontal",
+  puxar_vertical: "Puxar vertical",
+  carregamento: "Carregamento",
+} as const;
+
+export type MovementPattern = keyof typeof MOVEMENT_PATTERNS;
+
+// ============================================================================
+// PADRÕES LEGADOS (back-compat para linhas existentes em produção)
+// Estes valores ainda podem aparecer em `exercises_library.movement_pattern`
+// porque NÃO há migration nem backfill neste PR. A UI deve preservá-los como
+// `(legado)` ao editar — sem apagar automaticamente — e exibi-los com label
+// amigável em badges/diagnostics. Novos cadastros não devem mais escolhê-los.
+// ============================================================================
+
+export const LEGACY_MOVEMENT_PATTERNS = {
   empurrar: "Empurrar",
   puxar: "Puxar",
   dominancia_joelho: "Dominância de Joelho",
@@ -54,14 +88,60 @@ export const MOVEMENT_PATTERNS = {
   carregar: "Carregar",
 } as const;
 
-export type MovementPattern = keyof typeof MOVEMENT_PATTERNS;
+export type LegacyMovementPattern = keyof typeof LEGACY_MOVEMENT_PATTERNS;
+
+/**
+ * Mapa unificado padrão → label para lookups de display (badges, diagnostics,
+ * SessionDetail). Resolve novos e legados; o caller faz o sufixo "(legado)"
+ * quando relevante. Falha graceful para o próprio key se nada bater.
+ */
+export const MOVEMENT_PATTERN_LABELS: Record<string, string> = {
+  ...MOVEMENT_PATTERNS,
+  ...LEGACY_MOVEMENT_PATTERNS,
+};
+
+export const getMovementPatternLabel = (
+  pattern: string | null | undefined,
+): string | null => {
+  if (!pattern) return null;
+  return MOVEMENT_PATTERN_LABELS[pattern] ?? pattern;
+};
+
+export const isLegacyMovementPattern = (
+  pattern: string | null | undefined,
+): pattern is LegacyMovementPattern => {
+  if (!pattern) return false;
+  return pattern in LEGACY_MOVEMENT_PATTERNS;
+};
+
+/**
+ * Texto curto de ajuda usado em Add/Edit dialogs sob o campo
+ * "Padrão de Movimento". Mantido em um único lugar para evitar drift.
+ */
+export const MOVEMENT_PATTERN_HELP_TEXT =
+  "Classifique pelo gesto principal. Se a base se desloca, use Passada / deslocamento; se fica fixa, use agachamento/base fixa.";
 
 // ============================================================================
 // MAPEAMENTO PADRÃO DE MOVIMENTO → CATEGORIA
-// Somente os 6 padrões de força mapeiam para forca_hipertrofia.
+// Todos os padrões (novos + legados) caem em forca_hipertrofia. A duplicação
+// é proposital: garante que o auto-fill em Add/Edit funcione mesmo quando a
+// linha carrega um valor legado.
 // ============================================================================
 
 export const PATTERN_TO_CATEGORY: Record<string, ExerciseCategory> = {
+  // Novos (v2)
+  agachamento_bilateral: "forca_hipertrofia",
+  agachamento_unilateral: "forca_hipertrofia",
+  base_assimetrica: "forca_hipertrofia",
+  passada_deslocamento: "forca_hipertrofia",
+  dobradica_quadril: "forca_hipertrofia",
+  flexao_joelho: "forca_hipertrofia",
+  empurrar_horizontal: "forca_hipertrofia",
+  empurrar_vertical: "forca_hipertrofia",
+  puxar_horizontal: "forca_hipertrofia",
+  puxar_vertical: "forca_hipertrofia",
+  carregamento: "forca_hipertrofia",
+  // Legados (v1) — preservados pra não quebrar edição de linhas existentes
   empurrar: "forca_hipertrofia",
   puxar: "forca_hipertrofia",
   dominancia_joelho: "forca_hipertrofia",
@@ -72,15 +152,44 @@ export const PATTERN_TO_CATEGORY: Record<string, ExerciseCategory> = {
 
 // ============================================================================
 // AGRUPAMENTOS PARA IA MONTAR SESSÕES (somente força)
+// Cada slot inclui novos + legados pra que `TRAINING_STATIONS` continue
+// cobrindo linhas existentes em produção enquanto a taxonomia migra.
 // Para Core, Mobilidade, LMF, Pliometria e Respiração, a IA filtra por `category`.
 // ============================================================================
 
 export const SESSION_PATTERN_GROUPS = {
-  lower_knee: ["dominancia_joelho", "lunge"],
-  lower_hip: ["cadeia_posterior"],
-  upper_push: ["empurrar"],
-  upper_pull: ["puxar"],
-  carry: ["carregar"],
+  lower_knee: [
+    "agachamento_bilateral",
+    "agachamento_unilateral",
+    "base_assimetrica",
+    "passada_deslocamento",
+    "flexao_joelho",
+    // legados
+    "dominancia_joelho",
+    "lunge",
+  ],
+  lower_hip: [
+    "dobradica_quadril",
+    // legados
+    "cadeia_posterior",
+  ],
+  upper_push: [
+    "empurrar_horizontal",
+    "empurrar_vertical",
+    // legados
+    "empurrar",
+  ],
+  upper_pull: [
+    "puxar_horizontal",
+    "puxar_vertical",
+    // legados
+    "puxar",
+  ],
+  carry: [
+    "carregamento",
+    // legados
+    "carregar",
+  ],
 } as const;
 
 export type SessionPatternGroup = keyof typeof SESSION_PATTERN_GROUPS;
@@ -89,11 +198,55 @@ export type SessionPatternGroup = keyof typeof SESSION_PATTERN_GROUPS;
 // SUBCATEGORIAS POR CONTEXTO
 // ============================================================================
 
-/** Subcategorias para padrões de força que possuem subdivisão */
+/**
+ * Subcategorias controladas por padrão de movimento (taxonomia v2).
+ *
+ * Responde: "qual variação do padrão é este exercício?". As chaves em
+ * snake_case são persistidas em `exercises_library.subcategory`; as labels
+ * são exibidas no select e no filtro da biblioteca.
+ *
+ * Regras de classificação que ficam codificadas aqui:
+ *   - `agachamento_unilateral`: step-up/step-down moram em
+ *     `step_up_step_down` (base fixa, sem deslocamento da pisada).
+ *   - `base_assimetrica`: split squat, búlgaro e afundo PARADO.
+ *   - `passada_deslocamento`: passadas onde a base se desloca (frente,
+ *     reversa, lateral, walking, curtsy).
+ *   - `dobradica_quadril`: hinge bilateral/unilateral + ponte/hip thrust.
+ *   - `flexao_joelho`: nórdica, leg curl e sliding curl (não-hinge).
+ *
+ * Os padrões legados (empurrar/puxar/cadeia_posterior) NÃO aparecem aqui
+ * de propósito — quando uma linha existente tem `movement_pattern` legado,
+ * o filtro da biblioteca não exibe select de subcategoria, e o dialog cai
+ * no fallback de texto livre.
+ */
 export const STRENGTH_SUBCATEGORIES: Record<string, Record<string, string>> = {
-  empurrar: { horizontal: "Horizontal", vertical: "Vertical" },
-  puxar: { horizontal: "Horizontal", vertical: "Vertical" },
-  cadeia_posterior: { enfase_quadril: "Ênfase Quadril", enfase_joelho: "Ênfase Joelho" },
+  agachamento_unilateral: {
+    step_up_step_down: "Step-up / Step-down",
+    single_leg_squat: "Single-leg squat / pistol",
+    caixa_banco: "Caixa / banco",
+  },
+  base_assimetrica: {
+    split_squat: "Split squat",
+    bulgaro: "Búlgaro",
+    afundo_parado: "Afundo parado",
+  },
+  passada_deslocamento: {
+    frente: "Frente",
+    reversa: "Reversa",
+    lateral: "Lateral",
+    walking: "Walking",
+    curtsy: "Curtsy",
+  },
+  dobradica_quadril: {
+    bilateral: "Bilateral",
+    unilateral: "Unilateral",
+    ponte_hip_thrust: "Ponte / Hip thrust",
+  },
+  flexao_joelho: {
+    nordica: "Nórdica",
+    leg_curl: "Leg curl",
+    sliding_curl: "Sliding curl",
+  },
 };
 
 /** Subcategorias para Potência & Pliometria */

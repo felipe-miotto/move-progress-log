@@ -71,12 +71,18 @@ describe("PR — subcategorias Core e Ativação", () => {
       expect(addDialogSrc).toContain("CORE_ATIVACAO_SUBCATEGORIES");
     });
 
-    it("renderiza Select condicional para core_ativacao (preserva Input para outras)", () => {
+    it("renderiza Select controlado para core_ativacao (preserva Input para outras)", () => {
+      // Apos o PR de taxonomia v2, o gating ficou centralizado num IIFE
+      // que monta `map` por contexto (core_ativacao OU
+      // forca_hipertrofia+padrão com STRENGTH_SUBCATEGORIES). O contrato
+      // preservado é: core_ativacao continua usando a lista controlada;
+      // categorias sem mapping caem no Input livre.
+      expect(addDialogSrc).toMatch(/category === "core_ativacao"/);
       expect(addDialogSrc).toMatch(
-        /category\s*===\s*"core_ativacao"\s*\?\s*\([\s\S]*?<Select/,
+        /CORE_ATIVACAO_SUBCATEGORIES[\s\S]*?<SelectItem key=\{key\}/,
       );
       // O ramo "else" preserva o Input livre (não foi removido).
-      expect(addDialogSrc).toMatch(/\)\s*:\s*\(\s*<Input/);
+      expect(addDialogSrc).toMatch(/return\s*\(\s*\n?\s*<Input/);
     });
 
     it("mostra texto de ajuda 'Use a função principal do exercício na prescrição'", () => {
@@ -89,25 +95,29 @@ describe("PR — subcategorias Core e Ativação", () => {
       expect(editDialogSrc).toContain("CORE_ATIVACAO_SUBCATEGORIES");
     });
 
-    it("renderiza Select condicional para core_ativacao (preserva Input para outras)", () => {
+    it("renderiza Select controlado para core_ativacao (preserva Input para outras)", () => {
+      expect(editDialogSrc).toMatch(/category === "core_ativacao"/);
       expect(editDialogSrc).toMatch(
-        /category\s*===\s*"core_ativacao"\s*\?\s*\([\s\S]*?<Select/,
+        /CORE_ATIVACAO_SUBCATEGORIES[\s\S]*?<SelectItem key=\{key\}/,
       );
-      expect(editDialogSrc).toMatch(/\)\s*:\s*\(\s*<Input/);
+      expect(editDialogSrc).toMatch(/return\s*\(\s*\n?\s*<Input/);
     });
   });
 
   describe("preserva valor legado fora da lista controlada", () => {
     it("AddExerciseDialog exibe valor legado como opção 'legado'", () => {
+      // O check de "valor fora da lista" passou a usar a variável `map`
+      // do IIFE (que aponta para CORE_ATIVACAO_SUBCATEGORIES ou
+      // STRENGTH_SUBCATEGORIES). Aceita ambas as formas.
       expect(addDialogSrc).toMatch(
-        /!\(subcategory\s+in\s+CORE_ATIVACAO_SUBCATEGORIES\)/,
+        /!\(subcategory\s+in\s+(?:map|CORE_ATIVACAO_SUBCATEGORIES)\)/,
       );
       expect(addDialogSrc).toContain("(legado)");
     });
 
     it("EditExerciseLibraryDialog exibe valor legado como opção 'legado'", () => {
       expect(editDialogSrc).toMatch(
-        /!\(subcategory\s+in\s+CORE_ATIVACAO_SUBCATEGORIES\)/,
+        /!\(subcategory\s+in\s+(?:map|CORE_ATIVACAO_SUBCATEGORIES)\)/,
       );
       expect(editDialogSrc).toContain("(legado)");
     });

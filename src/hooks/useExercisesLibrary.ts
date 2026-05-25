@@ -12,6 +12,11 @@ import type { ExerciseFilters } from "./exerciseFilters";
 // Re-exportar constantes do backToBasics para manter compatibilidade
 export {
   MOVEMENT_PATTERNS,
+  LEGACY_MOVEMENT_PATTERNS,
+  MOVEMENT_PATTERN_LABELS,
+  MOVEMENT_PATTERN_HELP_TEXT,
+  getMovementPatternLabel,
+  isLegacyMovementPattern,
   LATERALITY_OPTIONS,
   MOVEMENT_PLANES,
   CONTRACTION_TYPES,

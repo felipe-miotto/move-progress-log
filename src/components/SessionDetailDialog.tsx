@@ -16,7 +16,7 @@ import { useState, useMemo, useCallback } from "react";
 import { formatSessionTime } from "@/utils/sessionTime";
 import { formatSessionDate } from "@/utils/sessionDate";
 import { calculateLoadFromBreakdown } from "@/utils/loadCalculation";
-import { MOVEMENT_PATTERNS } from "@/constants/backToBasics";
+import { getMovementPatternLabel } from "@/constants/backToBasics";
 
 interface SessionDetailDialogProps {
   sessionId: string | null;
@@ -78,7 +78,7 @@ const normalizeComparableText = (value: string): string =>
     .replace(/[^a-z0-9]+/g, " ");
 
 const formatMovementPatternLabel = (pattern: string): string =>
-  MOVEMENT_PATTERNS[pattern as keyof typeof MOVEMENT_PATTERNS] || pattern;
+  getMovementPatternLabel(pattern) ?? pattern;
 
 export const SessionDetailDialog = ({ 
   sessionId, 

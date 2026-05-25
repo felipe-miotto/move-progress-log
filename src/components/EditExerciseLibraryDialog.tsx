@@ -21,6 +21,8 @@ import { AlertTriangle } from "lucide-react";
 import {
   useUpdateExercise,
   MOVEMENT_PATTERNS,
+  LEGACY_MOVEMENT_PATTERNS,
+  MOVEMENT_PATTERN_HELP_TEXT,
   LATERALITY_OPTIONS,
   MOVEMENT_PLANES,
   CONTRACTION_TYPES,
@@ -32,6 +34,7 @@ import {
   STABILITY_POSITION_OPTIONS,
   SURFACE_MODIFIER_OPTIONS,
   CORE_ATIVACAO_SUBCATEGORIES,
+  STRENGTH_SUBCATEGORIES,
   ExerciseLibrary,
   CreateExerciseInput,
 } from "@/hooks/useExercisesLibrary";
@@ -228,7 +231,7 @@ export const EditExerciseLibraryDialog = ({
 
                 <div className="space-y-2">
                   <Label htmlFor="edit-movement-pattern">Padrão de Movimento</Label>
-                  <Select value={movementPattern} onValueChange={handleMovementPatternChange}>
+                  <Select value={movementPattern || "none"} onValueChange={handleMovementPatternChange}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o padrão" />
                     </SelectTrigger>
@@ -239,8 +242,25 @@ export const EditExerciseLibraryDialog = ({
                           {label}
                         </SelectItem>
                       ))}
+                      {/* Preserva valor legado fora da lista controlada (back-compat). */}
+                      {movementPattern &&
+                        movementPattern !== "none" &&
+                        !(movementPattern in MOVEMENT_PATTERNS) &&
+                        movementPattern in LEGACY_MOVEMENT_PATTERNS && (
+                          <SelectItem value={movementPattern}>
+                            {
+                              LEGACY_MOVEMENT_PATTERNS[
+                                movementPattern as keyof typeof LEGACY_MOVEMENT_PATTERNS
+                              ]
+                            }{" "}
+                            (legado)
+                          </SelectItem>
+                        )}
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {MOVEMENT_PATTERN_HELP_TEXT}
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -489,43 +509,69 @@ export const EditExerciseLibraryDialog = ({
 
                 <div className="space-y-2 col-span-2">
                   <Label htmlFor="edit-subcategory">Subcategoria</Label>
-                  {category === "core_ativacao" ? (
-                    <>
-                      <Select
-                        value={subcategory || "__none__"}
-                        onValueChange={(v) => setSubcategory(v === "__none__" ? "" : v)}
-                      >
-                        <SelectTrigger id="edit-subcategory">
-                          <SelectValue placeholder="Selecione a função principal" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">— (sem subcategoria)</SelectItem>
-                          {Object.entries(CORE_ATIVACAO_SUBCATEGORIES).map(([key, label]) => (
-                            <SelectItem key={key} value={key}>
-                              {label}
-                            </SelectItem>
-                          ))}
-                          {/* Preserva valor legado fora da lista controlada (ex.: dados antigos). */}
-                          {subcategory &&
-                            !(subcategory in CORE_ATIVACAO_SUBCATEGORIES) && (
+                  {(() => {
+                    // Mesmo gating do AddExerciseDialog:
+                    //   - core_ativacao → função na prescrição (controlada).
+                    //   - forca_hipertrofia + padrão novo (STRENGTH_SUBCATEGORIES) → variação.
+                    //   - resto (incl. padrões legados) → input livre.
+                    const strengthMap =
+                      category === "forca_hipertrofia" &&
+                      movementPattern &&
+                      STRENGTH_SUBCATEGORIES[movementPattern]
+                        ? STRENGTH_SUBCATEGORIES[movementPattern]
+                        : null;
+                    const coreMap =
+                      category === "core_ativacao"
+                        ? (CORE_ATIVACAO_SUBCATEGORIES as Record<string, string>)
+                        : null;
+                    const map = strengthMap || coreMap;
+                    if (!map) {
+                      return (
+                        <Input
+                          id="edit-subcategory"
+                          value={subcategory}
+                          onChange={(e) => setSubcategory(e.target.value)}
+                          placeholder="Ex: Agachamentos, Flexões"
+                        />
+                      );
+                    }
+                    const helperText = coreMap
+                      ? "Use a função principal do exercício na prescrição."
+                      : "Selecione a variação do padrão.";
+                    return (
+                      <>
+                        <Select
+                          value={subcategory || "__none__"}
+                          onValueChange={(v) => setSubcategory(v === "__none__" ? "" : v)}
+                        >
+                          <SelectTrigger id="edit-subcategory">
+                            <SelectValue
+                              placeholder={
+                                coreMap
+                                  ? "Selecione a função principal"
+                                  : "Selecione a variação"
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">— (sem subcategoria)</SelectItem>
+                            {Object.entries(map).map(([key, label]) => (
+                              <SelectItem key={key} value={key}>
+                                {label}
+                              </SelectItem>
+                            ))}
+                            {/* Preserva valor legado fora da lista controlada. */}
+                            {subcategory && !(subcategory in map) && (
                               <SelectItem value={subcategory}>
                                 {subcategory} (legado)
                               </SelectItem>
                             )}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">
-                        Use a função principal do exercício na prescrição.
-                      </p>
-                    </>
-                  ) : (
-                    <Input
-                      id="edit-subcategory"
-                      value={subcategory}
-                      onChange={(e) => setSubcategory(e.target.value)}
-                      placeholder="Ex: Agachamentos, Flexões"
-                    />
-                  )}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">{helperText}</p>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
