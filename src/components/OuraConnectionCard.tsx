@@ -41,7 +41,10 @@ export const OuraConnectionCard = ({ studentId, studentName = "Aluno" }: OuraCon
   const [syncStatus, setSyncStatus] = useState<string>("");
   const [syncError, setSyncError] = useState<string | null>(null);
 
-  const { data: connection, isLoading } = useOuraConnection(studentId);
+  const { data: connection, isLoading, isFetching } = useOuraConnection(studentId, {
+    pollUntilConnected: true,
+    refetchIntervalMs: 5000,
+  });
   const { data: latestMetrics } = useLatestOuraMetrics(studentId);
   const syncOura = useSyncOura();
   const disconnectOura = useDisconnectOura();
@@ -159,7 +162,7 @@ export const OuraConnectionCard = ({ studentId, studentName = "Aluno" }: OuraCon
           {!connection ? (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                Oura Ring não conectado
+                {isFetching ? "Verificando aceite do convite Oura..." : "Oura Ring não conectado"}
               </p>
               <Button
                 variant="outline"

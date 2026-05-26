@@ -73,15 +73,9 @@ Deno.serve(async (req) => {
       return jsonResponse({ valid: false, error: 'Convite expirado' }, 410);
     }
 
-    if (invite.is_used) {
-      console.log('Invite already used');
-      return jsonResponse({ valid: false, error: 'Convite já foi utilizado' }, 409);
-    }
-
-    console.log('Invite is valid');
-
     if (type === 'oura_connect' || invite.email === '__oura_connect__') {
       const ouraClientId = Deno.env.get('OURA_CLIENT_ID');
+      const trainerName = extractTrainerName(invite.trainer_profiles);
 
       let studentName = 'Aluno';
       if (invite.created_student_id) {
@@ -96,9 +90,36 @@ Deno.serve(async (req) => {
         if (student) studentName = student.name;
       }
 
+      if (invite.created_student_id) {
+        const { data: existingConnection } = await supabaseClient
+          .from('oura_connections')
+          .select('id')
+          .eq('student_id', invite.created_student_id)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (existingConnection) {
+          console.log('Oura invite already accepted; active connection exists');
+          return jsonResponse({
+            valid: false,
+            already_connected: true,
+            trainer_name: trainerName,
+            student_name: studentName,
+            student_id: invite.created_student_id,
+            invite_id: invite.id,
+          });
+        }
+      }
+
+      if (invite.is_used) {
+        console.log('Invite already used');
+        return jsonResponse({ valid: false, error: 'Convite já foi utilizado' }, 409);
+      }
+
+      console.log('Invite is valid');
       return jsonResponse({
         valid: true,
-        trainer_name: extractTrainerName(invite.trainer_profiles),
+        trainer_name: trainerName,
         student_name: studentName,
         student_id: invite.created_student_id,
         invite_id: invite.id,
@@ -107,6 +128,12 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (invite.is_used) {
+      console.log('Invite already used');
+      return jsonResponse({ valid: false, error: 'Convite já foi utilizado' }, 409);
+    }
+
+    console.log('Invite is valid');
     return jsonResponse({
       valid: true,
       trainer_name: extractTrainerName(invite.trainer_profiles),

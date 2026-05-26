@@ -255,6 +255,17 @@ Deno.serve(async (req) => {
 
     console.log(`Oura connection saved for student ${student_id}`);
 
+    if (invite_token && invite_token !== 'retry') {
+      const { error: inviteUpdateError } = await supabaseClient
+        .from('student_invites')
+        .update({ is_used: true, used_at: new Date().toISOString() })
+        .eq('id', invite_token);
+
+      if (inviteUpdateError) {
+        console.error('Failed to mark Oura invite as used:', inviteUpdateError);
+      }
+    }
+
     // OCB-02: Throttled initial sync — batch 5 at a time instead of 30 parallel
     console.log('🔄 Starting initial Oura sync (throttled, last 30 days)...');
     try {

@@ -4,11 +4,11 @@ import { Loader2, Shield, Activity, Moon, Heart, Thermometer } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { buildErrorDescription } from "@/utils/errorParsing";
 
 interface InviteData {
   valid: boolean;
+  already_connected?: boolean;
   trainer_name: string;
   student_name: string;
   student_id: string;
@@ -41,10 +41,11 @@ export default function OuraConnectPage() {
         );
 
         const result = await response.json();
-        if (!response.ok) {
+        if (result.already_connected) {
+          setInviteData(result);
+        } else if (!response.ok) {
           throw new Error(result?.error || "Falha ao validar convite do Oura");
-        }
-        if (!result.valid) {
+        } else if (!result.valid) {
           setError(result.error || "Link inválido ou expirado");
         } else {
           setInviteData(result);
@@ -121,6 +122,29 @@ export default function OuraConnectPage() {
           <CardContent>
             <p className="text-sm text-muted-foreground">
               Entre em contato com seu treinador para solicitar um novo link.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (inviteData.already_connected) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+        <Card className="max-w-md w-full">
+          <CardHeader className="text-center">
+            <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+              <Activity className="h-8 w-8 text-primary" />
+            </div>
+            <CardTitle>Oura Ring já conectado</CardTitle>
+            <CardDescription>
+              A autorização foi recebida com sucesso. Seu treinador já pode acompanhar seus dados do Oura Ring.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-center text-muted-foreground">
+              Você pode fechar esta aba agora.
             </p>
           </CardContent>
         </Card>

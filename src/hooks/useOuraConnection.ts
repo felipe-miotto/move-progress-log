@@ -15,6 +15,11 @@ interface OuraConnection {
 
 const OURA_CONNECTION_SELECT = "id, student_id, connected_at, last_sync_at, is_active";
 
+interface UseOuraConnectionOptions {
+  pollUntilConnected?: boolean;
+  refetchIntervalMs?: number;
+}
+
 // Configuração de timeout por tipo de operação
 const SYNC_TIMEOUT_CONFIG = {
   singleDay: 30000,    // 30s para sync de 1 dia
@@ -37,14 +42,19 @@ const calculateSyncTimeout = (days: number): number => {
   return Math.min(calculated, SYNC_TIMEOUT_CONFIG.maxTimeout);
 };
 
-export const useOuraConnection = (studentId: string) => {
+export const useOuraConnection = (
+  studentId: string,
+  options: UseOuraConnectionOptions = {}
+) => {
   return useQuery({
     queryKey: ["oura-connection", studentId],
     enabled: !!studentId,
-    staleTime: 60 * 1000,
+    staleTime: 0,
     gcTime: 10 * 60 * 1000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
+    refetchInterval: options.pollUntilConnected
+      ? (query) => query.state.data ? false : options.refetchIntervalMs ?? 5000
+      : false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("oura_connections")
@@ -253,7 +263,7 @@ export const useSyncOura = () => {
       ) {
         title = "🔒 Autenticação expirada";
         description =
-          "Reconecte o Oura Ring através de um novo link de convite.";
+          "Se a conexão acabou de ser aceita, aguarde alguns segundos e tente novamente. Se persistir, gere um novo link de convite.";
       } else if (
         message.includes("access denied") ||
         message.includes("forbidden") ||
