@@ -11,6 +11,11 @@ interface OuraConnection {
   is_active: boolean;
 }
 
+interface UseOuraConnectionOptions {
+  pollUntilConnected?: boolean;
+  refetchIntervalMs?: number;
+}
+
 // Configuração de timeout por tipo de operação
 const SYNC_TIMEOUT_CONFIG = {
   singleDay: 30000,    // 30s para sync de 1 dia
@@ -33,10 +38,18 @@ const calculateSyncTimeout = (days: number): number => {
   return Math.min(calculated, SYNC_TIMEOUT_CONFIG.maxTimeout);
 };
 
-export const useOuraConnection = (studentId: string) => {
+export const useOuraConnection = (
+  studentId: string,
+  options: UseOuraConnectionOptions = {}
+) => {
   return useQuery({
     queryKey: ["oura-connection", studentId],
     enabled: !!studentId,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchInterval: options.pollUntilConnected
+      ? (query) => query.state.data ? false : options.refetchIntervalMs ?? 5000
+      : false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("oura_connections")
@@ -66,7 +79,7 @@ const invokeWithTimeout = async (
   try {
     const { data, error } = await supabase.functions.invoke(functionName, {
       body,
-      // @ts-ignore - Supabase types may not include signal yet
+      // @ts-expect-error - Supabase types may not include signal yet
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
@@ -230,7 +243,7 @@ export const useSyncOura = () => {
       ) {
         title = "🔒 Autenticação expirada";
         description =
-          "Reconecte o Oura Ring através de um novo link de convite.";
+          "Se a conexão acabou de ser aceita, aguarde alguns segundos e tente novamente. Se persistir, gere um novo link de convite.";
       } else if (error.message.includes("Falha ao sincronizar todos")) {
         title = "❌ Nenhum dado disponível";
         description =

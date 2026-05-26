@@ -12,7 +12,10 @@ export default function OnboardingSuccessPage() {
   const studentId = searchParams.get("student_id");
 
   const { data: ouraMetrics, isLoading: metricsLoading } = useOuraMetrics(studentId || "", 7);
-  const { data: ouraConnection, isLoading: connectionLoading } = useOuraConnection(studentId || "");
+  const { data: ouraConnection, isLoading: connectionLoading } = useOuraConnection(studentId || "", {
+    pollUntilConnected: true,
+    refetchIntervalMs: 3000,
+  });
 
   const handleClose = () => {
     // Tentar fechar a janela (funciona se foi aberta via window.open)

@@ -55,17 +55,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if already used
-    if (invite.is_used) {
-      console.log('Invite already used');
-      return new Response(
-        JSON.stringify({ valid: false, error: 'Convite já foi utilizado' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log('Invite is valid');
-
     // If this is an oura_connect type invite, return additional data
     if (type === 'oura_connect' || invite.email === '__oura_connect__') {
       const ouraClientId = Deno.env.get('OURA_CLIENT_ID');
@@ -81,6 +70,40 @@ Deno.serve(async (req) => {
         if (student) studentName = student.name;
       }
 
+      if (invite.created_student_id) {
+        const { data: existingConnection } = await supabaseClient
+          .from('oura_connections')
+          .select('id')
+          .eq('student_id', invite.created_student_id)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (existingConnection) {
+          console.log('Oura invite already accepted; active connection exists');
+          return new Response(
+            JSON.stringify({
+              valid: false,
+              already_connected: true,
+              trainer_name: invite.trainer_profiles?.full_name || 'Seu treinador',
+              student_name: studentName,
+              student_id: invite.created_student_id,
+              invite_id: invite.id,
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+
+      if (invite.is_used) {
+        console.log('Invite already used');
+        return new Response(
+          JSON.stringify({ valid: false, error: 'Convite já foi utilizado' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log('Invite is valid');
+
       return new Response(
         JSON.stringify({
           valid: true,
@@ -94,6 +117,17 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Check if already used
+    if (invite.is_used) {
+      console.log('Invite already used');
+      return new Response(
+        JSON.stringify({ valid: false, error: 'Convite já foi utilizado' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Invite is valid');
 
     return new Response(
       JSON.stringify({
