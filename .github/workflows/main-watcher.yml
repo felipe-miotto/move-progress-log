@@ -1,10 +1,14 @@
 name: main-watcher
 
-# Vigia a lane que o classificador de PR NÃO cobre: commits DIRETOS no `main`.
-# A Lovable (gpt-engineer-app[bot]) commita direto em main e aplica migrations
-# no deploy — foi por aí que entraram role BYPASSRLS e migration duplicada,
-# sem PR. Este watcher reclassifica cada push em main e, se tocar paths de
-# risco, abre uma issue `needs-human` pedindo revisão pós-fato.
+# Vigia a lane que o classificador de PR NÃO cobre: commits DIRETOS no `main`
+# SEM PR associado. A Lovable (gpt-engineer-app[bot]) commita direto em main e
+# aplica migrations no deploy — foi por aí que entraram role BYPASSRLS e
+# migration duplicada, sem PR.
+#
+# v1.1: NÃO alerta em merges de PR já revisados. Um squash/merge produz um
+# commit em `main` associado ao PR; detectamos via
+# listPullRequestsAssociatedWithCommit e PULAMOS. Só classificamos/alertamos
+# quando o commit NÃO tem PR associado (commit direto na lane não-gerenciada).
 
 on:
   push:
@@ -13,22 +17,45 @@ on:
 permissions:
   contents: read
   issues: write
+  pull-requests: read
 
 jobs:
   watch:
     runs-on: ubuntu-latest
     steps:
+      - name: Commit tem PR associado? (merge revisado vs commit direto)
+        id: assoc
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const commit_sha = context.sha;
+            const { data: pulls } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner, repo, commit_sha,
+            });
+            const hasPR = pulls.length > 0;
+            core.info(`Commit ${commit_sha.slice(0, 7)} → PRs associados: ${pulls.length}` +
+              (hasPR ? ` (#${pulls.map((p) => p.number).join(', #')})` : " (commit direto, sem PR)"));
+            core.setOutput('has_pr', hasPR ? 'true' : 'false');
+
+      - name: Pular (merge de PR revisado)
+        if: steps.assoc.outputs.has_pr == 'true'
+        run: echo "Commit veio de PR revisado (lane de PR) — main-watcher não alerta. OK."
+
       - name: Checkout
+        if: steps.assoc.outputs.has_pr == 'false'
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Setup Node
+        if: steps.assoc.outputs.has_pr == 'false'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
       - name: Diff do push (before...after)
+        if: steps.assoc.outputs.has_pr == 'false'
         id: diff
         env:
           BEFORE: ${{ github.event.before }}
@@ -44,7 +71,8 @@ jobs:
           git diff --name-status $RANGE > changed.txt || git show --name-status --format= "$AFTER" > changed.txt
           cat changed.txt
 
-      - name: Classificar push direto
+      - name: Classificar commit direto
+        if: steps.assoc.outputs.has_pr == 'false'
         id: classify
         run: |
           npx --yes tsx scripts/classify-pr-risk.ts --files-from changed.txt --markdown-out watch.md > result.json || true
@@ -55,9 +83,11 @@ jobs:
           fi
           echo "risk=$RISK" >> "$GITHUB_OUTPUT"
 
-      - name: Abrir issue se push direto for de risco
-        if: steps.classify.outputs.risk != 'safe-auto'
+      - name: Abrir issue se commit direto for de risco
+        if: steps.assoc.outputs.has_pr == 'false' && steps.classify.outputs.risk != 'safe-auto'
         uses: actions/github-script@v7
+        env:
+          RISK: ${{ steps.classify.outputs.risk }}
         with:
           script: |
             const fs = require('fs');
@@ -70,9 +100,9 @@ jobs:
             const isLovable = /gpt-engineer-app|lovable/i.test(JSON.stringify(context.payload.head_commit?.author || {}))
               || /gpt-engineer-app|lovable/i.test(author);
             const msg = context.payload.head_commit?.message?.split('\n')[0] || '';
-            const title = `[main-watcher] commit direto de risco em main: ${sha}${isLovable ? ' (Lovable)' : ''}`;
+            const title = `[main-watcher] commit direto SEM PR em main: ${sha}${isLovable ? ' (Lovable)' : ''}`;
             const body = [
-              `Commit direto no \`main\` (fora da lane de PR) classificado como **${process.env.RISK || 'needs-human'}**.`,
+              `Commit direto no \`main\` **sem PR associado** classificado como **${process.env.RISK || 'needs-human'}**.`,
               ``,
               `- SHA: \`${context.sha}\``,
               `- Autor: \`${author}\`${isLovable ? ' — ⚠️ **bot da Lovable**' : ''}`,
@@ -80,10 +110,7 @@ jobs:
               ``,
               md,
               ``,
-              `> Lane não-gerenciada. Revise se este commit deveria ter passado por PR/aprovação humana.`,
+              `> Lane não-gerenciada (sem PR). Revise se este commit deveria ter passado por PR/aprovação humana.`,
             ].join('\n');
-            // Garante a label needs-human
             try { await github.rest.issues.createLabel({ owner, repo, name: 'needs-human', color: 'FBCA04' }); } catch {}
             await github.rest.issues.create({ owner, repo, title, body, labels: ['needs-human'] });
-        env:
-          RISK: ${{ steps.classify.outputs.risk }}
