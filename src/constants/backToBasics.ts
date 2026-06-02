@@ -275,6 +275,26 @@ export const CORE_ATIVACAO_SUBCATEGORIES = {
 } as const;
 
 /**
+ * Subcategorias CORE LEGADAS — vocabulário antigo que vivia só na cópia local
+ * de `ExerciseReviewPage`. Preservadas para back-compat: se alguma linha do
+ * banco usar uma destas, o dropdown ainda a exibe como "(legado)" e o coach
+ * pode reclassificar. Novos cadastros usam CORE_ATIVACAO_SUBCATEGORIES.
+ *
+ * Mapeamento conceitual (decisão de produto — NÃO há backfill de banco aqui):
+ *   - ativacao_gluteo (singular) → ativacao_gluteos
+ *   - ativacao_ombro             → cintura_escapular_serratil
+ *   - estabilizacao              → sem equivalente; reclassificar manualmente
+ *
+ * Os 3 `anti_*` NÃO entram aqui: são idênticos na lista canônica (e são as
+ * únicas chaves de core consumidas por generate-group-session).
+ */
+export const LEGACY_CORE_SUBCATEGORIES = {
+  ativacao_gluteo: "Ativação Glúteo (legado)",
+  ativacao_ombro: "Ativação Ombro (legado)",
+  estabilizacao: "Estabilização (legado)",
+} as const;
+
+/**
  * Subcategorias controladas para Liberação Miofascial (LMF).
  *
  * Região/grupo alvo da liberação. Chaves em snake_case persistidas em

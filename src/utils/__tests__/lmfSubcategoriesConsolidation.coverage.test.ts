@@ -78,11 +78,13 @@ describe("Fase 3 — LMF_SUBCATEGORIES consolidado", () => {
     });
   });
 
-  describe("guard de escopo — CORE intocado nesta rodada", () => {
-    it("CORE_SUBCATEGORIES local permanece em ExerciseReviewPage (fase separada)", () => {
-      // A divergência CORE_SUBCATEGORIES vs CORE_ATIVACAO_SUBCATEGORIES é
-      // tratada numa auditoria CORE posterior — NÃO neste PR.
-      expect(reviewPageSrc).toMatch(/const\s+CORE_SUBCATEGORIES\s*[:=]/);
+  describe("CORE consolidado depois, na Fase 4b", () => {
+    it("CORE_SUBCATEGORIES local NÃO existe mais (consolidado no PR 4b)", () => {
+      // Atualizado: no LMF (#199) o guard exigia que o CORE_SUBCATEGORIES local
+      // permanecesse intocado (fase separada). A Fase 4b consolidou o CORE na
+      // fonte canônica, então o const local foi removido. Cobertura detalhada
+      // do CORE em coreSubcategoriesConsolidation.coverage.test.ts.
+      expect(reviewPageSrc).not.toMatch(/const\s+CORE_SUBCATEGORIES\s*[:=]/);
     });
   });
 });

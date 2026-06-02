@@ -25,6 +25,8 @@ import {
   STRENGTH_SUBCATEGORIES,
   POTENCIA_SUBCATEGORIES,
   LMF_SUBCATEGORIES,
+  CORE_ATIVACAO_SUBCATEGORIES,
+  LEGACY_CORE_SUBCATEGORIES,
   STABILITY_POSITION_OPTIONS,
   SURFACE_MODIFIER_OPTIONS,
 } from "@/constants/backToBasics";
@@ -42,19 +44,15 @@ const MISSING_FIELD_LABELS: Record<MissingField, string> = {
   surface_modifier: "Modificador Superfície",
 };
 
-const CORE_SUBCATEGORIES: Record<string, string> = {
-  anti_extensao: "Anti-extensão",
-  anti_rotacao: "Anti-rotação",
-  anti_flexao_lateral: "Anti-flexão lateral",
-  ativacao_gluteo: "Ativação Glúteo",
-  ativacao_ombro: "Ativação Ombro",
-  estabilizacao: "Estabilização",
+// CORE e LMF consolidados em @/constants/backToBasics (fonte canônica única).
+// O dropdown de core_ativacao usa a lista canônica + as chaves legadas
+// (ativacao_gluteo/ativacao_ombro/estabilizacao) como "(legado)", pra que
+// dados existentes que usem o vocabulário antigo continuem visíveis/editáveis.
+// Sem migration / sem backfill de banco nesta fase.
+const CORE_SUBCATEGORY_OPTIONS: Record<string, string> = {
+  ...CORE_ATIVACAO_SUBCATEGORIES,
+  ...LEGACY_CORE_SUBCATEGORIES,
 };
-
-// LMF_SUBCATEGORIES consolidado em @/constants/backToBasics (fonte canônica).
-// CORE_SUBCATEGORIES local permanece intacto de propósito nesta rodada —
-// a divergência CORE_SUBCATEGORIES vs CORE_ATIVACAO_SUBCATEGORIES é tratada
-// numa fase separada (auditoria CORE), não aqui.
 
 const LEGACY_REVIEW_PAGE_SIZE = 25;
 
@@ -224,7 +222,7 @@ const ExerciseReviewPage = () => {
       return STRENGTH_SUBCATEGORIES[movementPattern];
     }
     if (category === "potencia_pliometria") return POTENCIA_SUBCATEGORIES;
-    if (category === "core_ativacao") return CORE_SUBCATEGORIES;
+    if (category === "core_ativacao") return CORE_SUBCATEGORY_OPTIONS;
     if (category === "lmf") return LMF_SUBCATEGORIES;
     return null;
   };
