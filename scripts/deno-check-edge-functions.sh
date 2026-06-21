@@ -54,7 +54,6 @@ fi
 # Deno 2.8.3 / TS 6.0.3 toolchain and @supabase/supabase-js@2.98.0 (via deno.lock).
 baseline_count() {
   case "$1" in
-    oura-callback)                    echo "3" ;;
     create-student-from-invite)       echo "6" ;;
     oura-sync-test)                   echo "1" ;;
     smoke-test-integrity)             echo "1" ;;
@@ -68,7 +67,6 @@ baseline_count() {
 # function MUST have an anchor (enforced below). Empty = not baselined.
 baseline_msg() {
   case "$1" in
-    oura-callback)                    echo "invite_token" ;;
     create-student-from-invite)       echo "type 'never'" ;;
     oura-sync-test)                   echo "temperature_deviation" ;;
     smoke-test-integrity)             echo "string | undefined" ;;
@@ -79,7 +77,6 @@ baseline_msg() {
 
 short_reason() {
   case "$1" in
-    oura-callback)                    echo "ReferenceError: invite_token — REAL bug, Ação 2 (needs-human)" ;;
     create-student-from-invite)       echo "untyped Supabase client -> never on update/insert" ;;
     oura-sync-test)                   echo "missing optional Oura contributor field (guarded by ?.)" ;;
     smoke-test-integrity)             echo "fetch url possibly-undefined (env-guarded, not a live route)" ;;

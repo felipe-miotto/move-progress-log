@@ -121,8 +121,9 @@ Deno.serve(async (req) => {
     }
 
     // OCB-06: Reject replay — a state captured from a successful OAuth
-    // round-trip must not be re-usable. is_used is flipped by this callback
-    // after tokens are saved successfully.
+    // round-trip must not be re-usable. is_used is claimed atomically by OCB-09
+    // below (before the token exchange), so a replayed state sees is_used=true
+    // and is rejected here.
     if (validatedInvite.is_used === true) {
       console.error('OCB-06: Invite already used (replay attempt)');
       return new Response('Invalid OAuth state', { status: 400 });
@@ -255,15 +256,19 @@ Deno.serve(async (req) => {
 
     console.log(`Oura connection saved for student ${student_id}`);
 
-    if (invite_token && invite_token !== 'retry') {
-      const { error: inviteUpdateError } = await supabaseClient
-        .from('student_invites')
-        .update({ is_used: true, used_at: new Date().toISOString() })
-        .eq('id', invite_token);
+    // OCB-09 already atomically set is_used=true before the token exchange.
+    // Now that tokens are stored, stamp used_at so the invite records when the
+    // Oura connection actually completed (audit only — used_at is not read for
+    // gating). The previous code referenced an undeclared `invite_token` here,
+    // throwing a ReferenceError (500) AFTER tokens were saved (regressed in
+    // PR #195); use the validated invite id instead.
+    const { error: inviteUpdateError } = await supabaseClient
+      .from('student_invites')
+      .update({ used_at: new Date().toISOString() })
+      .eq('id', validatedInvite.id);
 
-      if (inviteUpdateError) {
-        console.error('Failed to mark Oura invite as used:', inviteUpdateError);
-      }
+    if (inviteUpdateError) {
+      console.error('Failed to stamp Oura invite used_at:', inviteUpdateError);
     }
 
     // OCB-02: Throttled initial sync — batch 5 at a time instead of 30 parallel
