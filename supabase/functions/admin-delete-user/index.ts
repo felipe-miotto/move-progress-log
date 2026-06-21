@@ -25,15 +25,13 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) return json(401, { error: "Authorization required" });
 
-    const authClient = createClient(url, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: { user: caller }, error: authErr } = await authClient.auth.getUser();
-    if (authErr || !caller) return json(401, { error: "Invalid token" });
-
     const admin = createClient(url, serviceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
+
+    const token = authHeader.slice("Bearer ".length);
+    const { data: { user: caller }, error: authErr } = await admin.auth.getUser(token);
+    if (authErr || !caller) return json(401, { error: "Invalid token", detail: authErr?.message });
 
     const { data: roles, error: roleErr } = await admin
       .from("user_roles")
