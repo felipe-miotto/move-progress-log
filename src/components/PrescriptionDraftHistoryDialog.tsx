@@ -11,6 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { usePrescriptionDraftHistory } from "@/hooks/usePrescriptionDraftHistory";
+import type { PrescriptionDraftExercise, PrescriptionType } from "@/hooks/usePrescriptionDraft";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Trash2, Clock, FileText, ListChecks } from "lucide-react";
@@ -30,23 +31,8 @@ interface PrescriptionDraft {
   timestamp: string;
   name: string;
   objective: string;
-  exercises: Array<{
-    id: string;
-    exercise_library_id: string;
-    sets: string;
-    reps: string;
-    interval_seconds: string;
-    pse: string;
-    training_method: string;
-    observations: string;
-    group_with_previous: boolean;
-    should_track: boolean;
-    adaptations: Array<{
-      type: "regression_1" | "regression_2" | "regression_3";
-      exercise_library_id: string;
-    }>;
-    showAdaptations: boolean;
-  }>;
+  prescriptionType?: PrescriptionType;
+  exercises: PrescriptionDraftExercise[];
 }
 
 interface PrescriptionDraftHistoryDialogProps {

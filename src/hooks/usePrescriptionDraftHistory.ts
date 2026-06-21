@@ -1,29 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { notify } from '@/lib/notify';
 import { logger } from '@/utils/logger';
+import type { PrescriptionDraftExercise, PrescriptionType } from './usePrescriptionDraft';
 
 interface PrescriptionDraft {
   id: string;
   timestamp: string;
   name: string;
   objective: string;
-  exercises: Array<{
-    id: string;
-    exercise_library_id: string;
-    sets: string;
-    reps: string;
-    interval_seconds: string;
-    pse: string;
-    training_method: string;
-    observations: string;
-    group_with_previous: boolean;
-    should_track: boolean;
-    adaptations: Array<{
-      type: "regression_1" | "regression_2" | "regression_3";
-      exercise_library_id: string;
-    }>;
-    showAdaptations: boolean;
-  }>;
+  prescriptionType?: PrescriptionType;
+  exercises: PrescriptionDraftExercise[];
 }
 
 const DRAFT_HISTORY_KEY = 'prescription_draft_history_v1';

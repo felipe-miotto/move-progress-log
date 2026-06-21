@@ -3,27 +3,37 @@ import { notify } from '@/lib/notify';
 import { logger } from '@/utils/logger';
 import { usePrescriptionDraftHistory } from './usePrescriptionDraftHistory';
 
-interface PrescriptionDraft {
+export type PrescriptionType = 'group' | 'individual';
+
+export interface PrescriptionDraftExercise {
+  id: string;
+  exercise_library_id: string;
+  sets: string;
+  reps: string;
+  interval_seconds: string;
+  pse: string;
+  training_method: string;
+  observations: string;
+  group_with_previous: boolean;
+  should_track: boolean;
+  // load/rir are only persisted for individual prescriptions. Optional so
+  // drafts saved before these were tracked still parse from localStorage.
+  load?: string;
+  rir?: string;
+  adaptations: Array<{
+    type: "regression_1" | "regression_2" | "regression_3";
+    exercise_library_id: string;
+  }>;
+  showAdaptations: boolean;
+}
+
+export interface PrescriptionDraft {
   timestamp: string;
   name: string;
   objective: string;
-  exercises: Array<{
-    id: string;
-    exercise_library_id: string;
-    sets: string;
-    reps: string;
-    interval_seconds: string;
-    pse: string;
-    training_method: string;
-    observations: string;
-    group_with_previous: boolean;
-    should_track: boolean;
-    adaptations: Array<{
-      type: "regression_1" | "regression_2" | "regression_3";
-      exercise_library_id: string;
-    }>;
-    showAdaptations: boolean;
-  }>;
+  // Optional for backward-compat with drafts saved before it was tracked.
+  prescriptionType?: PrescriptionType;
+  exercises: PrescriptionDraftExercise[];
 }
 
 const DEBOUNCE_MS = 1000;
@@ -66,6 +76,7 @@ export function usePrescriptionDraft(entityId?: string) {
         timestamp: new Date().toISOString(),
         name: data.name || '',
         objective: data.objective || '',
+        prescriptionType: data.prescriptionType,
         exercises: data.exercises || [],
       };
 
@@ -101,7 +112,11 @@ export function usePrescriptionDraft(entityId?: string) {
   const hasUnsavedChanges = useCallback((currentData: Partial<PrescriptionDraft>) => {
     if (!draft) return false;
     
-    if (currentData.name !== draft.name || currentData.objective !== draft.objective) {
+    if (
+      currentData.name !== draft.name ||
+      currentData.objective !== draft.objective ||
+      currentData.prescriptionType !== draft.prescriptionType
+    ) {
       return true;
     }
 
@@ -122,6 +137,8 @@ export function usePrescriptionDraft(entityId?: string) {
         ex.observations !== d.observations ||
         ex.group_with_previous !== d.group_with_previous ||
         ex.should_track !== d.should_track ||
+        ex.load !== d.load ||
+        ex.rir !== d.rir ||
         ex.adaptations?.length !== d.adaptations?.length
       );
     });

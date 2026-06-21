@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useUpdatePrescription, usePrescriptionDetails } from "@/hooks/usePrescriptions";
 import { useExercisesLibrary } from "@/hooks/useExercisesLibrary";
-import { usePrescriptionDraft } from "@/hooks/usePrescriptionDraft";
+import { usePrescriptionDraft, type PrescriptionDraft } from "@/hooks/usePrescriptionDraft";
 import { Plus, Save, History, Trash2 } from "lucide-react";
 import { PrescriptionDraftHistoryDialog } from "@/components/PrescriptionDraftHistoryDialog";
 import { formatDistanceToNow } from "date-fns";
@@ -160,6 +160,9 @@ export function EditPrescriptionDialog({ open, onOpenChange, prescriptionId }: E
       setName(draft.name);
       setObjective(draft.objective);
       setExercises(draft.exercises.map((ex: Partial<Exercise>) => ({ ...ex, load: ex.load || "", rir: ex.rir || "" }) as Exercise));
+      if (draft.prescriptionType === 'group' || draft.prescriptionType === 'individual') {
+        setPrescriptionType(draft.prescriptionType);
+      }
       draftRestoredRef.current = true;
     }
   }, [open, dataLoaded, draft]);
@@ -175,9 +178,9 @@ export function EditPrescriptionDialog({ open, onOpenChange, prescriptionId }: E
   // Auto-save quando dados mudarem
   useEffect(() => {
     if (open && dataLoaded && (name || objective || exercises.some(ex => ex.exercise_library_id))) {
-      saveDraft({ name, objective, exercises });
+      saveDraft({ name, objective, exercises, prescriptionType });
     }
-  }, [name, objective, exercises, open, dataLoaded, saveDraft]);
+  }, [name, objective, exercises, prescriptionType, open, dataLoaded, saveDraft]);
 
   // Proteção ao navegar
   useEffect(() => {
@@ -463,10 +466,13 @@ export function EditPrescriptionDialog({ open, onOpenChange, prescriptionId }: E
     onOpenChange(false);
   };
 
-  const handleRestoreDraft = (draftData: { timestamp: string; name: string; objective: string; exercises: Array<{ id: string; exercise_library_id: string; sets: string; reps: string; interval_seconds: string; pse: string; training_method: string; observations: string; group_with_previous: boolean; should_track: boolean; adaptations: Array<{ type: "regression_1" | "regression_2" | "regression_3"; exercise_library_id: string }>; showAdaptations: boolean }> }) => {
+  const handleRestoreDraft = (draftData: PrescriptionDraft) => {
     setName(draftData.name);
     setObjective(draftData.objective);
-    setExercises(draftData.exercises.map(ex => ({ ...ex, load: "", rir: "" })));
+    setExercises(draftData.exercises.map(ex => ({ ...ex, load: ex.load ?? "", rir: ex.rir ?? "" }) as Exercise));
+    if (draftData.prescriptionType === 'group' || draftData.prescriptionType === 'individual') {
+      setPrescriptionType(draftData.prescriptionType);
+    }
     restoreDraft(draftData);
   };
 
