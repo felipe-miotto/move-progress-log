@@ -3,7 +3,7 @@
  * Fase 1 do plano v14.5 — UI para classificação e revisão
  */
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -15,12 +15,14 @@ import { Progress } from "@/components/ui/progress";
 import { notify } from "@/lib/notify";
 import { useClassifyExercises } from "@/hooks/useClassifyExercises";
 import { EXERCISE_DIMENSIONS, EXERCISE_CATEGORIES } from "@/constants/backToBasics";
-import { Brain, Save, RefreshCw, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Brain, Save, RefreshCw, CheckCircle2, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
 import { buildErrorDescription } from "@/utils/errorParsing";
 
 const DIMENSION_KEYS = ["axial_load", "lumbar_demand", "technical_complexity", "metabolic_potential", "knee_dominance", "hip_dominance"] as const;
 
 type DimensionKey = typeof DIMENSION_KEYS[number];
+
+const PAGE_SIZE = 100;
 
 interface DimensionEdit {
   id: string;
@@ -33,6 +35,7 @@ export const ExerciseDimensionReview = () => {
   const [edits, setEdits] = useState<Record<string, DimensionEdit>>({});
   const [filter, setFilter] = useState<"all" | "classified" | "unclassified">("unclassified");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Fetch exercises with dimension data
   const { data: exercises, isLoading } = useQuery({
@@ -92,6 +95,24 @@ export const ExerciseDimensionReview = () => {
       percentage: 0,
     };
   }, [exercises]);
+
+  // Client-side pagination over the in-memory (fully fetched) list, so the
+  // reviewer can reach every item instead of only the first 100 of a filter.
+  const allExercises = exercises || [];
+  const totalPages = Math.max(1, Math.ceil(allExercises.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const pageStart = (safePage - 1) * PAGE_SIZE;
+  const pageExercises = allExercises.slice(pageStart, pageStart + PAGE_SIZE);
+
+  // Back to page 1 whenever the filters change the dataset.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter, categoryFilter]);
+
+  // Keep the page in range if the list shrinks (refetch/save reclassification).
+  useEffect(() => {
+    setCurrentPage((p) => Math.min(Math.max(1, p), totalPages));
+  }, [totalPages]);
 
   // Total stats (unfiltered)
   const { data: totalStats } = useQuery({
@@ -312,6 +333,7 @@ export const ExerciseDimensionReview = () => {
           {isLoading ? (
             <p className="text-muted-foreground">Carregando...</p>
           ) : (
+            <>
             <div className="border rounded-lg overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -326,7 +348,7 @@ export const ExerciseDimensionReview = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(exercises || []).slice(0, 100).map((ex) => (
+                  {pageExercises.map((ex) => (
                     <TableRow key={ex.id} className={edits[ex.id] ? "bg-accent/30" : ""}>
                       <TableCell className="font-medium text-sm sticky left-0 bg-background z-10">
                         {ex.name}
@@ -358,23 +380,37 @@ export const ExerciseDimensionReview = () => {
                       })}
                     </TableRow>
                   ))}
-                  {(exercises || []).length === 0 && (
+                  {allExercises.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                         {filter === "unclassified" ? "Todos classificados! 🎉" : "Nenhum exercício encontrado."}
                       </TableCell>
                     </TableRow>
                   )}
-                  {(exercises || []).length > 100 && (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center text-muted-foreground py-4 text-sm">
-                        Exibindo 100 de {exercises!.length}. Use os filtros para refinar.
-                      </TableCell>
-                    </TableRow>
-                  )}
                 </TableBody>
               </Table>
             </div>
+            {allExercises.length > 0 && (
+              <div className="flex items-center justify-between gap-2 px-1 py-2 text-sm text-muted-foreground">
+                <span>
+                  Mostrando {pageStart + 1}–{pageStart + pageExercises.length} de {allExercises.length}
+                </span>
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(safePage - 1)} disabled={safePage <= 1}>
+                      <ChevronLeft className="h-4 w-4" />
+                      Anterior
+                    </Button>
+                    <span>Página {safePage} de {totalPages}</span>
+                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(safePage + 1)} disabled={safePage >= totalPages}>
+                      Próxima
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+            </>
           )}
         </CardContent>
       </Card>
