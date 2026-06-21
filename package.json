@@ -12,6 +12,7 @@
     "test": "vitest run",
     "verify:essential": "bash ./scripts/verify-essential-gates.sh",
     "verify:edge-auth": "bash ./scripts/verify-edge-auth-guards.sh",
+    "verify:edge-types": "bash ./scripts/deno-check-edge-functions.sh",
     "verify:data-integrity": "node ./scripts/verify-data-integrity.js",
     "verify:query-safety": "bash ./scripts/check-no-select-star.sh",
     "test:oura-integration": "VITE_RUN_OURA_INTEGRATION_TESTS=true vitest run src/utils/__tests__/ouraIntegration.test.ts --run"

@@ -19,6 +19,12 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: '2.8.3'
+          cache: true
+
       - name: Install dependencies
         run: npm ci
 
@@ -27,6 +33,12 @@ jobs:
 
       - name: TypeScript check
         run: npx tsc --noEmit
+
+      - name: Edge function type check (Deno)
+        run: npm run verify:edge-types
+
+      - name: Edge auth guard check
+        run: npm run verify:edge-auth
 
       - name: Query type safety check
         run: npm run verify:query-safety
