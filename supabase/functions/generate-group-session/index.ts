@@ -1554,7 +1554,7 @@ serve(async (req) => {
       .from("user_roles")
       .select("role")
       .eq("user_id", userData.user.id)
-      .in("role", ["admin", "trainer"])
+      .in("role", ["admin", "moderator"])
       .limit(1);
 
     if (roleError) {
