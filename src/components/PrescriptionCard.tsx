@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { usePrescriptionDetails, WorkoutPrescription, PrescriptionExercise } from "@/hooks/usePrescriptions";
 import { useFolders } from "@/hooks/useFolders";
+import { useIsModerator } from "@/hooks/useUserRole";
 import { Calendar, Users, ClipboardList, Pencil, MoreVertical, FolderInput, FolderX, Trash2, Monitor } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -105,6 +106,9 @@ const PrescriptionCardComponent = ({
 }: PrescriptionCardProps) => {
   const { data: details, isLoading } = usePrescriptionDetails(prescription.id);
   const { data: folders } = useFolders();
+  // "Registrar Sessão" abre o registro de sessão em grupo (ação de treinador).
+  // Esconde para aluno (user); admin/moderator veem. RLS já bloqueia no backend.
+  const { isModerator } = useIsModerator();
   const [tvMode, setTvMode] = useState(false);
   const hasAnyObservations = (details?.exercises || []).some(
     (ex) => ex.observations?.trim()
@@ -160,15 +164,17 @@ const PrescriptionCardComponent = ({
               <Users className="h-4 w-4" />
               Atribuir
             </Button>
-            <Button
-              variant="default"
-              size="sm"
-              className="gap-2"
-              onClick={() => onAddSession(prescription.id)}
-            >
-              <ClipboardList className="h-4 w-4" />
-              Registrar Sessão
-            </Button>
+            {isModerator && (
+              <Button
+                variant="default"
+                size="sm"
+                className="gap-2"
+                onClick={() => onAddSession(prescription.id)}
+              >
+                <ClipboardList className="h-4 w-4" />
+                Registrar Sessão
+              </Button>
+            )}
 
             {/* Context Menu */}
             <DropdownMenu>
