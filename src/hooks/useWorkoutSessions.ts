@@ -276,6 +276,7 @@ export const useCreateWorkoutSession = () => {
         load_description?: string;
         load_breakdown?: string;
         observations?: string;
+        is_best_set?: boolean;
       }>;
     }) => {
       const exercisesPayload = data.exercises.map((ex) => ({
@@ -288,6 +289,7 @@ export const useCreateWorkoutSession = () => {
         load_description: ex.load_description ?? null,
         load_breakdown: ex.load_breakdown ?? null,
         observations: ex.observations ?? null,
+        is_best_set: ex.is_best_set ?? false,
       }));
       assertExercisesHaveLibraryIds(exercisesPayload);
 
