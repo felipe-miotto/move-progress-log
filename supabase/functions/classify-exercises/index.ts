@@ -141,7 +141,7 @@ serve(async (req) => {
       .from("user_roles")
       .select("role")
       .eq("user_id", userId)
-      .in("role", ["admin", "trainer"])
+      .in("role", ["admin"])
       .limit(1);
 
     if (roleError) {
@@ -153,7 +153,7 @@ serve(async (req) => {
 
     if (!roleData || roleData.length === 0) {
       return new Response(
-        JSON.stringify({ success: false, error: "Acesso restrito a treinadores e admins" }),
+        JSON.stringify({ success: false, error: "Acesso restrito a administradores" }),
         { headers: jsonHeaders, status: 403 }
       );
     }
