@@ -22,6 +22,7 @@ import OuraMetricsCard from "@/components/OuraMetricsCard";
 import { OuraSleepDetailCard } from "@/components/OuraSleepDetailCard";
 import { OuraActivityCard } from "@/components/OuraActivityCard";
 import { WhoopActivityCard } from "@/components/WhoopActivityCard";
+import { SendWhoopConnectDialog } from "@/components/SendWhoopConnectDialog";
 import { OuraWorkoutsCard } from "@/components/OuraWorkoutsCard";
 import { OuraStressCard } from "@/components/OuraStressCard";
 import { OuraAdvancedMetricsCard } from "@/components/OuraAdvancedMetricsCard";
@@ -39,6 +40,7 @@ import { StudentOverviewDashboard } from "@/components/StudentOverviewDashboard"
 import { AssessmentsTab } from "@/components/assessments/AssessmentsTab";
 import { useOuraMetrics, useLatestOuraMetrics } from "@/hooks/useOuraMetrics";
 import { useWhoopMetrics } from "@/hooks/useWhoopMetrics";
+import { useWhoopConnection, useDisconnectWhoop } from "@/hooks/useWhoopConnection";
 import { useOuraConnection } from "@/hooks/useOuraConnection";
 import { useState, useMemo, useEffect } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -93,6 +95,7 @@ const StudentDetailPage = () => {
   const needsSessions = activeTab === "overview" || activeTab === "sessions" || activeTab === "exercises";
   const needsAssignments = activeTab === "overview" || activeTab === "prescriptions";
   const needsOuraHistory = activeTab === "training" || activeTab === "oura";
+  const needsWhoop = activeTab === "whoop";
   const needsLatestOura =
     activeTab === "training" || activeTab === "overview" || activeTab === "oura";
 
@@ -109,7 +112,10 @@ const StudentDetailPage = () => {
   );
   const { data: latestOuraMetrics } = useLatestOuraMetrics(needsLatestOura ? studentId : "");
   const { data: ouraConnection } = useOuraConnection(studentId);
-  const { data: whoopMetrics } = useWhoopMetrics(studentId, 7);
+  const { data: whoopMetrics } = useWhoopMetrics(needsWhoop ? studentId : "", 7);
+  const { data: whoopConnection } = useWhoopConnection(studentId);
+  const disconnectWhoop = useDisconnectWhoop();
+  const [whoopDialogOpen, setWhoopDialogOpen] = useState(false);
   const { isAdmin } = useIsAdmin();
   const [selectedExerciseKey, setSelectedExerciseKey] = useState<string | null>(null);
   const [recordSessionOpen, setRecordSessionOpen] = useState(false);
@@ -376,7 +382,7 @@ const StudentDetailPage = () => {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList
           aria-label="Seções do perfil do aluno"
-          className="flex h-auto w-full justify-start gap-1 overflow-x-auto p-1 sm:grid sm:grid-cols-4 lg:grid-cols-7"
+          className="flex h-auto w-full justify-start gap-1 overflow-x-auto p-1 sm:grid sm:grid-cols-4 lg:grid-cols-8"
         >
           <TabsTrigger className="min-h-11 min-w-max px-4" value="training">
             {NAV_LABELS.tabTraining}
@@ -398,6 +404,9 @@ const StudentDetailPage = () => {
           </TabsTrigger>
           <TabsTrigger className="min-h-11 min-w-max px-4" value="oura">
             {NAV_LABELS.tabOura}
+          </TabsTrigger>
+          <TabsTrigger className="min-h-11 min-w-max px-4" value="whoop">
+            Whoop
           </TabsTrigger>
         </TabsList>
 
@@ -842,17 +851,80 @@ const StudentDetailPage = () => {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
 
-          {whoopMetrics && whoopMetrics.length > 0 && (
-            <div className="mt-6 space-y-4">
-              <h3 className="text-lg font-semibold">Whoop</h3>
-              <div className="grid gap-4 md:grid-cols-2">
-                {whoopMetrics.slice(0, 4).map((m) => (
-                  <WhoopActivityCard key={m.id} metrics={m} />
-                ))}
-              </div>
-            </div>
+        <TabsContent value="whoop" className="space-y-6 animate-fade-in">
+          <div>
+            <h3 className="text-2xl font-bold">Whoop</h3>
+            <p className="text-muted-foreground">Recuperação, esforço (strain) e sono</p>
+          </div>
+
+          {whoopConnection ? (
+            <>
+              <Card>
+                <CardContent className="flex items-center justify-between py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Activity className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-medium">Whoop conectado</p>
+                      <p className="text-sm text-muted-foreground">
+                        {whoopConnection.last_sync_at
+                          ? `Última sincronização: ${new Date(whoopConnection.last_sync_at).toLocaleDateString("pt-BR")}`
+                          : "Aguardando primeira sincronização"}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => disconnectWhoop.mutate(studentId)}
+                    disabled={disconnectWhoop.isPending}
+                  >
+                    Desconectar
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {whoopMetrics && whoopMetrics.length > 0 ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {whoopMetrics.map((m) => (
+                    <WhoopActivityCard key={m.id} metrics={m} />
+                  ))}
+                </div>
+              ) : (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-12">
+                    <Activity className="h-12 w-12 text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">Ainda não há dados do Whoop disponíveis</p>
+                    <p className="text-sm text-muted-foreground mt-2">Os dados aparecem após a primeira sincronização.</p>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          ) : (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                <Activity className="h-12 w-12 text-muted-foreground mb-4" />
+                <p className="font-medium">Whoop não conectado</p>
+                <p className="text-sm text-muted-foreground mt-2 mb-4">
+                  Gere um link para o aluno autorizar o compartilhamento dos dados do Whoop.
+                </p>
+                <Button onClick={() => setWhoopDialogOpen(true)}>
+                  <Activity className="h-4 w-4 mr-2" />
+                  Conectar Whoop
+                </Button>
+              </CardContent>
+            </Card>
           )}
+
+          <SendWhoopConnectDialog
+            open={whoopDialogOpen}
+            onOpenChange={setWhoopDialogOpen}
+            studentId={id!}
+            studentName={student?.name ?? "Aluno"}
+          />
         </TabsContent>
       </Tabs>
 
