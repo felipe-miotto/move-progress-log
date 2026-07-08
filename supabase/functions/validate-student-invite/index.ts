@@ -128,6 +128,61 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (type === 'whoop_connect' || invite.email === '__whoop_connect__') {
+      const whoopClientId = Deno.env.get('WHOOP_CLIENT_ID');
+      const trainerName = extractTrainerName(invite.trainer_profiles);
+
+      let studentName = 'Aluno';
+      if (invite.created_student_id) {
+        const { data: student, error: studentError } = await supabaseClient
+          .from('students')
+          .select('name')
+          .eq('id', invite.created_student_id)
+          .single();
+        if (studentError) {
+          console.error('Failed to load student name for invite:', studentError);
+        }
+        if (student) studentName = student.name;
+      }
+
+      if (invite.created_student_id) {
+        const { data: existingConnection } = await supabaseClient
+          .from('whoop_connections')
+          .select('id')
+          .eq('student_id', invite.created_student_id)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (existingConnection) {
+          console.log('Whoop invite already accepted; active connection exists');
+          return jsonResponse({
+            valid: false,
+            already_connected: true,
+            trainer_name: trainerName,
+            student_name: studentName,
+            student_id: invite.created_student_id,
+            invite_id: invite.id,
+          });
+        }
+      }
+
+      if (invite.is_used) {
+        console.log('Invite already used');
+        return jsonResponse({ valid: false, error: 'Convite já foi utilizado' }, 409);
+      }
+
+      console.log('Whoop invite is valid');
+      return jsonResponse({
+        valid: true,
+        trainer_name: trainerName,
+        student_name: studentName,
+        student_id: invite.created_student_id,
+        invite_id: invite.id,
+        whoop_client_id: whoopClientId || null,
+        expires_at: invite.expires_at,
+      });
+    }
+
     if (invite.is_used) {
       console.log('Invite already used');
       return jsonResponse({ valid: false, error: 'Convite já foi utilizado' }, 409);

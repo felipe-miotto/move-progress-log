@@ -21,6 +21,7 @@ import { OuraConnectionCard } from "@/components/OuraConnectionCard";
 import OuraMetricsCard from "@/components/OuraMetricsCard";
 import { OuraSleepDetailCard } from "@/components/OuraSleepDetailCard";
 import { OuraActivityCard } from "@/components/OuraActivityCard";
+import { WhoopActivityCard } from "@/components/WhoopActivityCard";
 import { OuraWorkoutsCard } from "@/components/OuraWorkoutsCard";
 import { OuraStressCard } from "@/components/OuraStressCard";
 import { OuraAdvancedMetricsCard } from "@/components/OuraAdvancedMetricsCard";
@@ -37,6 +38,7 @@ import { EditStudentDialog } from "@/components/EditStudentDialog";
 import { StudentOverviewDashboard } from "@/components/StudentOverviewDashboard";
 import { AssessmentsTab } from "@/components/assessments/AssessmentsTab";
 import { useOuraMetrics, useLatestOuraMetrics } from "@/hooks/useOuraMetrics";
+import { useWhoopMetrics } from "@/hooks/useWhoopMetrics";
 import { useOuraConnection } from "@/hooks/useOuraConnection";
 import { useState, useMemo, useEffect } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -107,6 +109,7 @@ const StudentDetailPage = () => {
   );
   const { data: latestOuraMetrics } = useLatestOuraMetrics(needsLatestOura ? studentId : "");
   const { data: ouraConnection } = useOuraConnection(studentId);
+  const { data: whoopMetrics } = useWhoopMetrics(studentId, 7);
   const { isAdmin } = useIsAdmin();
   const [selectedExerciseKey, setSelectedExerciseKey] = useState<string | null>(null);
   const [recordSessionOpen, setRecordSessionOpen] = useState(false);
@@ -838,6 +841,17 @@ const StudentDetailPage = () => {
                 )}
               </CardContent>
             </Card>
+          )}
+
+          {whoopMetrics && whoopMetrics.length > 0 && (
+            <div className="mt-6 space-y-4">
+              <h3 className="text-lg font-semibold">Whoop</h3>
+              <div className="grid gap-4 md:grid-cols-2">
+                {whoopMetrics.slice(0, 4).map((m) => (
+                  <WhoopActivityCard key={m.id} metrics={m} />
+                ))}
+              </div>
+            </div>
           )}
         </TabsContent>
       </Tabs>
