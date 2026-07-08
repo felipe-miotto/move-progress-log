@@ -24,6 +24,23 @@ export async function refreshAccessToken(cfg: ProviderConfig, refreshToken: stri
   return await res.json();
 }
 
+// Exchange an authorization code for tokens at the provider's token endpoint.
+export async function exchangeCode(cfg: ProviderConfig, code: string, redirectUri: string): Promise<OAuthTokens> {
+  const res = await fetch(cfg.tokenUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: redirectUri,
+      client_id: Deno.env.get(cfg.secretEnv.clientId) ?? "",
+      client_secret: Deno.env.get(cfg.secretEnv.clientSecret) ?? "",
+    }).toString(),
+  });
+  if (!res.ok) throw new Error(`token exchange failed: ${res.status}`);
+  return await res.json();
+}
+
 // deno-lint-ignore no-explicit-any
 export async function storeTokens(supa: any, provider: string, studentId: string, t: { access_token: string; refresh_token: string; expires_at: string }) {
   return supa.rpc(`store_${provider}_tokens`, {
