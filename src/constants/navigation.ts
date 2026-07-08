@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Home, Users, ClipboardList, Library, FileText, Heart, UserCog, Shield, Bot, BarChart2, Brain, FileSearch } from "lucide-react";
+import { Home, Users, ClipboardList, Library, FileText, Heart, UserCog, Shield, Bot, BarChart2, Brain, FileSearch, Activity } from "lucide-react";
 
 /**
  * Constantes de navegação e nomenclaturas
@@ -38,6 +38,7 @@ export const ROUTES = {
   // Admin routes
   adminUsers: "/admin/usuarios",
   adminDiagnostics: "/admin/diagnostico-oura",
+  adminWhoopDiagnostics: "/admin/diagnostico-whoop",
   adminExerciseReview: "/admin/revisao-exercicios",
   aiBuilder: "/ai-builder",
   athleteInsights: "/athlete-insights",
@@ -74,6 +75,7 @@ export const ROUTE_CONFIG: RouteDefinition[] = [
   { path: ROUTES.protocols, label: "Protocolos", icon: Heart, navGroup: "library" },
   { path: ROUTES.adminUsers, label: "Usuários", icon: UserCog, requiresAdmin: true, navGroup: "admin" },
   { path: ROUTES.adminDiagnostics, label: "Diagnóstico Oura", icon: Shield, requiresAdmin: true, navGroup: "admin" },
+  { path: ROUTES.adminWhoopDiagnostics, label: "Diagnóstico Whoop", icon: Activity, requiresAdmin: true, navGroup: "admin" },
   { path: ROUTES.adminExerciseReview, label: "Revisão de exercícios", icon: FileSearch, requiresAdmin: true, navGroup: "admin" },
   { path: ROUTES.aiBuilder, label: "AI Builder", icon: Bot, requiresAdmin: true, navGroup: "experimental", experimentalNav: true },
   { path: ROUTES.athleteInsights, label: "Insights do Atleta", icon: BarChart2, requiresAdmin: true, navGroup: "experimental", experimentalNav: true },
@@ -93,6 +95,7 @@ export const NAV_LABELS = {
   studentsComparison: "Comparar alunos",
   adminUsers: "Usuários",
   adminDiagnostics: "Admin - Diagnóstico Oura",
+  adminWhoopDiagnostics: "Admin - Diagnóstico Whoop",
   adminExerciseReview: "Admin - Revisão de exercícios",
   
   // Ações comuns

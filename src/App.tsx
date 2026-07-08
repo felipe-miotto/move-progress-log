@@ -29,6 +29,7 @@ const ExercisesLibraryPage = lazy(() => import("./pages/ExercisesLibraryPage"));
 const PrescriptionsPage = lazy(() => import("./pages/PrescriptionsPage"));
 const RecoveryProtocolsPage = lazy(() => import("./pages/RecoveryProtocolsPage"));
 const AdminDiagnosticsPage = lazy(() => import("./pages/AdminDiagnosticsPage"));
+const WhoopDiagnosticsPage = lazy(() => import("./pages/WhoopDiagnosticsPage"));
 const AdminUsersPage = lazy(() => import("./pages/AdminUsersPage"));
 const ExerciseReviewPage = lazy(() => import("./pages/ExerciseReviewPage"));
 const StudentReportsPage = lazy(() => import("./pages/StudentReportsPage"));
@@ -110,6 +111,7 @@ const App = () => {
                                   <Route path="/prescricoes" element={<PrescriptionsPage />} />
                                   <Route path="/protocolos" element={<RecoveryProtocolsPage />} />
                                   <Route path="/admin/diagnostico-oura" element={<AdminRoute><AdminDiagnosticsPage /></AdminRoute>} />
+                                  <Route path="/admin/diagnostico-whoop" element={<AdminRoute><WhoopDiagnosticsPage /></AdminRoute>} />
                                   <Route path="/admin/usuarios" element={<AdminRoute><AdminUsersPage /></AdminRoute>} />
                                   <Route path={ROUTES.adminExerciseReview} element={<AdminRoute><ExerciseReviewPage /></AdminRoute>} />
                                   <Route path="/ai-builder" element={<AdminRoute><AIBuilderPage /></AdminRoute>} />
