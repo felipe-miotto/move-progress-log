@@ -36,6 +36,24 @@ verify_jwt = false
 [functions.oura-disconnect]
 verify_jwt = true
 
+[functions.whoop-connect-link]
+verify_jwt = true
+
+# OAuth callback - validates authorization code with Whoop API
+[functions.whoop-callback]
+verify_jwt = false
+
+# Service role endpoint - uses internal authentication
+[functions.whoop-sync]
+verify_jwt = false
+
+# Requires admin role or service_role - validates in code
+[functions.whoop-sync-all]
+verify_jwt = false
+
+[functions.whoop-disconnect]
+verify_jwt = true
+
 [functions.suggest-regressions]
 verify_jwt = true
 
