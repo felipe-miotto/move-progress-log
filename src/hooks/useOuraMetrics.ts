@@ -1,8 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { notify } from "@/lib/notify";
-import i18n from "@/i18n/pt-BR.json";
-import { buildErrorDescription } from "@/utils/errorParsing";
 
 export interface OuraMetrics {
   id: string;
@@ -142,33 +139,3 @@ export const useLatestOuraMetrics = (studentId: string) => {
   });
 };
 
-export const useAddOuraMetrics = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (metrics: Omit<OuraMetrics, "id" | "created_at">) => {
-      const { error } = await supabase
-        .from("oura_metrics")
-        .insert(metrics);
-
-      if (error) throw error;
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ 
-        queryKey: ["oura-metrics", variables.student_id] 
-      });
-      queryClient.invalidateQueries({ 
-        queryKey: ["oura-metrics-latest", variables.student_id] 
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["oura-trends", variables.student_id],
-      });
-      notify.success(i18n.modules.oura.metricsAdded);
-    },
-    onError: (error: Error) => {
-      notify.error(i18n.modules.oura.errorAddMetrics, {
-        description: buildErrorDescription(error, i18n.errors.unknown),
-      });
-    },
-  });
-};

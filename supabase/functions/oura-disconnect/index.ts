@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
 
     console.log(`Disconnecting Oura for student ${student_id}`);
 
-    // Verify ownership
+    // Verify ownership with the caller's JWT before any write.
     const { data: student, error: studentError } = await supabaseClient
       .from('students')
       .select('trainer_id')
@@ -76,8 +76,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Deactivate connection
-    const { error: updateError } = await supabaseClient
+    // oura_connections is client-read-only (RLS); writes go through service_role.
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+    const { error: updateError } = await supabaseAdmin
       .from('oura_connections')
       .update({ is_active: false })
       .eq('student_id', student_id);

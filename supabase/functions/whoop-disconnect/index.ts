@@ -33,14 +33,19 @@ Deno.serve(async (req) => {
     if (!student_id) return new Response(JSON.stringify({ error: 'student_id é obrigatório' }), { headers: jsonHeaders, status: 400 });
     if (!UUID_RE.test(student_id)) return new Response(JSON.stringify({ error: 'student_id inválido' }), { headers: jsonHeaders, status: 400 });
 
-    // Verify ownership (RLS also enforces this).
+    // Verify ownership with the caller's JWT before any write.
     const { data: student, error: studentError } = await supabaseClient
       .from('students').select('trainer_id').eq('id', student_id).single();
     if (studentError || student.trainer_id !== user.id) {
       return new Response(JSON.stringify({ error: 'Acesso negado' }), { headers: jsonHeaders, status: 403 });
     }
 
-    const { error: updateError } = await supabaseClient
+    // whoop_connections is client-read-only (RLS); writes go through service_role.
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+    const { error: updateError } = await supabaseAdmin
       .from('whoop_connections').update({ is_active: false }).eq('student_id', student_id);
     if (updateError) {
       console.error('Failed to disconnect Whoop:', updateError);
