@@ -48,7 +48,7 @@ export const useWhoopMetrics = (studentId: string, limit?: number) => {
         .limit(limit ?? 365);
 
       if (error) throw error;
-      return (data || []) as WhoopMetrics[];
+      return ((data || []) as unknown) as WhoopMetrics[];
     },
   });
 };
