@@ -5,6 +5,7 @@ import { Activity } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useWhoopConnection } from "@/hooks/useWhoopConnection";
 import { useWhoopMetrics } from "@/hooks/useWhoopMetrics";
+import { formatStrain } from "@/components/WhoopActivityCard";
 import { ROUTES } from "@/constants/navigation";
 
 interface WhoopStudentDiagnosticsCardProps {
@@ -50,7 +51,7 @@ export const WhoopStudentDiagnosticsCard = ({ studentId, studentName }: WhoopStu
             <div>
               <span className="text-muted-foreground">Strain</span>
               <br />
-              <span className="font-medium">{latest.day_strain ?? "—"}</span>
+              <span className="font-medium">{formatStrain(latest.day_strain)}</span>
             </div>
             <div>
               <span className="text-muted-foreground">Sono</span>

@@ -22,6 +22,11 @@ const formatTime = (seconds: number | null) => {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 };
 
+// Mirror the WHOOP app's own formatting: strain with 1 decimal (11.5), HRV as
+// a whole number of ms (28) — raw numerics like 11.471648 read as noise.
+export const formatStrain = (v: number | null) => (v === null ? "—" : v.toFixed(1));
+export const formatHrv = (v: number | null) => (v === null ? "—" : String(Math.round(v)));
+
 export const WhoopActivityCard = ({ metrics }: WhoopActivityCardProps) => {
   return (
     <Card>
@@ -51,7 +56,7 @@ export const WhoopActivityCard = ({ metrics }: WhoopActivityCardProps) => {
             <Zap className="h-4 w-4 text-primary" />
             <div>
               <p className="text-xs text-muted-foreground">Strain</p>
-              <p className="text-lg font-semibold">{metrics.day_strain ?? "—"}</p>
+              <p className="text-lg font-semibold">{formatStrain(metrics.day_strain)}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -59,7 +64,7 @@ export const WhoopActivityCard = ({ metrics }: WhoopActivityCardProps) => {
             <div>
               <p className="text-xs text-muted-foreground">HRV / FC repouso</p>
               <p className="text-sm font-medium">
-                {metrics.hrv_rmssd ?? "—"} ms · {metrics.resting_heart_rate ?? "—"} bpm
+                {formatHrv(metrics.hrv_rmssd)} ms · {metrics.resting_heart_rate ?? "—"} bpm
               </p>
             </div>
           </div>
