@@ -3452,6 +3452,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _bootstrap_upsert_vault_secret: {
+        Args: { p_name: string; p_value: string }
+        Returns: undefined
+      }
       calc_oura_baseline: {
         Args: { p_days?: number; p_student_id: string }
         Returns: {
