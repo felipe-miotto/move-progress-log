@@ -7,15 +7,28 @@ export interface OAuthTokens {
 }
 
 // Thrown on non-2xx from the provider's OAuth token endpoint. Exposes the HTTP
-// status so callers can distinguish permanent auth failures (400/401 →
-// invalid_grant, revoked/rotated) from transient ones (5xx, 429, network).
+// status and the provider's `error` code (parsed from a JSON body when
+// available) so callers can distinguish permanent auth failures
+// (invalid_grant → revoked/rotated) from transient ones (5xx, 429, network,
+// misconfig like invalid_client). The raw response body stays on `.body` and
+// is NEVER included in `Error.message`, which surfaces through
+// whoop_sync_logs and JSON responses.
 export class TokenHttpError extends Error {
   status: number;
+  errorCode: string | null;
   body: string;
   constructor(kind: string, status: number, body: string) {
-    super(`${kind} failed: ${status}${body ? ` | ${body.slice(0, 200)}` : ""}`);
+    let errorCode: string | null = null;
+    try {
+      const parsed = JSON.parse(body);
+      if (parsed && typeof parsed === "object" && typeof parsed.error === "string") {
+        errorCode = parsed.error;
+      }
+    } catch { /* non-JSON body → keep errorCode null */ }
+    super(errorCode ? `${kind} failed: ${status} ${errorCode}` : `${kind} failed: ${status}`);
     this.name = "TokenHttpError";
     this.status = status;
+    this.errorCode = errorCode;
     this.body = body;
   }
 }

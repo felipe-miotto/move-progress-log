@@ -39,12 +39,19 @@ export function validateWindow(body: Record<string, unknown>): WindowResult | { 
   return { start: new Date(startMs).toISOString(), end: new Date(endMs).toISOString() };
 }
 
-// Classify a token-refresh failure. Permanent = provider rejected the refresh
-// token itself (400/401 → invalid_grant/revoked/rotated); the trainer must
-// reconnect. Transient = network/5xx/429; the cron retries next run.
+// Classify a token-refresh failure. Permanent = the refresh token itself is
+// dead (provider returned invalid_grant → revoked/rotated/expired); only then
+// do we deactivate the connection so the trainer must reconnect. Everything
+// else — invalid_client (wrong secret in env), non-JSON body, network, 5xx,
+// 429 — is transient and must NOT deactivate: those would take down healthy
+// connections one by one on a config regression.
 export function isPermanentTokenFailure(err: unknown): boolean {
-  if (err instanceof TokenHttpError) return err.status === 400 || err.status === 401;
-  return false;
+  if (!(err instanceof TokenHttpError)) return false;
+  if (err.status !== 400 && err.status !== 401) return false;
+  if (err.errorCode === 'invalid_grant') return true;
+  // Fallback for providers that don't return a parseable JSON error envelope
+  // but still include the code in the raw body.
+  return typeof err.body === 'string' && err.body.includes('invalid_grant');
 }
 
 export interface RefreshDeps {
@@ -59,7 +66,7 @@ export type RefreshOutcome =
 
 // Refresh the WHOOP access token when missing/near-expiry. On failure this
 // logs a whoop_sync_logs row (status=failed, error_message prefixed with
-// "token_refresh: ") and, for permanent failures, sets
+// "token_refresh: ") and, for permanent failures (invalid_grant only), sets
 // whoop_connections.is_active=false so the cron stops retrying and the UI can
 // prompt the trainer to reconnect.
 export async function ensureAccessToken(
@@ -80,11 +87,16 @@ export async function ensureAccessToken(
     const refreshed = await refreshFn(WHOOP, refreshTok as string);
     const newExp = new Date();
     newExp.setSeconds(newExp.getSeconds() + (refreshed.expires_in ?? 3600));
-    await storeTokens(supa, 'whoop', args.student_id, {
+    // storeTokens returns PostgREST { data, error } and does NOT throw. If the
+    // RPC fails after WHOOP rotated the refresh token, we've already lost the
+    // new refresh token — surface as TRANSIENT so we don't deactivate a
+    // still-valid connection; the next run just refreshes again.
+    const { error: storeErr } = await storeTokens(supa, 'whoop', args.student_id, {
       access_token: refreshed.access_token,
       refresh_token: refreshed.refresh_token,
       expires_at: newExp.toISOString(),
     });
+    if (storeErr) throw new Error(`persistência: ${errorMessage(storeErr)}`);
     await supa.from('whoop_connections').update({ token_expires_at: newExp.toISOString() }).eq('student_id', args.student_id);
     return { ok: true, accessToken: refreshed.access_token };
   } catch (e) {

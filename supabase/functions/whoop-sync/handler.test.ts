@@ -31,12 +31,33 @@ Deno.test("validateWindow accepts a valid <=90d window", () => {
   assertEquals(r.start.startsWith("2026-06-01"), true);
 });
 
-Deno.test("isPermanentTokenFailure: 400/401 permanent, 5xx/429 transient", () => {
-  assertEquals(isPermanentTokenFailure(new TokenHttpError("t", 400, "invalid_grant")), true);
-  assertEquals(isPermanentTokenFailure(new TokenHttpError("t", 401, "unauthorized")), true);
+Deno.test("isPermanentTokenFailure: only invalid_grant is permanent", () => {
+  assertEquals(isPermanentTokenFailure(new TokenHttpError("t", 400, JSON.stringify({ error: "invalid_grant" }))), true);
+  assertEquals(isPermanentTokenFailure(new TokenHttpError("t", 401, JSON.stringify({ error: "invalid_grant" }))), true);
+  assertEquals(isPermanentTokenFailure(new TokenHttpError("t", 401, "invalid_grant: token revoked")), true);
+  // invalid_client (bad env secret) MUST be transient — a config regression
+  // must not deactivate healthy connections one by one.
+  assertEquals(isPermanentTokenFailure(new TokenHttpError("t", 401, JSON.stringify({ error: "invalid_client" }))), false);
+  assertEquals(isPermanentTokenFailure(new TokenHttpError("t", 400, JSON.stringify({ error: "invalid_request" }))), false);
+  assertEquals(isPermanentTokenFailure(new TokenHttpError("t", 401, "<html>proxy error</html>")), false);
   assertEquals(isPermanentTokenFailure(new TokenHttpError("t", 429, "rate")), false);
   assertEquals(isPermanentTokenFailure(new TokenHttpError("t", 503, "down")), false);
   assertEquals(isPermanentTokenFailure(new Error("network")), false);
+});
+
+Deno.test("TokenHttpError.message never contains the raw body; body stays on .body", () => {
+  const raw = JSON.stringify({ error: "invalid_grant", error_description: "leaky secret abc123 SHOULD NOT LEAK" });
+  const err = new TokenHttpError("token refresh", 401, raw);
+  assertEquals(err.errorCode, "invalid_grant");
+  assertEquals(err.message.includes("SHOULD NOT LEAK"), false);
+  assertEquals(err.message.includes("abc123"), false);
+  assertEquals(err.message, "token refresh failed: 401 invalid_grant");
+  assertEquals(err.body, raw);
+  // Non-JSON body → no errorCode, message keeps only the status.
+  const err2 = new TokenHttpError("token refresh", 500, "<html>internal error stack trace secret</html>");
+  assertEquals(err2.errorCode, null);
+  assertEquals(err2.message, "token refresh failed: 500");
+  assertEquals(err2.message.includes("stack trace"), false);
 });
 
 // Minimal fluent stub for the Supabase client used by handler.ts.
@@ -66,10 +87,10 @@ function makeSupa(rpcRefreshTok: string | null = "r0") {
   return { supa, calls };
 }
 
-Deno.test("ensureAccessToken: permanent (401) failure logs and deactivates connection", async () => {
+Deno.test("ensureAccessToken: invalid_grant (400) logs, deactivates, returns permanent 401", async () => {
   const { supa, calls } = makeSupa("r0");
   const res = await ensureAccessToken(
-    { supa, refreshAccessToken: () => Promise.reject(new TokenHttpError("token refresh", 401, "invalid_grant")) },
+    { supa, refreshAccessToken: () => Promise.reject(new TokenHttpError("token refresh", 400, JSON.stringify({ error: "invalid_grant" }))) },
     { student_id: "s1", tokenExpiresAt: null, currentAccessToken: null },
   );
   assertEquals(res.ok, false);
@@ -83,6 +104,21 @@ Deno.test("ensureAccessToken: permanent (401) failure logs and deactivates conne
   assertEquals(!!deact, true);
 });
 
+Deno.test("ensureAccessToken: invalid_client (401 bad secret) is TRANSIENT, keeps connection active", async () => {
+  const { supa, calls } = makeSupa("r0");
+  const res = await ensureAccessToken(
+    { supa, refreshAccessToken: () => Promise.reject(new TokenHttpError("token refresh", 401, JSON.stringify({ error: "invalid_client" }))) },
+    { student_id: "s1", tokenExpiresAt: null, currentAccessToken: null },
+  );
+  assertEquals(res.ok, false);
+  if (res.ok) throw new Error();
+  assertEquals(res.permanent, false);
+  assertEquals(res.status, 502);
+  assertEquals(calls.logs[0].row.status, "failed");
+  const deact = calls.updates.find((u) => u.table === "whoop_connections" && u.row.is_active === false);
+  assertEquals(!!deact, false);
+});
+
 Deno.test("ensureAccessToken: transient (network) failure logs but keeps connection active", async () => {
   const { supa, calls } = makeSupa("r0");
   const res = await ensureAccessToken(
@@ -94,6 +130,44 @@ Deno.test("ensureAccessToken: transient (network) failure logs but keeps connect
   assertEquals(res.permanent, false);
   assertEquals(res.status, 502);
   assertEquals(calls.logs[0].row.status, "failed");
+  const deact = calls.updates.find((u) => u.table === "whoop_connections" && u.row.is_active === false);
+  assertEquals(!!deact, false);
+});
+
+Deno.test("ensureAccessToken: store_whoop_tokens RPC failure → TRANSIENT, no deactivation", async () => {
+  // deno-lint-ignore no-explicit-any
+  const calls: { logs: any[]; updates: any[] } = { logs: [], updates: [] };
+  const supa = {
+    // deno-lint-ignore no-explicit-any
+    rpc(name: string, _args: any) {
+      if (name === "get_whoop_refresh_token") return Promise.resolve({ data: "r0", error: null });
+      if (name === "store_whoop_tokens") {
+        return Promise.resolve({ data: null, error: { code: "23505", message: "duplicate", details: null, hint: null } });
+      }
+      return Promise.resolve({ data: null, error: null });
+    },
+    from(table: string) {
+      return {
+        // deno-lint-ignore no-explicit-any
+        insert(row: any) { calls.logs.push({ table, row }); return Promise.resolve({ error: null }); },
+        // deno-lint-ignore no-explicit-any
+        update(row: any) {
+          calls.updates.push({ table, row });
+          return { eq: () => Promise.resolve({ error: null }) };
+        },
+      };
+    },
+  };
+  const res = await ensureAccessToken(
+    { supa, refreshAccessToken: () => Promise.resolve({ access_token: "a2", refresh_token: "r2", expires_in: 3600 }) },
+    { student_id: "s1", tokenExpiresAt: null, currentAccessToken: null },
+  );
+  assertEquals(res.ok, false);
+  if (res.ok) throw new Error();
+  assertEquals(res.permanent, false);
+  assertEquals(res.status, 502);
+  assertEquals(calls.logs[0].row.status, "failed");
+  assertEquals(calls.logs[0].row.error_message.includes("persistência"), true);
   const deact = calls.updates.find((u) => u.table === "whoop_connections" && u.row.is_active === false);
   assertEquals(!!deact, false);
 });
