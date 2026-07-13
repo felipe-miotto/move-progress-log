@@ -27,12 +27,12 @@ interface PatternMapping {
 }
 
 const SPREADSHEET_PATTERN_MAP: Record<string, PatternMapping> = {
-    "Squat": { category: "forca_hipertrofia", movement_pattern: "dominancia_joelho" },
-    "Hinge": { category: "forca_hipertrofia", movement_pattern: "cadeia_posterior" },
-    "Push": { category: "forca_hipertrofia", movement_pattern: "empurrar" },
-    "Pull": { category: "forca_hipertrofia", movement_pattern: "puxar" },
-    "Carry": { category: "forca_hipertrofia", movement_pattern: "carregar" },
-    "Lunge": { category: "forca_hipertrofia", movement_pattern: "lunge" },
+    "Squat": { category: "forca_hipertrofia", movement_pattern: "agachamento_bilateral" },
+    "Hinge": { category: "forca_hipertrofia", movement_pattern: "dobradica_quadril" },
+    "Push": { category: "forca_hipertrofia", movement_pattern: "empurrar_horizontal" },
+    "Pull": { category: "forca_hipertrofia", movement_pattern: "puxar_horizontal" },
+    "Carry": { category: "forca_hipertrofia", movement_pattern: "carregamento" },
+    "Lunge": { category: "forca_hipertrofia", movement_pattern: "passada_deslocamento" },
     "Core": { category: "core_ativacao", movement_pattern: null },
     "Estab_AntiRotacao": { category: "core_ativacao", movement_pattern: null },
     "Estab_AntiExtensao": { category: "core_ativacao", movement_pattern: null },
@@ -61,23 +61,23 @@ interface SubcategoryMapping {
 }
 
 const SUBCATEGORY_MAP: Record<string, SubcategoryMapping> = {
-    empurrar_horizontal: { movement_pattern: "empurrar", category: "forca_hipertrofia" },
-    empurrar_vertical: { movement_pattern: "empurrar", category: "forca_hipertrofia" },
-    puxar_horizontal: { movement_pattern: "puxar", category: "forca_hipertrofia" },
-    puxar_vertical: { movement_pattern: "puxar", category: "forca_hipertrofia" },
-    agachamento_bilateral: { movement_pattern: "dominancia_joelho", category: "forca_hipertrofia" },
-    agachamento_lateral: { movement_pattern: "dominancia_joelho", category: "forca_hipertrofia" },
-    agachamento_unilateral: { movement_pattern: "dominancia_joelho", category: "forca_hipertrofia" },
-    base_assimetrica_split_squat: { movement_pattern: "lunge", category: "forca_hipertrofia" },
-    lunge: { movement_pattern: "lunge", category: "forca_hipertrofia" },
-    lunge_slideboard: { movement_pattern: "lunge", category: "forca_hipertrofia" },
-    flexao_joelhos_nordica: { movement_pattern: "cadeia_posterior", category: "forca_hipertrofia" },
-    deadlift_bilateral: { movement_pattern: "cadeia_posterior", category: "forca_hipertrofia" },
-    deadlift_unilateral: { movement_pattern: "cadeia_posterior", category: "forca_hipertrofia" },
-    rdl_stiff: { movement_pattern: "cadeia_posterior", category: "forca_hipertrofia" },
-    ponte_hip_thrust: { movement_pattern: "cadeia_posterior", category: "forca_hipertrofia" },
-    carregamento: { movement_pattern: "carregar", category: "forca_hipertrofia" },
-    carregamentos: { movement_pattern: "carregar", category: "forca_hipertrofia" },
+    empurrar_horizontal: { movement_pattern: "empurrar_horizontal", category: "forca_hipertrofia" },
+    empurrar_vertical: { movement_pattern: "empurrar_vertical", category: "forca_hipertrofia" },
+    puxar_horizontal: { movement_pattern: "puxar_horizontal", category: "forca_hipertrofia" },
+    puxar_vertical: { movement_pattern: "puxar_vertical", category: "forca_hipertrofia" },
+    agachamento_bilateral: { movement_pattern: "agachamento_bilateral", category: "forca_hipertrofia" },
+    agachamento_lateral: { movement_pattern: "agachamento_unilateral", category: "forca_hipertrofia" },
+    agachamento_unilateral: { movement_pattern: "agachamento_unilateral", category: "forca_hipertrofia" },
+    base_assimetrica_split_squat: { movement_pattern: "base_assimetrica", category: "forca_hipertrofia" },
+    lunge: { movement_pattern: "passada_deslocamento", category: "forca_hipertrofia" },
+    lunge_slideboard: { movement_pattern: "passada_deslocamento", category: "forca_hipertrofia" },
+    flexao_joelhos_nordica: { movement_pattern: "flexao_joelho", category: "forca_hipertrofia" },
+    deadlift_bilateral: { movement_pattern: "dobradica_quadril", category: "forca_hipertrofia" },
+    deadlift_unilateral: { movement_pattern: "dobradica_quadril", category: "forca_hipertrofia" },
+    rdl_stiff: { movement_pattern: "dobradica_quadril", category: "forca_hipertrofia" },
+    ponte_hip_thrust: { movement_pattern: "dobradica_quadril", category: "forca_hipertrofia" },
+    carregamento: { movement_pattern: "carregamento", category: "forca_hipertrofia" },
+    carregamentos: { movement_pattern: "carregamento", category: "forca_hipertrofia" },
     anti_extensao: { movement_pattern: null, category: "core_ativacao" },
     anti_flexao_lateral: { movement_pattern: null, category: "core_ativacao" },
     anti_rotacao: { movement_pattern: null, category: "core_ativacao" },
@@ -101,23 +101,27 @@ const SUBCATEGORY_MAP: Record<string, SubcategoryMapping> = {
     tecnicas: { movement_pattern: null, category: "respiracao" },
 };
 
-const LATERALITY_MAP: Record<string, string> = {
-    bilateral: "bilateral",
-    unilateral: "unilateral",
-    alternado: "alternado",
-    assimetrica: "base_assimetrica",
-    Bilateral: "bilateral",
-    Unilateral: "unilateral",
-};
+function mapLaterality(value?: string | null): string | null {
+    if (!value) return null;
+    const normalized = value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+    if (normalized === "bilateral") return "bilateral";
+    if (normalized === "unilateral") return "unilateral";
+    if (normalized === "alternado" || normalized === "alternada") return "alternada";
+    return null;
+}
 
 function extractMovementPlane(tags: string[], subcategoryKey: string): string {
     if (tags.includes("plano_frontal")) return "frontal";
-    if (tags.includes("plano_transverso")) return "transverse";
-    if (tags.includes("plano_sagital")) return "sagittal";
+    if (tags.includes("plano_transverso")) return "transverso";
+    if (tags.includes("plano_sagital")) return "sagital";
     if (subcategoryKey === "frontal") return "frontal";
-    if (subcategoryKey === "transverso") return "transverse";
-    if (subcategoryKey === "sagital") return "sagittal";
-    return "sagittal";
+    if (subcategoryKey === "transverso") return "transverso";
+    if (subcategoryKey === "sagital") return "sagital";
+    return "sagital";
 }
 
 function riskFromLevel(level: number): string {
@@ -128,8 +132,8 @@ function riskFromLevel(level: number): string {
 
 function levelLabel(level: number): string {
     if (level <= 2) return "Iniciante";
-    if (level <= 3) return "Intermediario";
-    return "Avancado";
+    if (level <= 3) return "Intermediário";
+    return "Avançado";
 }
 
 // ============================================================================
@@ -177,8 +181,8 @@ function flattenJSON(json: Record<string, unknown>): FlatExercise[] {
                                 exerciseSubcategory = subKey.replace("empurrar_", "");
                     } else if (subKey === "puxar_horizontal" || subKey === "puxar_vertical") {
                                 exerciseSubcategory = subKey.replace("puxar_", "");
-                    } else if (movementPattern === "cadeia_posterior") {
-                                exerciseSubcategory = subKey === "flexao_joelhos_nordica" ? "enfase_joelho" : "enfase_quadril";
+                    } else if (movementPattern === "dobradica_quadril" || movementPattern === "flexao_joelho") {
+                                exerciseSubcategory = movementPattern === "flexao_joelho" ? "enfase_joelho" : "enfase_quadril";
                     } else if (category === "potencia_pliometria") {
                                 if (["bilateral_linear", "unilateral_linear", "unilateral_lateral", "unilateral_lateral_medial"].includes(subKey)) {
                                               exerciseSubcategory = "pliometria";
@@ -250,11 +254,15 @@ function getField(row: SpreadsheetExercise, ...keys: string[]): unknown {
 }
 
 function mapSpreadsheetPlane(plano?: string): string {
-    if (!plano) return "sagittal";
-    const p = plano.toLowerCase().trim();
+    if (!plano) return "sagital";
+    const p = plano
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim();
     if (p.includes("frontal")) return "frontal";
-    if (p.includes("transvers")) return "transverse";
-    return "sagittal";
+    if (p.includes("transvers")) return "transverso";
+    return "sagital";
 }
 
 function mapSpreadsheetRisk(risco?: string): string | null {
@@ -350,7 +358,7 @@ Deno.serve(async (req: Request) => {
       }
 
       const body = await req.json();
-      const skipOrphans = body.skip_orphans === true;
+      const reclassifyOrphans = body.reclassify_orphans === true;
 
       // Detect format
       let isSpreadsheetFormat = false;
@@ -483,10 +491,10 @@ Deno.serve(async (req: Request) => {
                                            const lateralidade = getField(ex, "lateralidade") as string | undefined;
                                            if (base || lateralidade) {
                                                          const lat = lateralidade || base;
-                                                         record.laterality = lat ? (LATERALITY_MAP[lat] || lat.toLowerCase()) : null;
+                                                         record.laterality = mapLaterality(lat);
                                            }
                                            const posicao = getField(ex, "Posicao", "posicao") as string | undefined;
-                                           if (posicao) record.position = posicao;
+                                           if (posicao) record.stability_position = posicao;
                                            const plano = getField(ex, "plano") as string | undefined;
                                            if (plano) record.movement_plane = mapSpreadsheetPlane(plano);
                                            const tipoContracao = getField(ex, "Tipo_contracao", "tipo_contracao") as string | undefined;
@@ -570,7 +578,7 @@ Deno.serve(async (req: Request) => {
               const orphans: string[] = [];
               const orphanRows: Record<string, unknown>[] = [];
 
-              if (!skipOrphans) {
+              if (reclassifyOrphans) {
                      for (const [norm, ex] of existingMap) {
                                if (!matchedNames.has(norm) && ex.id !== "__pending__") {
                                            orphans.push(ex.name);
@@ -630,9 +638,7 @@ Deno.serve(async (req: Request) => {
                                try {
                                            const normalizedName = normalize(ex.nome);
 
-                                 const laterality = ex.base
-                                             ? LATERALITY_MAP[ex.base] || ex.base
-                                               : null;
+                                 const laterality = mapLaterality(ex.base);
 
                                  const equipmentArr = ex.equipamento
                                              ? ex.equipamento.split(/[+/]/).map((e: string) => e.trim()).filter(Boolean)
@@ -657,7 +663,7 @@ Deno.serve(async (req: Request) => {
                                                laterality,
                                                numeric_level: ex.nivel || null,
                                                boyle_score: ex.nivel ? (ex.nivel <= 2 ? 1 : ex.nivel <= 4 ? 2 : ex.nivel <= 6 ? 3 : ex.nivel <= 8 ? 4 : 5) : null,
-                                               position: ex.posicao || null,
+                                               stability_position: ex.posicao || null,
                                                tags: ex.tags || [],
                                                equipment_required: equipmentArr,
                                                risk_level: ex.nivel ? riskFromLevel(ex.nivel) : null,

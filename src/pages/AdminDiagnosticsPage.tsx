@@ -220,11 +220,10 @@ const AdminDiagnosticsPage = () => {
       for (let i = 0; i < batches.length; i++) {
         setImportProgress({ current: i * BATCH_SIZE, total: exercises.length });
         
-        const isLastBatch = i === batches.length - 1;
         const payload = { 
           format: "spreadsheet", 
           exercises: batches[i],
-          skip_orphans: !isLastBatch,
+          reclassify_orphans: false,
         };
 
         logger.log(`[import] Batch ${i + 1}/${batches.length}, size: ${batches[i].length}`);
