@@ -47,6 +47,7 @@ const AIBuilderPage = lazy(() => import("./features/ai-builder/AIBuilderPage"));
 const AthleteInsightsDashboard = lazy(() => import("./pages/AthleteInsightsDashboard"));
 const CoachConsole = lazy(() => import("./pages/CoachConsole"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const OAuthConsentPage = lazy(() => import("./pages/OAuthConsentPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
