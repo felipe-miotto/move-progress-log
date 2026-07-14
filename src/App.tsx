@@ -89,6 +89,8 @@ const App = () => {
                   <Route path={ROUTES.terms} element={<LegalPage variant="terms" />} />
                   <Route path={ROUTES.privacy} element={<LegalPage variant="privacy" />} />
                   <Route path={ROUTES.ouraConsent} element={<LegalPage variant="ouraConsent" />} />
+                  <Route path="/.lovable/oauth/consent" element={<OAuthConsentPage />} />
+                  
                   
                   {/* Protected routes with sidebar */}
                   <Route path="/*" element={
