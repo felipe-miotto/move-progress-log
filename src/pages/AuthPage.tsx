@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +31,13 @@ export default function AuthPage() {
   const [show2FAVerify, setShow2FAVerify] = useState(false);
   const [mfaFactorId, setMfaFactorId] = useState<string>('');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const nextParam = searchParams.get("next");
+  // Only accept same-origin relative paths (must start with "/" and not "//")
+  const safeNext = nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
+    ? nextParam
+    : null;
+  const postLoginTarget = safeNext ?? POST_LOGIN_ROUTE;
   const { toast } = useToast();
   const { checkPasswordSecurity, checking } = usePasswordSecurity();
 
@@ -95,7 +102,7 @@ export default function AuthPage() {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}${POST_LOGIN_ROUTE}`,
+          redirectTo: `${window.location.origin}${postLoginTarget}`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -311,7 +318,7 @@ export default function AuthPage() {
         title: "Login realizado com sucesso",
         description: "Redirecionando para o sistema...",
       });
-      navigate(POST_LOGIN_ROUTE);
+      navigate(postLoginTarget);
     }
   };
 

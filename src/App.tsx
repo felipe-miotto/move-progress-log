@@ -47,6 +47,7 @@ const AIBuilderPage = lazy(() => import("./features/ai-builder/AIBuilderPage"));
 const AthleteInsightsDashboard = lazy(() => import("./pages/AthleteInsightsDashboard"));
 const CoachConsole = lazy(() => import("./pages/CoachConsole"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const OAuthConsentPage = lazy(() => import("./pages/OAuthConsentPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -88,6 +89,8 @@ const App = () => {
                   <Route path={ROUTES.terms} element={<LegalPage variant="terms" />} />
                   <Route path={ROUTES.privacy} element={<LegalPage variant="privacy" />} />
                   <Route path={ROUTES.ouraConsent} element={<LegalPage variant="ouraConsent" />} />
+                  <Route path="/.lovable/oauth/consent" element={<OAuthConsentPage />} />
+                  
                   
                   {/* Protected routes with sidebar */}
                   <Route path="/*" element={

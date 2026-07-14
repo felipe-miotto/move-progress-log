@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "sdk_version": "0.21.0",
+  "path": "/functions/v1/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://zrgfrdmywxlemcuiqtqg.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "fabrik-mcp",
+      "version": "0.1.0",
+      "title": "Fabrik Performance (read-only)"
+    },
+    "tools": [
+      {
+        "name": "run_readonly_query",
+        "title": "Run read-only SQL query",
+        "description": "Execute a single read-only SQL statement (SELECT / WITH / EXPLAIN SELECT) against the app database as the signed-in user. RLS applies — you see only what the user is allowed to see. Rejects any DDL/DML (INSERT/UPDATE/DELETE/ALTER/DROP/CREATE/GRANT/TRUNCATE/COPY/SET/...), multiple statements, and unsafe server functions. Wrapped in a READ ONLY transaction with a 15s statement timeout and hard cap of 5000 rows.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "sql": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A single SELECT/WITH/EXPLAIN SELECT statement. No trailing semicolons required; multi-statement input is rejected."
+            }
+          },
+          "required": [
+            "sql"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}

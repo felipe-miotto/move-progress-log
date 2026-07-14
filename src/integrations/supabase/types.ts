@@ -3623,6 +3623,10 @@ export type Database = {
           variants: string[]
         }[]
       }
+      mcp_run_readonly_query: {
+        Args: { p_max_rows?: number; p_sql: string; p_timeout_ms?: number }
+        Returns: Json[]
+      }
       migrate_oura_tokens_to_vault: { Args: never; Returns: undefined }
       move_prescription_folder: {
         Args: {
