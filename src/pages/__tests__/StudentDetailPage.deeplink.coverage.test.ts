@@ -92,16 +92,32 @@ describe("E4.3b StudentDetailPage — tab=assessments deep link", () => {
   });
 
   it("inicializa activeTab lendo ?tab= via useState initializer", () => {
-    // useState(() => { ... searchParams.get("tab") ... }) — leitura no
-    // primeiro render só, sem efeito recorrente.
+    // useState(() => resolveInitialTab(searchParams.get("tab"))) — leitura no
+    // primeiro render só (expression ou block body), sem efeito recorrente.
     expect(studentDetailSource).toMatch(
-      /useState<string>\(\(\)\s*=>\s*\{[\s\S]*?searchParams\.get\(["']tab["']\)/,
+      /useState<string>\(\(\)\s*=>[\s\S]*?searchParams\.get\(["']tab["']\)/,
     );
   });
 
   it("usa whitelist pra ignorar valor inválido (fallback training)", () => {
     expect(studentDetailSource).toContain('"training"');
     expect(studentDetailSource).toContain("VALID_STUDENT_DETAIL_TABS.has");
+  });
+
+  it("Op 2: aba unificada `recuperacao` na whitelist; oura/whoop viram alias", () => {
+    // As antigas abas `oura`/`whoop` foram fundidas numa aba agnóstica de
+    // dispositivo. Deep-links legados resolvem pra `recuperacao` SEM reescrever
+    // a URL (o teste de read-only acima cobre a ausência de setSearchParams).
+    expect(studentDetailSource).toContain('"recuperacao"');
+    expect(studentDetailSource).toContain("LEGACY_TAB_ALIAS");
+    expect(studentDetailSource).toMatch(
+      /oura:\s*["']recuperacao["']/,
+    );
+    expect(studentDetailSource).toMatch(
+      /whoop:\s*["']recuperacao["']/,
+    );
+    // a aba `oura` como valor de whitelist não existe mais (virou alias)
+    expect(studentDetailSource).not.toMatch(/VALID_STUDENT_DETAIL_TABS[\s\S]*?["']oura["']/);
   });
 
   it("não introduz mutation (deep-link é read-only)", () => {

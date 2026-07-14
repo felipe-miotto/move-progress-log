@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Calendar, Activity, FileText, TrendingUp, Info, Mic, Users, Trash2, AlertCircle, User, Filter } from "lucide-react";
+import { ArrowLeft, Calendar, Activity, FileText, TrendingUp, Mic, Users, Trash2, AlertCircle, User, Filter } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -17,19 +17,7 @@ import WorkoutCard from "@/components/WorkoutCard";
 import ExerciseHistoryCard from "@/components/ExerciseHistoryCard";
 import TrainingZonesCard from "@/components/TrainingZonesCard";
 import ProtocolRecommendationsCard from "@/components/ProtocolRecommendationsCard";
-import { OuraConnectionCard } from "@/components/OuraConnectionCard";
-import OuraMetricsCard from "@/components/OuraMetricsCard";
-import { OuraSleepDetailCard } from "@/components/OuraSleepDetailCard";
-import { OuraActivityCard } from "@/components/OuraActivityCard";
-import { WhoopActivityCard } from "@/components/WhoopActivityCard";
-import { SendWhoopConnectDialog } from "@/components/SendWhoopConnectDialog";
-import { OuraWorkoutsCard } from "@/components/OuraWorkoutsCard";
-import { OuraStressCard } from "@/components/OuraStressCard";
-import { OuraAdvancedMetricsCard } from "@/components/OuraAdvancedMetricsCard";
-import { OuraApiDiagnosticsCard } from "@/components/OuraApiDiagnosticsCard";
-import { OuraConnectionStatus } from "@/components/OuraConnectionStatus";
-import { useIsAdmin } from "@/hooks/useUserRole";
-import ManualProtocolRecommendationDialog from "@/components/ManualProtocolRecommendationDialog";
+import { RecoveryTab } from "@/components/wearables/RecoveryTab";
 import PersonalizedTrainingDashboard from "@/components/PersonalizedTrainingDashboard";
 import { StudentObservationsCard } from "@/components/StudentObservationsCard";
 import { RecordIndividualSessionDialog } from "@/components/RecordIndividualSessionDialog";
@@ -39,8 +27,6 @@ import { EditStudentDialog } from "@/components/EditStudentDialog";
 import { StudentOverviewDashboard } from "@/components/StudentOverviewDashboard";
 import { AssessmentsTab } from "@/components/assessments/AssessmentsTab";
 import { useOuraMetrics, useLatestOuraMetrics } from "@/hooks/useOuraMetrics";
-import { useWhoopMetrics } from "@/hooks/useWhoopMetrics";
-import { useWhoopConnection, useDisconnectWhoop } from "@/hooks/useWhoopConnection";
 import { useOuraConnection } from "@/hooks/useOuraConnection";
 import { useState, useMemo, useEffect } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -78,26 +64,35 @@ const VALID_STUDENT_DETAIL_TABS = new Set([
   "exercises",
   "prescriptions",
   "assessments",
-  "oura",
+  "recuperacao",
 ]);
+
+// Op 2: the separate `oura` / `whoop` tabs were merged into one device-agnostic
+// `recuperacao` tab. Legacy deep-links alias to it WITHOUT rewriting the URL
+// (preserves the read-only-URL contract; see E4.3b).
+const LEGACY_TAB_ALIAS: Record<string, string> = {
+  oura: "recuperacao",
+  whoop: "recuperacao",
+};
+
+const resolveInitialTab = (requested: string | null): string => {
+  if (!requested) return "training";
+  const aliased = LEGACY_TAB_ALIAS[requested] ?? requested;
+  return VALID_STUDENT_DETAIL_TABS.has(aliased) ? aliased : "training";
+};
 
 const StudentDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const studentId = id ?? "";
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState<string>(() => {
-    const requested = searchParams.get("tab");
-    return requested && VALID_STUDENT_DETAIL_TABS.has(requested)
-      ? requested
-      : "training";
-  });
+  const [activeTab, setActiveTab] = useState<string>(() =>
+    resolveInitialTab(searchParams.get("tab")),
+  );
   const needsSessions = activeTab === "overview" || activeTab === "sessions" || activeTab === "exercises";
   const needsAssignments = activeTab === "overview" || activeTab === "prescriptions";
-  const needsOuraHistory = activeTab === "training" || activeTab === "oura";
-  const needsWhoop = activeTab === "whoop";
-  const needsLatestOura =
-    activeTab === "training" || activeTab === "overview" || activeTab === "oura";
+  const needsOuraHistory = activeTab === "training";
+  const needsLatestOura = activeTab === "training" || activeTab === "overview";
 
   const { data: student, isLoading: loadingStudent } = useStudentById(id ?? null);
   const { data: sessions, isLoading: loadingSessions } = useSessionsWithExercises(
@@ -106,17 +101,12 @@ const StudentDetailPage = () => {
   const { data: assignments, isLoading: loadingAssignments } = useStudentPrescriptions(
     needsAssignments ? studentId : ""
   );
-  const { data: ouraMetrics, isLoading: loadingOuraMetrics } = useOuraMetrics(
+  const { data: ouraMetrics } = useOuraMetrics(
     needsOuraHistory ? studentId : "",
     30
   );
   const { data: latestOuraMetrics } = useLatestOuraMetrics(needsLatestOura ? studentId : "");
   const { data: ouraConnection } = useOuraConnection(studentId);
-  const { data: whoopMetrics } = useWhoopMetrics(needsWhoop ? studentId : "", 7);
-  const { data: whoopConnection } = useWhoopConnection(studentId);
-  const disconnectWhoop = useDisconnectWhoop();
-  const [whoopDialogOpen, setWhoopDialogOpen] = useState(false);
-  const { isAdmin } = useIsAdmin();
   const [selectedExerciseKey, setSelectedExerciseKey] = useState<string | null>(null);
   const [recordSessionOpen, setRecordSessionOpen] = useState(false);
   const [sessionToReopen, setSessionToReopen] = useState<string | null>(null);
@@ -402,11 +392,8 @@ const StudentDetailPage = () => {
           <TabsTrigger className="min-h-11 min-w-max px-4" value="assessments">
             {NAV_LABELS.tabAssessments}
           </TabsTrigger>
-          <TabsTrigger className="min-h-11 min-w-max px-4" value="oura">
-            {NAV_LABELS.tabOura}
-          </TabsTrigger>
-          <TabsTrigger className="min-h-11 min-w-max px-4" value="whoop">
-            Whoop
+          <TabsTrigger className="min-h-11 min-w-max px-4" value="recuperacao">
+            Recuperação
           </TabsTrigger>
         </TabsList>
 
@@ -427,7 +414,7 @@ const StudentDetailPage = () => {
             assignments={assignments || []}
             latestOuraMetrics={latestOuraMetrics}
             ouraConnection={ouraConnection}
-            onNavigateToOura={() => setActiveTab("oura")}
+            onNavigateToOura={() => setActiveTab("recuperacao")}
           />
         </TabsContent>
 
@@ -710,221 +697,8 @@ const StudentDetailPage = () => {
           />
         </TabsContent>
 
-        <TabsContent value="oura" className="space-y-6 animate-fade-in">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-2xl font-bold">Métricas do Oura Ring</h3>
-              <p className="text-muted-foreground">Dados completos de recuperação, atividade e sono</p>
-            </div>
-            <ManualProtocolRecommendationDialog studentId={id!} />
-          </div>
-
-          <OuraConnectionCard studentId={id!} studentName={student?.name} />
-          
-          {/* Status de conexão discreto apenas para alunos */}
-          {!isAdmin && (
-            <OuraConnectionStatus 
-              studentId={id!} 
-              hasConnection={!!ouraConnection} 
-            />
-          )}
-          
-          {/* Diagnóstico técnico apenas para admins */}
-          {isAdmin && (
-            <OuraApiDiagnosticsCard studentId={id!} />
-          )}
-
-          {loadingOuraMetrics ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {[1, 2, 3].map((i) => (
-                <Card key={i}>
-                  <CardContent className="p-6 space-y-4">
-                    <Skeleton className="h-6 w-3/4" />
-                    <Skeleton className="h-4 w-1/2" />
-                    <Skeleton className="h-20 w-full" />
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : ouraMetrics && ouraMetrics.length > 0 ? (
-            <Tabs defaultValue="overview" className="w-full">
-              <TabsList className="grid w-full grid-cols-6">
-                <TabsTrigger value="overview">Resumo Oura</TabsTrigger>
-                <TabsTrigger value="activity">Atividade</TabsTrigger>
-                <TabsTrigger value="sleep">Sono</TabsTrigger>
-                <TabsTrigger value="stress">Estresse</TabsTrigger>
-                <TabsTrigger value="workouts">Treinos</TabsTrigger>
-                <TabsTrigger value="advanced">Avançado</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="overview" className="space-y-4 mt-6 animate-fade-in">
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {ouraMetrics.slice(0, 7).map((metrics) => (
-                    <OuraMetricsCard key={metrics.id} metrics={metrics} />
-                  ))}
-                </div>
-              </TabsContent>
-
-              <TabsContent value="activity" className="space-y-4 mt-6 animate-fade-in">
-                {ouraMetrics[0] && <OuraActivityCard metrics={ouraMetrics[0]} />}
-                {ouraMetrics.length > 1 && (
-                  <div className="mt-4">
-                    <h4 className="text-lg font-semibold mb-4">Histórico de Atividade</h4>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      {ouraMetrics.slice(1, 7).map((metrics) => (
-                        <OuraActivityCard key={metrics.id} metrics={metrics} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </TabsContent>
-
-              <TabsContent value="sleep" className="space-y-4 mt-6 animate-fade-in">
-                {ouraMetrics[0] && <OuraSleepDetailCard metrics={ouraMetrics[0]} />}
-                {ouraMetrics.length > 1 && (
-                  <div className="mt-4">
-                    <h4 className="text-lg font-semibold mb-4">Histórico de Sono</h4>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      {ouraMetrics.slice(1, 7).map((metrics) => (
-                        <OuraSleepDetailCard key={metrics.id} metrics={metrics} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </TabsContent>
-
-              <TabsContent value="stress" className="space-y-4 mt-6 animate-fade-in">
-                {ouraMetrics[0] && <OuraStressCard metrics={ouraMetrics[0]} />}
-                {ouraMetrics.length > 1 && (
-                  <div className="mt-4">
-                    <h4 className="text-lg font-semibold mb-4">Histórico de Estresse</h4>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      {ouraMetrics.slice(1, 7).map((metrics) => (
-                        <OuraStressCard key={metrics.id} metrics={metrics} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </TabsContent>
-
-              <TabsContent value="workouts" className="space-y-4 mt-6 animate-fade-in">
-                <OuraWorkoutsCard studentId={id!} limit={20} />
-              </TabsContent>
-
-              <TabsContent value="advanced" className="space-y-4 mt-6 animate-fade-in">
-                {ouraMetrics[0] && <OuraAdvancedMetricsCard metrics={ouraMetrics[0]} />}
-                {ouraMetrics.length > 1 && (
-                  <div className="mt-4">
-                    <h4 className="text-lg font-semibold mb-4">Histórico de Métricas Avançadas</h4>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      {ouraMetrics.slice(1, 7).map((metrics) => (
-                        <OuraAdvancedMetricsCard key={metrics.id} metrics={metrics} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
-          ) : (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Activity className="h-12 w-12 text-muted-foreground mb-4" />
-                {ouraConnection ? (
-                  <>
-                    <Alert className="mb-4">
-                      <Info className="h-4 w-4" />
-                      <AlertDescription>
-                        Oura Ring conectado, mas ainda não há dados disponíveis.
-                        Os dados são processados pelo Oura após você acordar e sincronizar seu anel.
-                        Use o botão "Sincronizar" acima para buscar novos dados.
-                      </AlertDescription>
-                    </Alert>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-muted-foreground">Nenhuma métrica do Oura Ring disponível</p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Conecte o Oura Ring do aluno para visualizar dados de recuperação
-                    </p>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-        <TabsContent value="whoop" className="space-y-6 animate-fade-in">
-          <div>
-            <h3 className="text-2xl font-bold">Whoop</h3>
-            <p className="text-muted-foreground">Recuperação, esforço (strain) e sono</p>
-          </div>
-
-          {whoopConnection ? (
-            <>
-              <Card>
-                <CardContent className="flex items-center justify-between py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Activity className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-medium">Whoop conectado</p>
-                      <p className="text-sm text-muted-foreground">
-                        {whoopConnection.last_sync_at
-                          ? `Última sincronização: ${new Date(whoopConnection.last_sync_at).toLocaleDateString("pt-BR")}`
-                          : "Aguardando primeira sincronização"}
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => disconnectWhoop.mutate(studentId)}
-                    disabled={disconnectWhoop.isPending}
-                  >
-                    Desconectar
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {whoopMetrics && whoopMetrics.length > 0 ? (
-                <div className="grid gap-4 md:grid-cols-2">
-                  {whoopMetrics.map((m) => (
-                    <WhoopActivityCard key={m.id} metrics={m} />
-                  ))}
-                </div>
-              ) : (
-                <Card>
-                  <CardContent className="flex flex-col items-center justify-center py-12">
-                    <Activity className="h-12 w-12 text-muted-foreground mb-4" />
-                    <p className="text-muted-foreground">Ainda não há dados do Whoop disponíveis</p>
-                    <p className="text-sm text-muted-foreground mt-2">Os dados aparecem após a primeira sincronização.</p>
-                  </CardContent>
-                </Card>
-              )}
-            </>
-          ) : (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                <Activity className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="font-medium">Whoop não conectado</p>
-                <p className="text-sm text-muted-foreground mt-2 mb-4">
-                  Gere um link para o aluno autorizar o compartilhamento dos dados do Whoop.
-                </p>
-                <Button onClick={() => setWhoopDialogOpen(true)}>
-                  <Activity className="h-4 w-4 mr-2" />
-                  Conectar Whoop
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-
-          <SendWhoopConnectDialog
-            open={whoopDialogOpen}
-            onOpenChange={setWhoopDialogOpen}
-            studentId={id!}
-            studentName={student?.name ?? "Aluno"}
-          />
+        <TabsContent value="recuperacao" className="space-y-6 animate-fade-in">
+          <RecoveryTab studentId={id!} studentName={student?.name} />
         </TabsContent>
       </Tabs>
 
