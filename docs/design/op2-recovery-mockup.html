@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fabrik · Recuperação (mockup Op 2)</title>
+<style>
+  :root{
+    --bg:30 22% 97%; --surface:0 0% 100%; --surface-2:28 16% 95%;
+    --ink:20 12% 14%; --muted:22 7% 42%; --border:25 12% 88%;
+    --brand:7 44% 45%; --brand-ink:7 46% 38%;
+    --good:146 55% 29%; --good-bg:146 42% 93%;
+    --warn:30 82% 32%; --warn-bg:41 90% 90%;
+    --bad:2 66% 43%;  --bad-bg:5 78% 95%;
+    --shadow:20 30% 30%;
+    --r-sm:6px; --r-md:10px; --r-lg:14px;
+    --maxw:1060px;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:20 9% 8%; --surface:20 8% 12%; --surface-2:20 7% 16%;
+      --ink:30 12% 93%; --muted:26 8% 62%; --border:20 9% 22%;
+      --brand:8 58% 60%; --brand-ink:8 62% 70%;
+      --good:146 48% 60%; --good-bg:146 30% 15%;
+      --warn:40 82% 62%; --warn-bg:36 42% 16%;
+      --bad:5 74% 66%;  --bad-bg:5 46% 18%;
+      --shadow:0 0% 0%;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:20 9% 8%; --surface:20 8% 12%; --surface-2:20 7% 16%;
+    --ink:30 12% 93%; --muted:26 8% 62%; --border:20 9% 22%;
+    --brand:8 58% 60%; --brand-ink:8 62% 70%;
+    --good:146 48% 60%; --good-bg:146 30% 15%;
+    --warn:40 82% 62%; --warn-bg:36 42% 16%;
+    --bad:5 74% 66%; --bad-bg:5 46% 18%; --shadow:0 0% 0%;
+  }
+  :root[data-theme="light"]{
+    --bg:30 22% 97%; --surface:0 0% 100%; --surface-2:28 16% 95%;
+    --ink:20 12% 14%; --muted:22 7% 42%; --border:25 12% 88%;
+    --brand:7 44% 45%; --brand-ink:7 46% 38%;
+    --good:146 55% 29%; --good-bg:146 42% 93%;
+    --warn:30 82% 32%; --warn-bg:41 90% 90%;
+    --bad:2 66% 43%; --bad-bg:5 78% 95%; --shadow:20 30% 30%;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:hsl(var(--bg));color:hsl(var(--ink));
+    font-family:var(--font);line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    font-variant-numeric:tabular-nums;
+  }
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:clamp(16px,4vw,40px) clamp(14px,4vw,32px) 64px}
+  .num{font-variant-numeric:tabular-nums}
+  h1,h2,h3{margin:0;text-wrap:balance;letter-spacing:-0.02em;font-weight:650}
+
+  /* ---- top chrome ---- */
+  .topbar{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+  .mark{display:flex;align-items:center;gap:9px;font-weight:750;letter-spacing:-0.03em;font-size:17px}
+  .mark .dot{width:12px;height:12px;border-radius:3px;background:hsl(var(--brand));display:inline-block;transform:rotate(45deg)}
+  .crumb{color:hsl(var(--muted));font-size:13px}
+  .spacer{flex:1}
+  .themebtn{border:1px solid hsl(var(--border));background:hsl(var(--surface));color:hsl(var(--ink));
+    border-radius:var(--r-sm);padding:6px 11px;font:inherit;font-size:13px;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+  .themebtn:hover{background:hsl(var(--surface-2))}
+  .themebtn:focus-visible{outline:2px solid hsl(var(--brand));outline-offset:2px}
+
+  .student{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+  .avatar{width:46px;height:46px;border-radius:50%;flex:none;
+    background:hsl(var(--brand)/.14);color:hsl(var(--brand-ink));
+    display:grid;place-items:center;font-weight:700;font-size:17px}
+  .student h1{font-size:clamp(21px,3.4vw,27px)}
+  .student .sub{color:hsl(var(--muted));font-size:13px;margin-top:2px}
+
+  /* ---- tab bar ---- */
+  .tabs{display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid hsl(var(--border));
+    margin:18px 0 26px;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{white-space:nowrap;padding:10px 14px;font-size:14px;color:hsl(var(--muted));
+    border-bottom:2px solid transparent;margin-bottom:-1px;cursor:default}
+  .tab.active{color:hsl(var(--ink));border-bottom-color:hsl(var(--brand));font-weight:600}
+
+  /* ---- source / connection bar ---- */
+  .srcbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-bottom:20px}
+  .chip{display:inline-flex;align-items:center;gap:7px;font-size:13px;padding:5px 11px;border-radius:999px;
+    border:1px solid hsl(var(--border));background:hsl(var(--surface));color:hsl(var(--muted))}
+  .chip .led{width:7px;height:7px;border-radius:50%}
+  .chip.on{color:hsl(var(--ink))}
+  .chip.on .led{background:hsl(var(--good))}
+  .chip.off .led{background:hsl(var(--muted)/.5)}
+  .seg{display:inline-flex;border:1px solid hsl(var(--border));border-radius:var(--r-sm);overflow:hidden;background:hsl(var(--surface))}
+  .seg button{border:0;background:transparent;color:hsl(var(--muted));font:inherit;font-size:13px;
+    padding:6px 13px;cursor:pointer}
+  .seg button[aria-pressed="true"]{background:hsl(var(--brand));color:#fff;font-weight:600}
+  .seg button:focus-visible{outline:2px solid hsl(var(--brand));outline-offset:-2px}
+  .synced{font-size:12.5px;color:hsl(var(--muted));margin-left:auto}
+
+  .card{background:hsl(var(--surface));border:1px solid hsl(var(--border));border-radius:var(--r-lg);
+    box-shadow:0 1px 2px hsl(var(--shadow)/.05)}
+
+  /* ---- recovery headline ---- */
+  .headline{display:grid;grid-template-columns:auto 1fr;gap:clamp(18px,4vw,34px);
+    align-items:center;padding:clamp(20px,3.6vw,30px)}
+  .gauge{position:relative;width:132px;height:132px;flex:none}
+  .gauge svg{transform:rotate(-90deg)}
+  .gauge .val{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
+  .gauge .val b{font-size:34px;font-weight:700;letter-spacing:-0.03em;line-height:1}
+  .gauge .val span{font-size:12px;color:hsl(var(--muted));display:block;margin-top:3px}
+  .hl-main .status{display:inline-flex;align-items:center;gap:8px;font-size:15px;font-weight:650;
+    padding:6px 13px;border-radius:999px;margin-bottom:10px}
+  .hl-main h2{font-size:clamp(20px,3vw,25px);margin-bottom:8px}
+  .hl-main p{margin:0;color:hsl(var(--muted));font-size:14.5px;max-width:56ch}
+  .trend{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:600;margin-top:12px;
+    padding:4px 10px;border-radius:var(--r-sm);background:hsl(var(--surface-2))}
+
+  /* status utility (color + icon + label, never color alone) */
+  .s-good{background:hsl(var(--good-bg));color:hsl(var(--good))}
+  .s-warn{background:hsl(var(--warn-bg));color:hsl(var(--warn))}
+  .s-bad{background:hsl(var(--bad-bg));color:hsl(var(--bad))}
+  .ic{width:16px;height:16px;flex:none}
+
+  /* ---- attention flags ---- */
+  .flags{display:flex;flex-direction:column;gap:9px;margin:16px 0}
+  .flag{display:flex;align-items:center;gap:11px;padding:12px 15px;border-radius:var(--r-md);font-size:14px;
+    border:1px solid transparent}
+  .flag.s-warn{border-color:hsl(var(--warn)/.28)}
+  .flag.s-bad{border-color:hsl(var(--bad)/.28)}
+  .flag b{font-weight:650}
+  .flag .why{color:inherit;opacity:.82;font-weight:400}
+
+  /* ---- metric tiles ---- */
+  .grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:6px}
+  .tile{padding:16px 17px 14px;display:flex;flex-direction:column;gap:9px}
+  .tile .top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+  .tile .label{font-size:13px;color:hsl(var(--muted));font-weight:600}
+  .tile .pill{font-size:11.5px;font-weight:650;padding:3px 9px;border-radius:999px;display:inline-flex;gap:5px;align-items:center}
+  .tile .figure{display:flex;align-items:baseline;gap:6px}
+  .tile .figure b{font-size:29px;font-weight:700;letter-spacing:-0.03em}
+  .tile .figure .u{font-size:13px;color:hsl(var(--muted))}
+  .tile .base{font-size:12.5px;color:hsl(var(--muted))}
+  .tile .base .d{font-weight:650}
+  .d.up{color:hsl(var(--good))}.d.down{color:hsl(var(--bad))}.d.flat{color:hsl(var(--muted))}
+  .spark{width:100%;height:38px;display:block;margin-top:2px}
+
+  /* ---- details ---- */
+  details.more{margin-top:16px;border:1px solid hsl(var(--border));border-radius:var(--r-md);background:hsl(var(--surface))}
+  details.more>summary{list-style:none;cursor:pointer;padding:13px 16px;font-size:14px;font-weight:600;
+    display:flex;align-items:center;gap:9px;color:hsl(var(--ink))}
+  details.more>summary::-webkit-details-marker{display:none}
+  details.more>summary:focus-visible{outline:2px solid hsl(var(--brand));outline-offset:-2px;border-radius:var(--r-md)}
+  .chev{transition:transform .18s ease;color:hsl(var(--muted))}
+  details.more[open] .chev{transform:rotate(90deg)}
+  .more-body{padding:2px 16px 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+  .sec{padding:12px 14px;background:hsl(var(--surface-2));border-radius:var(--r-md)}
+  .sec .k{font-size:12.5px;color:hsl(var(--muted));display:flex;gap:6px;align-items:center;margin-bottom:5px}
+  .sec .v{font-size:19px;font-weight:650}
+  .sec .v small{font-size:12px;color:hsl(var(--muted));font-weight:400}
+
+  /* ---- section label ---- */
+  .seclabel{font-size:12.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+    color:hsl(var(--muted));margin:40px 0 14px}
+
+  /* ---- states gallery ---- */
+  .states{display:grid;grid-template-columns:repeat(auto-fit,minmax(232px,1fr));gap:14px}
+  .state{padding:15px 16px;min-height:132px;display:flex;flex-direction:column;gap:9px}
+  .state h4{margin:0;font-size:14px;font-weight:650;display:flex;align-items:center;gap:8px}
+  .state p{margin:0;font-size:12.8px;color:hsl(var(--muted));line-height:1.45}
+  .mini{margin-top:auto;display:flex;align-items:center;gap:9px;padding-top:8px;border-top:1px dashed hsl(var(--border))}
+  .mini .badge{font-size:11px;font-weight:650;padding:3px 8px;border-radius:999px;display:inline-flex;gap:5px;align-items:center}
+  .mini .metaflag{font-size:11.5px;color:hsl(var(--muted))}
+  .cta{font-size:12.5px;color:hsl(var(--brand-ink));font-weight:600}
+
+  footer{margin-top:44px;padding-top:18px;border-top:1px solid hsl(var(--border));
+    font-size:12.5px;color:hsl(var(--muted));display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
+  .tag{padding:3px 9px;border-radius:999px;background:hsl(var(--surface-2));border:1px solid hsl(var(--border))}
+
+  .fade{opacity:0;transform:translateY(8px);animation:rise .5s cubic-bezier(.2,.7,.2,1) forwards}
+  @keyframes rise{to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){.fade{animation:none;opacity:1;transform:none}.chev{transition:none}}
+</style>
+
+<div class="wrap">
+  <div class="topbar fade">
+    <span class="mark"><span class="dot"></span>Fabrik</span>
+    <span class="crumb">Wellness Hub · Perfil do aluno</span>
+    <span class="spacer"></span>
+    <button class="themebtn" id="theme" aria-label="Alternar tema">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      Tema
+    </button>
+  </div>
+
+  <div class="student fade">
+    <div class="avatar">MS</div>
+    <div>
+      <h1>Mariana Souza</h1>
+      <div class="sub">Plano Back to Basics · 3× / semana · treinadora: Alex</div>
+    </div>
+  </div>
+
+  <nav class="tabs fade" aria-label="Seções do perfil">
+    <span class="tab">Treino</span>
+    <span class="tab">Visão geral</span>
+    <span class="tab">Sessões</span>
+    <span class="tab">Exercícios</span>
+    <span class="tab">Prescrições</span>
+    <span class="tab">Avaliações</span>
+    <span class="tab active" aria-current="page">Recuperação</span>
+  </nav>
+
+  <!-- SOURCE / CONNECTION BAR -->
+  <div class="srcbar fade">
+    <span class="chip on"><span class="led"></span>Oura conectado</span>
+    <span class="chip on"><span class="led"></span>Whoop conectado</span>
+    <div class="seg" role="group" aria-label="Fonte de recuperação">
+      <button aria-pressed="true">Whoop</button>
+      <button aria-pressed="false">Oura</button>
+    </div>
+    <span class="synced">Fonte: Whoop (mais recente) · sincronizado há 2 h</span>
+  </div>
+
+  <!-- RECOVERY HEADLINE -->
+  <section class="card headline fade" aria-label="Recuperação de hoje">
+    <div class="gauge" role="img" aria-label="Recuperação 58 por cento">
+      <svg width="132" height="132" viewBox="0 0 132 132">
+        <circle cx="66" cy="66" r="56" fill="none" stroke="hsl(var(--surface-2))" stroke-width="13"/>
+        <circle cx="66" cy="66" r="56" fill="none" stroke="hsl(var(--warn))" stroke-width="13"
+          stroke-linecap="round" stroke-dasharray="351.9" stroke-dashoffset="147.8"/>
+      </svg>
+      <div class="val"><b class="num">58<span style="font-size:16px">%</span></b><span>recuperação</span></div>
+    </div>
+    <div class="hl-main">
+      <span class="status s-warn">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 2 18a2 2 0 0 0 1.7 3h16.6A2 2 0 0 0 22 18L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+        Atenção
+      </span>
+      <h2>Recuperação abaixo do normal dela</h2>
+      <p>Recuperação e VFC estão abaixo da linha de base de Mariana e caíram nos últimos dias. Bom dia para reduzir a carga — priorize técnica e mobilidade em vez de intensidade.</p>
+      <span class="trend"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="hsl(var(--bad))" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7 17 17M17 17v-7M17 17h-7"/></svg>−14% vs. média de 14 dias (68%)</span>
+    </div>
+  </section>
+
+  <!-- ATTENTION FLAGS -->
+  <div class="flags fade">
+    <div class="flag s-bad">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v5M12 16h.01"/><circle cx="12" cy="12" r="9"/></svg>
+      <span><b>Recuperação baixa há 3 dias seguidos.</b> <span class="why">Padrão de fadiga acumulada — considere um dia leve ou de descanso.</span></span>
+    </div>
+  </div>
+
+  <!-- PRIMARY METRIC TILES -->
+  <div class="grid3 fade">
+    <article class="card tile">
+      <div class="top">
+        <span class="label">VFC (HRV)</span>
+        <span class="pill s-bad"><span class="ic" style="width:8px;height:8px;border-radius:50%;background:currentColor"></span>Baixa</span>
+      </div>
+      <div class="figure"><b class="num">42</b><span class="u">ms</span></div>
+      <div class="base">Linha de base <b class="num">48 ms</b> · <span class="d down num">−6 ms</span></div>
+      <svg class="spark" data-spark="52,50,49,51,47,49,46,44,47,43,45,42,41,42" data-tone="bad" preserveAspectRatio="none"></svg>
+    </article>
+
+    <article class="card tile">
+      <div class="top">
+        <span class="label">FC de repouso</span>
+        <span class="pill s-warn"><span class="ic" style="width:8px;height:8px;border-radius:50%;background:currentColor"></span>Elevada</span>
+      </div>
+      <div class="figure"><b class="num">61</b><span class="u">bpm</span></div>
+      <div class="base">Linha de base <b class="num">57 bpm</b> · <span class="d down num">+4 bpm</span></div>
+      <svg class="spark" data-spark="56,57,56,58,57,59,58,60,59,60,61,60,62,61" data-tone="warn" preserveAspectRatio="none"></svg>
+    </article>
+
+    <article class="card tile">
+      <div class="top">
+        <span class="label">Sono</span>
+        <span class="pill s-good"><span class="ic" style="width:8px;height:8px;border-radius:50%;background:currentColor"></span>Bom</span>
+      </div>
+      <div class="figure"><b class="num">82</b><span class="u">/100 · 7 h 20</span></div>
+      <div class="base">Linha de base <b class="num">79</b> · <span class="d up num">+3</span></div>
+      <svg class="spark" data-spark="74,80,77,82,76,84,79,81,83,78,85,80,84,82" data-tone="good" preserveAspectRatio="none"></svg>
+    </article>
+  </div>
+
+  <!-- PROGRESSIVE DISCLOSURE -->
+  <details class="more fade">
+    <summary>
+      <svg class="ic chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+      Detalhes e histórico
+    </summary>
+    <div class="more-body">
+      <div class="sec"><div class="k">Freq. respiratória</div><div class="v num">15,2 <small>rpm</small></div></div>
+      <div class="sec"><div class="k">Temp. da pele</div><div class="v num">+0,3 <small>°C vs. base</small></div></div>
+      <div class="sec"><div class="k">Strain do dia</div><div class="v num">12,4</div></div>
+      <div class="sec"><div class="k">Eficiência do sono</div><div class="v num">88<small>%</small></div></div>
+    </div>
+  </details>
+
+  <!-- STATES GALLERY -->
+  <div class="seclabel">Estados da aba — como ela responde aos dados</div>
+  <div class="states fade">
+    <article class="card state">
+      <h4><span class="dot" style="width:8px;height:8px;border-radius:2px;background:hsl(var(--good));transform:rotate(45deg)"></span>Ambos os dispositivos</h4>
+      <p>Seletor de fonte visível. Padrão = fonte final mais recente e não desatualizada. Nunca combina os dois algoritmos.</p>
+      <div class="mini"><span class="badge s-warn">Whoop · 58%</span><span class="metaflag">Oura 63% (secundário)</span></div>
+    </article>
+
+    <article class="card state">
+      <h4><span style="width:8px;height:8px;border-radius:50%;background:hsl(var(--good));display:inline-block"></span>Só Oura</h4>
+      <p>Sem seletor. Prontidão do Oura como manchete, com VFC · FC repouso · Sono.</p>
+      <div class="mini"><span class="badge s-good">Oura · 81%</span><span class="metaflag">Recuperado</span></div>
+    </article>
+
+    <article class="card state">
+      <h4><span style="width:8px;height:8px;border-radius:50%;background:hsl(var(--good));display:inline-block"></span>Só Whoop</h4>
+      <p>Recuperação do Whoop como manchete. Mesmo layout, rótulos por dispositivo.</p>
+      <div class="mini"><span class="badge s-good">Whoop · 74%</span><span class="metaflag">Pronta</span></div>
+    </article>
+
+    <article class="card state">
+      <h4><svg class="ic" style="color:hsl(var(--muted))" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4.9 4.9 19 19M9 9a4 4 0 0 1 6 3M12 4a8 8 0 0 1 6.9 4"/></svg>Sem dispositivo</h4>
+      <p>Estado vazio com convite: enviar link de conexão Oura ou Whoop ao aluno.</p>
+      <div class="mini"><span class="cta">＋ Conectar dispositivo</span></div>
+    </article>
+
+    <article class="card state">
+      <h4><svg class="ic" style="color:hsl(var(--muted))" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 9h8M8 13h5"/></svg>Conectado, sem dados</h4>
+      <p>Dispositivo conectado mas sem histórico suficiente. Tiles mostram “baseline em construção”, sem status falso.</p>
+      <div class="mini"><span class="badge" style="background:hsl(var(--surface-2));color:hsl(var(--muted))">— aguardando dados</span></div>
+    </article>
+
+    <article class="card state">
+      <h4><svg class="ic" style="color:hsl(var(--warn))" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Desatualizado</h4>
+      <p>Duas regras distintas: “não sincroniza” (conexão) vs. “sem dados recentes” (última medição). Dados exibidos com aviso de idade.</p>
+      <div class="mini"><span class="badge s-warn">Sem sincronizar há 2 dias</span></div>
+    </article>
+  </div>
+
+  <footer>
+    <span class="tag">Mockup · dados fictícios</span>
+    <span>Op 2 · nova aba <b>Recuperação</b> (agnóstica de dispositivo) — para aprovação de direção.</span>
+    <span class="spacer"></span>
+    <span>Fabrik Wellness Hub</span>
+  </footer>
+</div>
+
+<script>
+  // theme toggle — stamps data-theme, overriding the media query in both directions
+  (function(){
+    var btn=document.getElementById('theme');
+    btn.addEventListener('click',function(){
+      var cur=document.documentElement.getAttribute('data-theme');
+      var dark=cur? cur==='dark' : matchMedia('(prefers-color-scheme:dark)').matches;
+      document.documentElement.setAttribute('data-theme', dark?'light':'dark');
+    });
+  })();
+
+  // sparklines: build from data-spark="v,v,..." — area fill + line + emphasized endpoint
+  (function(){
+    var tone={good:'var(--good)',warn:'var(--warn)',bad:'var(--bad)'};
+    document.querySelectorAll('svg.spark').forEach(function(svg){
+      var data=svg.getAttribute('data-spark').split(',').map(Number);
+      var col='hsl('+(tone[svg.getAttribute('data-tone')]||'var(--brand)')+')';
+      var W=100,H=38,pad=3;
+      var min=Math.min.apply(null,data),max=Math.max.apply(null,data),rng=(max-min)||1;
+      var pts=data.map(function(v,i){
+        var x=pad+(W-2*pad)*i/(data.length-1);
+        var y=pad+(H-2*pad)*(1-(v-min)/rng);
+        return [x,y];
+      });
+      var line=pts.map(function(p){return p[0].toFixed(1)+','+p[1].toFixed(1)}).join(' ');
+      var area=pad+','+(H-pad)+' '+line+' '+(W-pad)+','+(H-pad);
+      var last=pts[pts.length-1];
+      svg.setAttribute('viewBox','0 0 '+W+' '+H);
+      svg.innerHTML=
+        '<polygon points="'+area+'" fill="'+col+'" opacity="0.10"/>'+
+        '<polyline points="'+line+'" fill="none" stroke="'+col+'" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>'+
+        '<circle cx="'+last[0].toFixed(1)+'" cy="'+last[1].toFixed(1)+'" r="2.4" fill="'+col+'"/>';
+    });
+  })();
+</script>
+
+</html>
